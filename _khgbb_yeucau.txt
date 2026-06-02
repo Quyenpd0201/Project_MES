@@ -1,0 +1,94 @@
+Biên bản Cuộc họp & Ghi nhận Yêu cầu: Hệ thống Quản lý Sản xuất Nhà máy Bao bì
+1. Thông tin chung (General Information)
+Tên dự án 	Hệ thống Quản lý Sản
+xuất Đơn giản
+Ngày họp 	[Nhập ngày]
+Địa điểm họp 	Nhà máy Bao bì 	Thời gian 	[Bắt đầu] - [Kết thúc]
+Người lập biên bản 	[Tên của bạn -
+Solution Consultant /
+PM]
+Người chủ trì 	[Tên người chủ trì]
+2. Khảo sát Hiện trạng & Mô hình Sản xuất (As-Is)
+2.1. Cấu trúc Nhà máy & Máy móc
+● Nhà máy 1 (Nhà máy thổi): Gồm 2 máy thổi lớn, 2 máy thổi nhỏ và 1 máy HD.
+● Nhà máy 2 (Nhà máy cắt): Gồm 7 máy cắt.
+2.2. Nguồn lực (Nguyên vật liệu & Nhân sự)
+● Nguyên vật liệu (NVL): Hạt nhựa, Chất phụ gia.
+● Nhân sự: 1 Quản lý công nghệ, 3 nhân sự bộ phận thổi, 6 công nhân bộ phận cắt máy.
+2.3. Cấu trúc Sản phẩm
+● Bán thành phẩm (BTP): Cuộn ni lông (quản lý theo kích thước và màu).
+● Thành phẩm (TP): Túi ni lông công nghiệp, Túi PE, Bao lồng túi HDPE, Màng trùng
+pallet.
+● Đặc thù sản phẩm: Bắt buộc theo dõi theo 3 thuộc tính cốt lõi: Kích thước, Độ dày, Màu
+sắc.
+3. Các Vấn đề Tồn đọng (Pain Points)
+Chi tiết các điểm nghẽn trong vận hành hiện tại cần hệ thống phần mềm giải quyết:
+
+-- 1 of 3 --
+
+1. Quản lý Định mức (BOM) & Mua sắm: Khó xác định công thức pha màu chính xác, dẫn
+đến không thể tính toán và lên kế hoạch số lượng NVL cần mua sắm.
+2. Kiểm soát Tồn kho: Không nắm bắt được số lượng tồn kho thực tế và vị trí lưu trữ của
+NVL, BTP, và TP.
+3. Quản lý Đơn hàng: Không theo dõi sát đơn hàng của khách hàng cũ và khách lẻ. Việc
+đưa ra lệnh sản xuất đang mang tính tự phát, thiếu kế hoạch.
+4. Tối ưu hóa Sản xuất (Phế phẩm): Do sản phẩm đa dạng về kích thước, màu sắc và độ
+dày, việc thay đổi (changeover) sản phẩm liên tục trên máy móc gây ra tỷ lệ phế phẩm
+thổi nhựa rất cao.
+4. Yêu cầu Hệ thống Phần mềm (To-Be Requirements)
+Định hướng thiết kế hệ thống phần mềm tinh gọn, tập trung vào 3 phân hệ cốt lõi để giải quyết
+triệt để các vấn đề trên:
+4.1. Phân hệ Quản lý Kế hoạch (Planning)
+● Kế hoạch theo sản phẩm: Thuật toán gom nhóm các lệnh sản xuất có cùng thuộc tính
+(cùng màu, cùng kích thước) để chạy hàng loạt, giảm thiểu tối đa phế phẩm do quá trình
+súc rửa, chuyển đổi máy.
+● Kế hoạch theo Đơn hàng: Lên lịch sản xuất dựa trên Đơn đặt hàng của khách hàng.
+● Kế hoạch theo Ngày giao: Ưu tiên tiến độ dựa trên Deadline giao hàng.
+● Phân bổ Nguồn lực: Sắp xếp và giao việc chi tiết xuống từng đội, ca làm việc và nhân
+công cụ thể.
+4.2. Phân hệ Quản lý Kho (Inventory)
+● Quản lý chính xác số lượng tồn kho hiện thời của Nguyên vật liệu.
+● Quản lý số lượng tồn kho của Thành phẩm và Bán thành phẩm theo đa thuộc tính.
+● Thiết lập theo dõi Vị trí lưu trữ trong xưởng/kho.
+4.3. Phân hệ Quản lý Sản xuất (Production Execution)
+Hạng mục 	Chi tiết Yêu cầu
+Thông tin Sản xuất Cơ
+bản
+Ghi nhận các Công việc sản xuất (Routing/Tasks), thông tin
+Khách hàng, Mã sản phẩm, Khối lượng cần sản xuất.
+Thông số Đặc thù 	Hệ thống cho phép khai báo và kế thừa các thông số: Kích
+
+-- 2 of 3 --
+
+Hạng mục 	Chi tiết Yêu cầu
+(Attributes) 	thước, Màu sắc, Độ dày xuyên suốt từ lúc tạo mã đến khi ra
+thành phẩm.
+Yêu cầu Gia công Khác Tích hợp trường thông tin/checklist cho các yêu cầu gia công
+hoàn thiện (ví dụ: Cần đục lỗ, Xí đáy,...).
+5. Kế hoạch Hành động & Thống nhất (Next Steps &
+Sign-off)
+STT 	Hành động (Action Item) 	Người phụ trách
+(PIC)
+Thời hạn
+(Deadline)
+Trạng thái
+1 	Cung cấp danh sách công thức pha
+màu sơ bộ và sơ đồ Layout kho hiện
+tại
+Đại diện Nhà
+máy
+[Ngày] 	Đang chờ
+2 	Hoàn thiện thiết kế giải pháp
+(Solution Design) cho 3 phân hệ
+chính
+Đội ngũ Tư vấn [Ngày] 	Chưa bắt
+đầu
+Đại diện Đội ngũ Dự án
+___________________________
+Họ và Tên:
+Đại diện Nhà máy / Khách hàng
+___________________________
+Họ và Tên:
+
+-- 3 of 3 --
+

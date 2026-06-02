@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bao Bì Ngọc An Thư · Hệ thống MES</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <!-- Tailwind via Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      // Phối màu theo thương hiệu Bao Bì Ngọc An Thư (xanh #0055b3)
+      tailwind.config = {
+        theme: { extend: { colors: {
+          blue: {
+            50: "#e7f0fa", 100: "#c4dcf2", 200: "#8fbbe6", 300: "#5a99d9",
+            400: "#2e7ccb", 500: "#0a63b8", 600: "#0055b3", 700: "#00428c",
+            800: "#003066", 900: "#001f42",
+          },
+        } } },
+      };
+    </script>
+    <style>
+      body { margin: 0; background: #f1f5f9; font-family: ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+
+      /* Thanh cuộn mảnh, mờ — ẩn lúc thường, hiện nhẹ khi rê chuột (sidebar + vùng nội dung) */
+      .nav-scroll { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+      .nav-scroll:hover { scrollbar-color: rgba(148,163,184,.45) transparent; }
+      .nav-scroll::-webkit-scrollbar { width: 6px; }
+      .nav-scroll::-webkit-scrollbar-track { background: transparent; }
+      .nav-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; transition: background .2s; }
+      .nav-scroll:hover::-webkit-scrollbar-thumb { background: rgba(148,163,184,.35); }
+      .nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.6); }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
