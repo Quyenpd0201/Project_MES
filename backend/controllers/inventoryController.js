@@ -166,12 +166,16 @@ exports.transactions = async (req, res) => {
 };
 
 // POST /api/inventory/adjust — nhập/xuất/điều chỉnh, upsert tồn + ghi giao dịch
+const VALID_TRX_TYPES = ['Nhập', 'Xuất', 'Điều chỉnh'];
 exports.adjust = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const b = req.body;
     if (!b.product_id || b.quantity === undefined || !b.trx_type)
       return res.status(400).json({ message: 'Thiếu Sản phẩm / Số lượng / Loại giao dịch' });
+    if (!VALID_TRX_TYPES.includes(b.trx_type))
+      return res.status(400).json({ message: `Loại giao dịch không hợp lệ. Chỉ chấp nhận: ${VALID_TRX_TYPES.join(', ')}` });
+
     const delta = b.trx_type === 'Xuất' ? -Math.abs(Number(b.quantity)) : Number(b.quantity);
     const specs = specsFromBody(b);
     const a = legacyAttrs(specs);

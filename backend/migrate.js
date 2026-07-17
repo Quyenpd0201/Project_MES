@@ -16,7 +16,13 @@ async function main() {
   // Nạp tuần tự mọi file schema*.sql (schema.sql trước, rồi schema_v2.sql, ...)
   const files = fs.readdirSync(__dirname)
     .filter(f => /^schema.*\.sql$/i.test(f))
-    .sort();
+    .sort((a, b) => {
+      if (a === 'schema.sql') return -1;
+      if (b === 'schema.sql') return 1;
+      const numA = parseInt((a.match(/\d+/) || [0])[0]);
+      const numB = parseInt((b.match(/\d+/) || [0])[0]);
+      return numA - numB;
+    });
   try {
     for (const f of files) {
       const sql = fs.readFileSync(path.join(__dirname, f), 'utf8');

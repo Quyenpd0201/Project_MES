@@ -29,5 +29,5 @@ END $$;
 
 -- Ràng buộc duy nhất mới: 1 dòng tồn = (sản phẩm, vị trí, nhóm thông số, lô)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_stock_spec_lot
-  ON inventory_stock (product_id, location_id, spec_key, lot_code) NULLS NOT DISTINCT;
+  ON inventory_stock (product_id, location_id, spec_key, lot_code);
 CREATE INDEX IF NOT EXISTS idx_stock_speckey ON inventory_stock (product_id, spec_key);

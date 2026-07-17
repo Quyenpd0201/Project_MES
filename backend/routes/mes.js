@@ -15,6 +15,17 @@ const auth = require('../controllers/authController');
 const user = require('../controllers/userController');
 const lookups = require('../controllers/lookupController');
 const deliveries = require('../controllers/deliveryController');
+const requireAuth = require('../middleware/requireAuth');
+
+// ---- Đăng nhập (public — không cần token) ----
+router.post('/auth/login', auth.login);
+router.get('/auth/me', auth.me);
+router.post('/auth/logout', auth.logout);
+
+// ========================================================
+// Toàn bộ route bên dưới yêu cầu xác thực hợp lệ
+// ========================================================
+router.use(requireAuth);
 
 // Helper gắn 5 route CRUD chuẩn
 function mountCrud(path, crud) {
@@ -25,6 +36,8 @@ function mountCrud(path, crud) {
   router.put(`${path}/:id`, crud.update);
   router.delete(`${path}/:id`, crud.remove);
 }
+
+
 
 // ---- Master data ----
 mountCrud('/customers', makeCrud({
@@ -87,15 +100,13 @@ mountCrud('/roles', makeCrud({
 }));
 router.put('/roles/:id/permissions', role.savePermissions);
 
-// ---- Đăng nhập / Tài khoản ----
-router.post('/auth/login', auth.login);
-router.get('/auth/me', auth.me);
-router.post('/auth/logout', auth.logout);
+// ---- Tài khoản người dùng ----
 router.get('/users', user.list);
 router.post('/users', user.create);
 router.get('/users/:id', user.getById);
 router.put('/users/:id', user.update);
 router.delete('/users/:id', user.remove);
+
 
 // ---- Lịch làm việc ----
 router.get('/work-schedules', workSchedule.list);
