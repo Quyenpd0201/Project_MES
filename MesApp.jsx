@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Routes, Route, useNavigate, Navigate, useLocation, NavLink, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
-  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers,
+  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
@@ -112,34 +113,36 @@ const inputCls =
   "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition";
 
 /* ============================== SIDEBAR ============================== */
-function Sidebar({ active, onNav, user, onLogout }) {
+
+function Sidebar({ user, onLogout, collapsed, onToggle }) {
+  const location = useLocation();
   const allItems = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { key: "products", label: "Sản phẩm", icon: Package },
-    { key: "bom", label: "Định mức (BOM)", icon: FlaskConical },
-    { key: "process", label: "Quy trình CN", icon: GitBranch },
-    { key: "orders", label: "Đơn hàng", icon: ShoppingCart },
-    { key: "deliveries", label: "Phiếu giao hàng", icon: FileText },
-    { key: "planning", label: "Kế hoạch", icon: ClipboardList },
-    { key: "production", label: "Sản xuất", icon: Factory },
-    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "planning" },
-    { key: "execution", label: "Thực thi SX", icon: Hammer },
-    { key: "qrlabels", label: "Tem QR", icon: QrCode },
-    { key: "qrscan", label: "Quét QR", icon: ScanLine },
-    { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays },
-    { key: "inventory", label: "Tồn kho", icon: Warehouse },
-    { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true },
-    { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true },
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/" },
+    { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
+    { key: "bom", label: "Định mức (BOM)", icon: FlaskConical, path: "/bom" },
+    { key: "process", label: "Quy trình CN", icon: GitBranch, path: "/process" },
+    { key: "orders", label: "Đơn hàng", icon: ShoppingCart, path: "/orders" },
+    { key: "deliveries", label: "Phiếu giao hàng", icon: FileText, path: "/deliveries" },
+    { key: "planning", label: "Kế hoạch", icon: ClipboardList, path: "/planning" },
+    { key: "production", label: "Sản xuất", icon: Factory, path: "/production" },
+    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "planning", path: "/orderstatus" },
+    { key: "execution", label: "Thực thi SX", icon: Hammer, path: "/execution" },
+    { key: "qrlabels", label: "Tem QR", icon: QrCode, path: "/qrlabels" },
+    { key: "qrscan", label: "Quét QR", icon: ScanLine, path: "/qrscan" },
+    { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays, path: "/workschedule" },
+    { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
+    { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+    { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true, path: "/users" },
     {
       key: "masterdata", label: "Danh mục", icon: Database, perm: "masterdata",
       children: [
-        { key: "md:customers", label: "Khách hàng", icon: Users },
-        { key: "md:machines", label: "Máy móc", icon: Wrench },
-        { key: "md:employees", label: "Nhân viên", icon: Users },
-        { key: "md:shifts", label: "Ca làm việc", icon: Clock },
-        { key: "md:warehouses", label: "Kho", icon: Warehouse },
-        { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin },
-        { key: "md:roles", label: "Vai trò", icon: Shield },
+        { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers" },
+        { key: "md:machines", label: "Máy móc", icon: Wrench, path: "/master-data/machines" },
+        { key: "md:employees", label: "Nhân viên", icon: Users, path: "/master-data/employees" },
+        { key: "md:shifts", label: "Ca làm việc", icon: Clock, path: "/master-data/shifts" },
+        { key: "md:warehouses", label: "Kho", icon: Warehouse, path: "/master-data/warehouses" },
+        { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations" },
+        { key: "md:roles", label: "Vai trò", icon: Shield, path: "/master-data/roles" },
       ],
     },
   ];
@@ -151,63 +154,101 @@ function Sidebar({ active, onNav, user, onLogout }) {
   };
   const items = allItems.filter(canSee);
   const [expanded, setExpanded] = useState({});
-  const itemCls = (on) =>
-    `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-      on ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
+  const [search, setSearch] = useState("");
+
+  const filteredItems = items.map(it => {
+    const term = search.toLowerCase();
+    if (it.children) {
+      const matchC = it.children.filter(c => c.label.toLowerCase().includes(term));
+      if (matchC.length > 0 || it.label.toLowerCase().includes(term)) {
+        return { ...it, children: matchC.length > 0 ? matchC : it.children };
+      }
+      return null;
+    }
+    return it.label.toLowerCase().includes(term) ? it : null;
+  }).filter(Boolean);
+
+  const isSearchActive = search.trim().length > 0;
+
+  const itemCls = (isActive) =>
+    `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition ${
+      isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
 
   return (
-    <aside className="w-60 shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col">
-      <div className="px-4 py-4 border-b border-slate-100 shrink-0 text-center">
-        <Logo className="max-h-20 max-w-full w-auto mx-auto object-contain" />
-        <div className="text-[11px] text-slate-400 mt-1">Hệ thống MES</div>
+    <aside className={`${collapsed ? "w-16" : "w-60"} shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col transition-all duration-300 relative`}>
+      <div className={`px-4 py-4 border-b border-slate-100 shrink-0 flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all`}>
+        <button onClick={onToggle} className="p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Thu gọn/Mở rộng menu">
+          <Menu size={20} />
+        </button>
+        {!collapsed && (
+          <div className="flex-1 flex flex-col items-center pr-6">
+            <Logo className="max-h-10 max-w-full w-auto object-contain" />
+            <div className="text-[11px] text-slate-400 mt-0.5">Hệ thống MES</div>
+          </div>
+        )}
       </div>
-      <nav className="nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
-        {items.map((it) => {
+      {!collapsed && (
+        <div className="px-3 py-3 border-b border-slate-100 shrink-0">
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+            <input 
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" 
+              placeholder="Tìm module..." 
+            />
+          </div>
+        </div>
+      )}
+      <nav className={`nav-scroll flex-1 min-h-0 overflow-y-auto ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
+        {filteredItems.map((it) => {
           const Icon = it.icon;
           if (it.children) {
-            const childActive = it.children.some((c) => c.key === active);
-            const open = expanded[it.key] ?? childActive;
+            const childActive = it.children.some((c) => location.pathname.startsWith(c.path));
+            const open = isSearchActive || (expanded[it.key] ?? childActive);
             return (
               <div key={it.key}>
-                <button onClick={() => setExpanded((e) => ({ ...e, [it.key]: !(e[it.key] ?? childActive) }))}
-                  className={itemCls(false)}>
-                  <Icon size={18} /> <span className="flex-1 text-left">{it.label}</span>
-                  <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />
+                <button onClick={() => { if (!collapsed) setExpanded((e) => ({ ...e, [it.key]: !(e[it.key] ?? childActive) })) }}
+                  className={itemCls(false)} title={collapsed ? it.label : undefined}>
+                  <Icon size={18} className="shrink-0" /> 
+                  {!collapsed && <span className="flex-1 text-left truncate">{it.label}</span>}
+                  {!collapsed && <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />}
                 </button>
-                {open && (
+                {open && !collapsed && (
                   <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {it.children.map((c) => (
-                      <button key={c.key} onClick={() => onNav(c.key)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
-                          active === c.key ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
-                        <c.icon size={15} /> {c.label}
-                      </button>
+                      <NavLink key={c.key} to={c.path}
+                        className={({ isActive }) => `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
+                          isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
+                        <c.icon size={15} className="shrink-0" /> <span className="truncate">{c.label}</span>
+                      </NavLink>
                     ))}
                   </div>
                 )}
               </div>
             );
           }
-          const on = active === it.key || (it.key === "products" && (active === "product-form" || active === "product-detail"));
           return (
-            <button key={it.key} onClick={() => onNav(it.key)} className={itemCls(on)}>
-              <Icon size={18} /> {it.label}
-            </button>
+            <NavLink key={it.key} to={it.path} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
+              <Icon size={18} className="shrink-0" /> 
+              {!collapsed && <span className="truncate">{it.label}</span>}
+            </NavLink>
           );
         })}
       </nav>
-      <div className="px-4 py-3 border-t border-slate-100 shrink-0">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+      <div className={`px-4 py-3 border-t border-slate-100 shrink-0 ${collapsed ? "flex flex-col items-center gap-3 px-2" : ""}`}>
+        <div className={`flex items-center gap-2 ${collapsed ? "justify-center mb-0" : "mb-2"}`}>
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0" title={collapsed ? (user?.full_name || user?.username) : undefined}>
             {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
           </div>
-          <div className="min-w-0">
-            <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
-            <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
-          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
+              <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
+            </div>
+          )}
         </div>
-        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition">
-          <LogOut size={16} /> Đăng xuất
+        <button onClick={onLogout} className={`flex items-center justify-center gap-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition ${collapsed ? "w-10 h-10 p-0" : "w-full px-3 py-2"}`} title={collapsed ? "Đăng xuất" : undefined}>
+          <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
         </button>
       </div>
     </aside>
@@ -843,7 +884,7 @@ function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
               { label: "Còn phải thu (công nợ)", value: finance.debt, cls: "text-rose-600", nav: "deliveries" },
               { label: "Phiếu chưa thu đủ", value: finance.unpaid_count, cls: "text-amber-600", isCount: true, nav: "deliveries" },
             ].map((c) => (
-              <button key={c.label} onClick={() => c.nav && setView(c.nav)} disabled={!c.nav}
+              <button key={c.label} onClick={() => c.nav && onNav?.(c.nav)} disabled={!c.nav}
                 className={`px-5 py-4 text-left ${c.nav ? "hover:bg-slate-50" : ""}`}>
                 <div className="text-xs text-slate-500 mb-1">{c.label}{c.nav ? " →" : ""}</div>
                 <div className={`text-xl font-bold ${c.cls}`}>{fmt(c.value)}{c.isCount ? "" : " đ"}</div>
@@ -997,116 +1038,122 @@ function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
 
 /* =============================== ROOT APP =============================== */
 export default function MesApp() {
-  const [view, setView] = useState("dashboard"); // dashboard|products|planning|production|inventory|...
+  const navigate = useNavigate();
+  const [authLoading, setAuthLoading] = useState(true);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
+
+  // Focus ID cho các danh sách (nếu có, để highlight)
   const [detailId, setDetailId] = useState(null);
-  const [detailBack, setDetailBack] = useState("products"); // màn quay lại từ chi tiết SP
-  const [productEditId, setProductEditId] = useState(null); // sản phẩm đang sửa (null = thêm mới)
-  const [productCopyId, setProductCopyId] = useState(null);  // sản phẩm nguồn để sao chép
-  const [focusOrderId, setFocusOrderId] = useState(null);   // mở sẵn chi tiết 1 lệnh SX
-  const [focusSalesOrderId, setFocusSalesOrderId] = useState(null); // mở sẵn 1 đơn hàng
-  const [deliveryOrderId, setDeliveryOrderId] = useState(null); // tạo phiếu giao hàng từ 1 đơn
-  const [prodOrderBack, setProdOrderBack] = useState(null); // nơi quay lại sau khi xem 1 lệnh SX (mở chéo)
-  const [planningTab, setPlanningTab] = useState("orders"); // nhớ tab Kế hoạch
+  const [detailBack, setDetailBack] = useState("/");
+  const [productEditId, setProductEditId] = useState(null);
+  const [productCopyId, setProductCopyId] = useState(null);
+  const [focusOrderId, setFocusOrderId] = useState(null);
+  const [prodOrderBack, setProdOrderBack] = useState(null);
+  const [focusSalesOrderId, setFocusSalesOrderId] = useState(null);
+  const [deliveryOrderId, setDeliveryOrderId] = useState(null);
+
+  // Tab state
+  const [planningTab, setPlanningTab] = useState("calendar");
+
   const [lookups, setLookups] = useState(null);
   const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const location = useLocation();
 
-  // Khôi phục phiên đăng nhập
+  // Load user từ token
   useEffect(() => {
+    const token = typeof localStorage !== "undefined" ? localStorage.getItem("mes_token") : "";
+    if (!token) {
+      setAuthLoading(false);
+      return;
+    }
     auth.me().then((r) => setUser(r.user)).catch(() => { setToken(""); setUser(null); }).finally(() => setAuthLoading(false));
   }, []);
 
-  const logout = () => { auth.logout().catch(() => {}); setToken(""); setUser(null); setView("dashboard"); };
+  const logout = () => { auth.logout().catch(() => {}); setToken(""); setUser(null); navigate("/"); };
 
   // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập,
   // và làm mới mỗi khi đổi màn để các dropdown luôn có dữ liệu mới nhất.
   useEffect(() => {
     if (user) getLookups().then(setLookups).catch((e) => console.error("Lookups lỗi:", e.message));
-  }, [user, view]);
+  }, [user, location.pathname]);
 
   // Khi đăng nhập: nếu không có quyền xem Dashboard → vào thẳng màn đầu tiên được phép
   useEffect(() => {
-    if (!user || user.is_admin) return;
+    if (!user || user.is_admin || location.pathname !== "/") return;
     const perms = user.permissions || {};
     if (perms.dashboard?.view) return; // được xem dashboard thì giữ nguyên
-    const order = ["execution", "production", "planning", "orders", "deliveries", "products", "bom", "process", "inventory", "qrlabels", "qrscan", "workschedule", "masterdata"];
-    const firstKey = order.find((k) => perms[k]?.view);
-    if (firstKey) setView(firstKey === "masterdata" ? "md:customers" : firstKey);
-  }, [user]);
+    const order = [
+      { key: "execution", path: "/execution" }, { key: "production", path: "/production" },
+      { key: "planning", path: "/planning" }, { key: "orders", path: "/orders" },
+      { key: "deliveries", path: "/deliveries" }, { key: "products", path: "/products" },
+      { key: "bom", path: "/bom" }, { key: "process", path: "/process" },
+      { key: "inventory", path: "/inventory" }, { key: "qrlabels", path: "/qrlabels" },
+      { key: "qrscan", path: "/qrscan" }, { key: "workschedule", path: "/workschedule" },
+      { key: "masterdata", path: "/master-data/customers" }
+    ];
+    const first = order.find((k) => perms[k.key]?.view);
+    if (first) navigate(first.path, { replace: true });
+  }, [user, location.pathname, navigate]);
 
   // Điều hướng chéo module
-  const goProductDetail = (id, back = "products") => { setDetailId(id); setDetailBack(back); setView("product-detail"); };
-  const goProductionOrder = (id) => { setFocusOrderId(id); setProdOrderBack(view); setView("production"); };
-  const goSalesOrder = (id) => { setFocusSalesOrderId(id); setView("orders"); };
-  const goNewDelivery = (id) => { setDeliveryOrderId(id); setView("deliveries"); };
+  const goProductDetail = (id, back = "/products") => { setDetailId(id); setDetailBack(back); navigate("/products/detail"); };
+  const goProductionOrder = (id) => { setFocusOrderId(id); setProdOrderBack(location.pathname); navigate("/production"); };
+  const goSalesOrder = (id) => { setFocusSalesOrderId(id); navigate("/orders"); };
+  const goNewDelivery = (id) => { setDeliveryOrderId(id); navigate("/deliveries"); };
 
   const needLookups = (Comp) =>
     lookups ? <Comp lookups={lookups} /> : <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
   const loadingEl = <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
 
-  const render = () => {
-    switch (view) {
-      case "dashboard": return <Dashboard onNav={setView} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
-      case "products":
-        return <ProductList onCreate={() => { setProductEditId(null); setProductCopyId(null); setView("product-form"); }}
-          onCopy={(id) => { setProductEditId(null); setProductCopyId(id); setView("product-form"); }}
-          onOpen={(id) => { setDetailId(id); setDetailBack("products"); setView("product-detail"); }} />;
-      case "product-form":
-        return <ProductForm productId={productEditId} copyId={productCopyId}
-          onBack={() => { setProductCopyId(null); setView(productEditId ? "product-detail" : "products"); }}
-          onSaved={() => { setProductCopyId(null); setView(productEditId ? "product-detail" : "products"); }} />;
-      case "product-detail":
-        return <ProductDetail id={detailId} onBack={() => setView(detailBack)}
-          onDeleted={() => setView(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
-      case "planning":
-        return lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl;
-      case "production":
-        return lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
-          onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); setView(b); } : null} /> : loadingEl;
-      case "orderstatus":
-        return lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl;
-      case "execution":
-        return needLookups(ExecutionModule);
-      case "inventory":
-        return lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "inventory")} /> : loadingEl;
-      case "md:customers": case "md:machines": case "md:warehouses": case "md:locations":
-      case "md:employees": case "md:shifts": case "md:roles":
-        return lookups ? <MasterDataScreen lookups={lookups} entity={view.slice(3)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl;
-      case "workschedule": return needLookups(WorkScheduleModule);
-      case "qrlabels": return <QrLabelsModule />;
-      case "qrscan": return <QrScanModule />;
-      case "permissions": return <PermissionsModule />;
-      case "users": return needLookups(UsersModule);
-      case "bom": return needLookups(BomModule);
-      case "process": return needLookups(ProcessModule);
-      case "orders":
-        return lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl;
-      case "deliveries":
-        return lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl;
-      default: return <Dashboard onNav={setView} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
-    }
-  };
-
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Đang tải…</div>;
   if (!user) return <Login onLogin={setUser} />;
 
+  // Wrapper cho MasterDataScreen để lấy `entity` từ URL
+  const MasterDataWrapper = () => {
+    const { entity } = useParams();
+    return lookups ? <MasterDataScreen lookups={lookups} entity={entity} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl;
+  };
+
   return (
     <PermProvider user={user}>
-    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
-      <Sidebar active={view} onNav={(k) => setView(k)} user={user} onLogout={logout} />
-      <main className="nav-scroll flex-1 p-8 overflow-y-auto">{render()}</main>
-      <style>{`
-        .btn-primary { display:inline-flex; align-items:center; gap:.4rem; background:#0055b3; color:#fff;
-          font-size:.875rem; font-weight:500; padding:.5rem .9rem; border-radius:.6rem; transition:.15s; }
-        .btn-primary:hover { background:#00428c; }
-        .btn-ghost { display:inline-flex; align-items:center; gap:.4rem; background:#fff; color:#475569;
-          font-size:.875rem; font-weight:500; padding:.5rem .9rem; border-radius:.6rem; border:1px solid #e2e8f0; transition:.15s; }
-        .btn-ghost:hover { background:#f8fafc; }
-        /* Trường chỉ-đọc (chế độ xem): rõ chữ, không bị mờ */
-        input:disabled, select:disabled, textarea:disabled {
-          background:#f8fafc; color:#334155; -webkit-text-fill-color:#334155; opacity:1; cursor:default; }
-        fieldset { min-width:0; border:0; margin:0; padding:0; }
-      `}</style>
+    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
+      <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} />
+      <main className="nav-scroll flex-1 p-8 overflow-y-auto relative">
+        <Routes>
+          <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
+          <Route path="/products" element={<ProductList 
+            onCreate={() => { setProductEditId(null); setProductCopyId(null); navigate("/products/form"); }}
+            onCopy={(id) => { setProductEditId(null); setProductCopyId(id); navigate("/products/form"); }}
+            onOpen={(id) => { setDetailId(id); setDetailBack("/products"); navigate("/products/detail"); }} 
+          />} />
+          <Route path="/products/form" element={<ProductForm productId={productEditId} copyId={productCopyId}
+            onBack={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
+            onSaved={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }} 
+          />} />
+          <Route path="/products/detail" element={<ProductDetail id={detailId} onBack={() => navigate(detailBack)}
+            onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} 
+          />} />
+          
+          <Route path="/planning" element={lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "/planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl} />
+          <Route path="/production" element={lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
+            onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
+          <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
+          <Route path="/execution" element={needLookups(ExecutionModule)} />
+          <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
+          <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
+          <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
+          <Route path="/qrlabels" element={<QrLabelsModule />} />
+          <Route path="/qrscan" element={<QrScanModule />} />
+          <Route path="/permissions" element={<PermissionsModule />} />
+          <Route path="/users" element={needLookups(UsersModule)} />
+          <Route path="/bom" element={needLookups(BomModule)} />
+          <Route path="/process" element={needLookups(ProcessModule)} />
+          <Route path="/orders" element={lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl} />
+          <Route path="/deliveries" element={lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+
     </div>
     </PermProvider>
   );

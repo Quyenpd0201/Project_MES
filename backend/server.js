@@ -4,7 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const productsRouter = require('./routes/products');
-const mesRouter = require('./routes/mes');
+const apiRouter = require('./routes/index');
 const { ensureSeedAdmin } = require('./controllers/authController');
 
 const app = express();
@@ -53,7 +53,7 @@ app.use('/api/products/:id/attachments', express.json({ limit: '10mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/products', productsRouter);
-app.use('/api', mesRouter);
+app.use('/api', apiRouter);
 app.get('/health', (_, res) => res.json({ ok: true }));
 
 // ── Error handler cuối cùng ───────────────────────────────────────────────────

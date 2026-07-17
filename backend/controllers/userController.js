@@ -40,7 +40,10 @@ exports.create = async (req, res) => {
       [username.trim(), hashPassword(password), full_name ? String(full_name).slice(0, 100) : null,
        role_id || null, resolvedStatus, team ? String(team).slice(0, 100) : null]);
     res.status(201).json({ id: rows[0].id });
-  } catch (e) { res.status(500).json({ message: e.code === '23505' ? 'Tài khoản đã tồn tại' : (e.detail || 'Lỗi tạo tài khoản') }); }
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
+    res.status(500).json({ message: e.detail || 'Lỗi tạo tài khoản' });
+  }
 };
 
 exports.update = async (req, res) => {
@@ -69,7 +72,10 @@ exports.update = async (req, res) => {
     const { rows } = await db.query(`UPDATE users SET ${cols.join(', ')} WHERE id = $${i} AND is_deleted = FALSE RETURNING id`, [...vals, req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
     res.json({ message: 'Đã cập nhật tài khoản' });
-  } catch (e) { res.status(500).json({ message: e.code === '23505' ? 'Tài khoản đã tồn tại' : (e.detail || 'Lỗi cập nhật') }); }
+  } catch (e) {
+    if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
+    res.status(500).json({ message: e.detail || 'Lỗi cập nhật' });
+  }
 };
 
 exports.remove = async (req, res) => {

@@ -30,6 +30,17 @@
       .nav-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 9999px; transition: background .2s; }
       .nav-scroll:hover::-webkit-scrollbar-thumb { background: rgba(148,163,184,.35); }
       .nav-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148,163,184,.6); }
+
+      .btn-primary { display:inline-flex; align-items:center; gap:.4rem; background:#0055b3; color:#fff;
+        font-size:.875rem; font-weight:500; padding:.5rem .9rem; border-radius:.6rem; transition:.15s; }
+      .btn-primary:hover { background:#00428c; }
+      .btn-ghost { display:inline-flex; align-items:center; gap:.4rem; background:#fff; color:#475569;
+        font-size:.875rem; font-weight:500; padding:.5rem .9rem; border-radius:.6rem; border:1px solid #e2e8f0; transition:.15s; }
+      .btn-ghost:hover { background:#f8fafc; }
+      /* Trường chỉ-đọc (chế độ xem): rõ chữ, không bị mờ */
+      input:disabled, select:disabled, textarea:disabled {
+        background:#f8fafc; color:#334155; -webkit-text-fill-color:#334155; opacity:1; cursor:default; }
+      fieldset { min-width:0; border:0; margin:0; padding:0; }
     </style>
   </head>
   <body>

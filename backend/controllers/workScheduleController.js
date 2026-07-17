@@ -10,7 +10,7 @@ exports.list = async (req, res) => {
     if (to) { where.push(`ws.work_date <= $${i++}`); params.push(to); }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = await db.query(`
-      SELECT ws.id, ws.employee_id, ws.work_date, ws.shift_id, ws.note,
+      SELECT ws.id, ws.employee_id, ws.work_date, ws.shift_id, ws.note, ws.check_in_at, ws.check_out_at,
              e.name AS employee_name, e.employee_code, e.factory, s.name AS shift_name
       FROM work_schedules ws
       JOIN employees e ON e.id = ws.employee_id
@@ -25,6 +25,28 @@ exports.upsert = async (req, res) => {
   try {
     const { employee_id, work_date, shift_id, note } = req.body;
     if (!employee_id || !work_date) return res.status(400).json({ message: 'Thiếu nhân viên hoặc ngày' });
+    
+    // Kiểm tra ràng buộc thời gian & chấm công
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const wDate = new Date(work_date);
+    wDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.floor((today - wDate) / (1000 * 60 * 60 * 24));
+    
+    // Nếu quá 3 ngày trong quá khứ -> chặn
+    if (diffDays > 3) {
+      return res.status(400).json({ message: 'Không thể thay đổi ca trước ngày hôm nay quá 3 ngày' });
+    }
+
+    // Kiểm tra xem đã có dữ liệu chấm công chưa
+    const { rows: existing } = await db.query(
+      `SELECT check_in_at, check_out_at FROM work_schedules WHERE employee_id = $1 AND work_date = $2`, 
+      [employee_id, work_date]
+    );
+    if (existing.length && (existing[0].check_in_at || existing[0].check_out_at)) {
+      return res.status(400).json({ message: 'Không thể thay đổi ca đã có dữ liệu chấm công' });
+    }
+
     if (!shift_id) {
       await db.query(`DELETE FROM work_schedules WHERE employee_id = $1 AND work_date = $2`, [employee_id, work_date]);
       return res.json({ message: 'Đã xóa ca' });

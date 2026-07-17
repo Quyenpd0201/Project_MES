@@ -26,14 +26,19 @@ export default function WorkScheduleModule({ lookups }) {
     try {
       const rows = await workSchedules.list(days[0], days[6]);
       const m = {};
-      rows.forEach((r) => { m[`${r.employee_id}|${r.work_date}`] = r.shift_id; });
+      rows.forEach((r) => { 
+        m[`${r.employee_id}|${r.work_date}`] = {
+          shift_id: r.shift_id,
+          has_attendance: !!(r.check_in_at || r.check_out_at)
+        }; 
+      });
       setMap(m);
     } catch (e) { alert("Lỗi tải lịch: " + e.message); }
-  }, [anchor]); // eslint-disable-line
+  }, [days]);
   useEffect(() => { load(); }, [load]);
 
-  const setCell = async (employee_id, work_date, shift_id) => {
-    setMap((m) => ({ ...m, [`${employee_id}|${work_date}`]: shift_id || undefined }));
+  const setCell = async (employee_id, work_date, shift_id, has_attendance) => {
+    setMap((m) => ({ ...m, [`${employee_id}|${work_date}`]: { shift_id: shift_id || undefined, has_attendance } }));
     try { await workSchedules.upsert({ employee_id, work_date, shift_id: shift_id || null }); }
     catch (e) { alert("Lỗi lưu: " + e.message); load(); }
   };
@@ -48,11 +53,22 @@ export default function WorkScheduleModule({ lookups }) {
   return (
     <div className="space-y-5">
       <ListHeader title="Lịch làm việc" actions={<>
-        <button onClick={() => setAnchor(addDays(anchor, -7))} className="btn-ghost px-2"><ChevronLeft size={16} /></button>
-        <span className="text-sm font-medium text-slate-700">Tuần {d(days[0]).getDate()}/{d(days[0]).getMonth() + 1} – {d(days[6]).getDate()}/{d(days[6]).getMonth() + 1}</span>
-        <button onClick={() => setAnchor(addDays(anchor, 7))} className="btn-ghost px-2"><ChevronRight size={16} /></button>
-        <button onClick={() => setAnchor(mondayOf(new Date()))} className="btn-ghost">Tuần này</button>
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        <div className="flex bg-slate-100 p-1 rounded-lg">
+          <button 
+            onClick={() => setAnchor(addDays(mondayOf(new Date()), -7))} 
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${anchor === addDays(mondayOf(new Date()), -7) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            Tuần trước
+          </button>
+          <button 
+            onClick={() => setAnchor(mondayOf(new Date()))} 
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${anchor === mondayOf(new Date()) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            Tuần này
+          </button>
+        </div>
+        <span className="text-sm font-medium text-slate-500 border-l border-slate-200 pl-4 py-1">
+          {d(days[0]).getDate()}/{d(days[0]).getMonth() + 1} – {d(days[6]).getDate()}/{d(days[6]).getMonth() + 1}
+        </span>
+        <button onClick={load} className="btn-ghost ml-2"><RotateCcw size={16} /> Làm mới</button>
       </>} />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
@@ -79,11 +95,20 @@ export default function WorkScheduleModule({ lookups }) {
                       <div className="text-[11px] text-slate-400">{e.employee_code}{e.skill_level ? ` · ${e.skill_level}` : ""}</div>
                     </td>
                     {days.map((dy) => {
-                      const val = map[`${e.id}|${dy}`] || "";
+                      const cell = map[`${e.id}|${dy}`] || {};
+                      const val = cell.shift_id || "";
+                      
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const wDate = d(dy);
+                      const diffDays = Math.floor((today - wDate) / (1000 * 60 * 60 * 24));
+                      const isLocked = cell.has_attendance || diffDays > 3;
+
                       return (
                         <td key={dy} className="px-1.5 py-1.5 border-r border-slate-100">
-                          <select value={val} onChange={(ev) => setCell(e.id, dy, ev.target.value)}
-                            className={`${inputCls} px-1.5 py-1 text-xs ${val ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "text-slate-400"}`}>
+                          <select value={val} onChange={(ev) => setCell(e.id, dy, ev.target.value, cell.has_attendance)}
+                            disabled={isLocked}
+                            className={`${inputCls} px-1.5 py-1 text-xs ${val ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "text-slate-400"} ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-100" : ""}`}>
                             <option value="">—</option>
                             {shiftList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>
