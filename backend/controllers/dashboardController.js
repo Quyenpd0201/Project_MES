@@ -6,7 +6,7 @@ const FINAL = `(CASE WHEN EXISTS (SELECT 1 FROM production_tasks t2 WHERE t2.pro
 
 exports.summary = async (_req, res) => {
   try {
-    const [kpi, machines, inProgress, dueSoon, statusBreakdown] = await Promise.all([
+    const [kpi, machines, inProgress, dueSoon, statusBreakdown, overduePay, finance] = await Promise.all([
       // KPI tổng
       db.query(`
         SELECT
@@ -19,7 +19,7 @@ exports.summary = async (_req, res) => {
       // Trạng thái máy hôm nay
       db.query(`
         SELECT m.id, m.name, m.factory,
-          (SELECT json_build_object('order_code', po.order_code, 'stage', t.stage, 'status', t.status, 'product', p.product_name)
+          (SELECT json_build_object('order_code', po.order_code, 'production_order_id', po.id, 'stage', t.stage, 'status', t.status, 'product', p.product_name)
            FROM production_tasks t
            JOIN production_orders po ON po.id = t.production_order_id
            JOIN products p ON p.id = po.product_id
@@ -42,7 +42,7 @@ exports.summary = async (_req, res) => {
       `),
       // Đơn hàng sắp đến hạn
       db.query(`
-        SELECT so.order_code, so.due_date, so.status, c.name AS customer_name,
+        SELECT so.id, so.order_code, so.due_date, so.status, c.name AS customer_name,
                (SELECT COUNT(*)::int FROM sales_order_items it WHERE it.sales_order_id=so.id) AS item_count
         FROM sales_orders so JOIN customers c ON c.id=so.customer_id
         WHERE so.is_deleted=FALSE AND so.status IN ('Mới','Đang sản xuất')
@@ -52,6 +52,28 @@ exports.summary = async (_req, res) => {
       db.query(`
         SELECT status, COUNT(*)::int AS n FROM production_orders WHERE is_deleted=FALSE GROUP BY status
       `),
+      // Công nợ quá hạn: phiếu đã giao > 30 ngày mà chưa thanh toán đủ
+      db.query(`
+        SELECT d.id, d.note_code, d.delivery_date, d.status, d.total_amount,
+               c.name AS customer_name,
+               (CURRENT_DATE - d.delivery_date) AS days_overdue
+        FROM delivery_notes d LEFT JOIN customers c ON c.id = d.customer_id
+        WHERE d.is_deleted = FALSE
+          AND d.status <> 'Đã thanh toán'
+          AND d.delivery_date IS NOT NULL
+          AND d.delivery_date <= CURRENT_DATE - INTERVAL '30 days'
+        ORDER BY d.delivery_date
+      `),
+      // Tổng quan kế toán: doanh thu / đã thu / công nợ
+      db.query(`
+        SELECT
+          COALESCE(SUM(total_amount),0)::numeric AS revenue,
+          COALESCE(SUM(paid_amount),0)::numeric AS paid,
+          COALESCE(SUM(total_amount - paid_amount),0)::numeric AS debt,
+          COUNT(*) FILTER (WHERE total_amount - paid_amount > 0)::int AS unpaid_count,
+          COUNT(*)::int AS note_count
+        FROM delivery_notes WHERE is_deleted = FALSE
+      `),
     ]);
 
     res.json({
@@ -60,6 +82,8 @@ exports.summary = async (_req, res) => {
       in_progress: inProgress.rows,
       due_soon: dueSoon.rows,
       status_breakdown: statusBreakdown.rows,
+      overdue_payments: overduePay.rows,
+      finance: finance.rows[0],
     });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy dữ liệu dashboard' }); }
 };

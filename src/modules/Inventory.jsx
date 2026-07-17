@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { PackagePlus, Save, Warehouse, History } from "lucide-react";
-import { ListHeader, usePager } from "../components.jsx";
+import { PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
+import { ListHeader, DataTable, PageHeader, Section } from "../components.jsx";
 import { inventory } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass } from "../ui.js";
+import { PRODUCT_SPECS, splitNU, specShort } from "../specs.js";
 
 const Field = ({ label, required, children }) => (
   <div>
@@ -14,11 +15,51 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
+/* Bộ ô nhập thông số kỹ thuật (dùng ở Nhập/Xuất & thêm dòng tồn) */
+function SpecFields({ specs, onChange, disabled, cls = inputCls }) {
+  const get = (n) => specs?.[n] || "";
+  const setV = (n, v) => { const next = { ...specs }; if (v) next[n] = v; else delete next[n]; onChange(next); };
+  return (
+    <>
+      {PRODUCT_SPECS.map((spec) => {
+        const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.name}</span>;
+        if (spec.kind === "select") return (
+          <label key={spec.name}>{lbl}
+            <select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
+              <option value="">-- Chọn --</option>{spec.options.map((o) => <option key={o}>{o}</option>)}
+            </select>
+          </label>
+        );
+        if (spec.kind === "num") { const { num } = splitNU(get(spec.name)); return (
+          <label key={spec.name}>{lbl}
+            <div className="relative">
+              <input type="number" className={cls + " pr-10"} disabled={disabled} value={num} placeholder="0"
+                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${spec.unit}` : "")} />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">{spec.unit}</span>
+            </div>
+          </label>
+        ); }
+        const { num, unit } = splitNU(get(spec.name)); const cu = unit || spec.units[0];
+        return (
+          <label key={spec.name}>{lbl}
+            <div className="flex gap-1.5">
+              <input type="number" className={cls + " flex-1"} disabled={disabled} value={num} placeholder="0"
+                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${cu}` : "")} />
+              <select className={cls + " w-20"} disabled={disabled} value={cu}
+                onChange={(e) => setV(spec.name, num ? `${num} ${e.target.value}` : "")}>
+                {spec.units.map((u) => <option key={u}>{u}</option>)}
+              </select>
+            </div>
+          </label>
+        );
+      })}
+    </>
+  );
+}
+
 function AdjustModal({ lookups, onClose, onSaved }) {
-  const [f, setF] = useState({
-    product_id: "", trx_type: "Nhập", quantity: "", unit: "",
-    attr_size: "", attr_thickness: "", attr_color: "", location_id: "", note: "",
-  });
+  const [f, setF] = useState({ product_id: "", trx_type: "Nhập", quantity: "", unit: "", location_id: "", lot_code: "", note: "" });
+  const [specs, setSpecs] = useState({});
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const onProduct = (id) => {
     const p = lookups.products.find((x) => x.id === id);
@@ -27,14 +68,14 @@ function AdjustModal({ lookups, onClose, onSaved }) {
   const save = async () => {
     if (!f.product_id) return alert("Chọn sản phẩm");
     if (!f.quantity || Number(f.quantity) <= 0) return alert("Nhập số lượng hợp lệ");
-    try { await inventory.adjust(f); onSaved(); }
+    try { await inventory.adjust({ ...f, specs }); onSaved(); }
     catch (e) { alert("Lỗi: " + e.message); }
   };
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-slate-800">Nhập / Xuất / Điều chỉnh tồn</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Field label="Sản phẩm" required>
             <select className={inputCls} value={f.product_id} onChange={(e) => onProduct(e.target.value)}>
               <option value="">-- Chọn --</option>
@@ -58,15 +99,15 @@ function AdjustModal({ lookups, onClose, onSaved }) {
               {lookups.locations.map((l) => <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>)}
             </select>
           </Field>
-          <Field label="Màu sắc">
-            <input className={inputCls} list="colors" value={f.attr_color} onChange={(e) => set("attr_color", e.target.value)} />
+          <Field label="Lô sản xuất">
+            <input className={inputCls} value={f.lot_code} placeholder="VD: LSX00007 / Thủ công" onChange={(e) => set("lot_code", e.target.value)} />
           </Field>
-          <Field label="Kích thước">
-            <input className={inputCls} list="sizes" value={f.attr_size} onChange={(e) => set("attr_size", e.target.value)} />
-          </Field>
-          <Field label="Độ dày">
-            <input className={inputCls} list="thicknesses" value={f.attr_thickness} onChange={(e) => set("attr_thickness", e.target.value)} />
-          </Field>
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Thông số kỹ thuật</div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <SpecFields specs={specs} onChange={setSpecs} />
+          </div>
         </div>
         <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
         <div className="flex justify-end gap-2 pt-1">
@@ -78,62 +119,99 @@ function AdjustModal({ lookups, onClose, onSaved }) {
   );
 }
 
-function StockTab({ lookups, onOpenProduct }) {
+/* ---- Tab Tồn kho: cây 3 cấp Sản phẩm → Nhóm thông số → Lô sản xuất ---- */
+function TreeTab({ lookups }) {
   const { can } = usePerm();
-  const [rows, setRows] = useState([]);
-  const [filters, setFilters] = useState({ warehouse_id: "", q: "" });
+  const [data, setData] = useState([]);
+  const [q, setQ] = useState("");
+  const [openP, setOpenP] = useState(() => new Set());
+  const [openG, setOpenG] = useState(() => new Set());
   const [adjusting, setAdjusting] = useState(false);
-  const { slice, Pager, Filler } = usePager(rows);
 
   const load = useCallback(async () => {
-    try { setRows(await inventory.list(filters)); }
-    catch (e) { alert("Lỗi tải tồn kho: " + e.message); }
-  }, [filters]);
+    try { setData(await inventory.tree({})); } catch (e) { alert("Lỗi tải tồn kho: " + e.message); }
+  }, []);
   useEffect(() => { load(); }, [load]);
+
+  const toggle = (set, setSet, key) => { const n = new Set(set); n.has(key) ? n.delete(key) : n.add(key); setSet(n); };
+  const norm = (s) => (s || "").toString().toLowerCase();
+  const rows = data.filter((p) => !q || norm(p.product_code).includes(norm(q)) || norm(p.product_name).includes(norm(q)));
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
-        {(can("inventory", "edit") || can("inventory", "create")) && <button onClick={() => setAdjusting(true)} className="btn-primary"><PackagePlus size={16} /> Nhập / Xuất kho</button>}
+      <div className="flex items-center justify-between gap-3">
+        <input className={inputCls + " max-w-xs"} placeholder="Tìm mã / tên sản phẩm…" value={q} onChange={(e) => setQ(e.target.value)} />
+        {(can("inventory", "edit") || can("inventory", "create")) &&
+          <button onClick={() => setAdjusting(true)} className="btn-primary"><PackagePlus size={16} /> Nhập / Xuất kho</button>}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input placeholder="Tìm sản phẩm" className={inputCls} value={filters.q}
-          onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
-        <select className={inputCls} value={filters.warehouse_id} onChange={(e) => setFilters({ ...filters, warehouse_id: e.target.value })}>
-          <option value="">Tất cả kho</option>
-          {lookups.warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-      </div>
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        {/* Tiêu đề cột */}
+        <div className="grid grid-cols-12 px-4 py-2.5 bg-slate-50 text-slate-500 text-xs uppercase tracking-wide font-semibold border-b border-slate-100">
+          <div className="col-span-7">Sản phẩm / Nhóm thông số / Lô</div>
+          <div className="col-span-3">Kho · Vị trí</div>
+          <div className="col-span-2 text-right">Tồn</div>
+        </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>{["Mã SP", "Sản phẩm", "Loại", "Màu", "Kích thước", "Độ dày", "Kho / Vị trí", "Tồn", "ĐVT"].map((h) =>
-              <th key={h} className="text-left px-3 py-3 font-semibold">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((s) => (
-              <tr key={s.id} className="hover:bg-slate-50/70">
-                <td className="px-3 py-3">
-                  <button onClick={() => onOpenProduct?.(s.product_id)} className="font-medium text-blue-600 hover:underline">{s.product_code}</button>
-                </td>
-                <td className="px-3 py-3 text-slate-800">{s.product_name}</td>
-                <td className="px-3 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(s.product_type)}`}>{s.product_type}</span></td>
-                <td className="px-3 py-3">{s.attr_color || "—"}</td>
-                <td className="px-3 py-3">{s.attr_size || "—"}</td>
-                <td className="px-3 py-3">{s.attr_thickness || "—"}</td>
-                <td className="px-3 py-3 text-slate-600">{s.warehouse_name ? `${s.warehouse_name} · ${s.location_name}` : "—"}</td>
-                <td className={`px-3 py-3 text-right font-semibold ${Number(s.quantity) < 0 ? "text-rose-600" : ""}`}>{fmt(s.quantity)}</td>
-                <td className="px-3 py-3">{s.unit}</td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">Chưa có tồn kho</td></tr>}
-            <Filler cols={9} />
-          </tbody>
-        </table>
+        {rows.length === 0 && <div className="px-4 py-10 text-center text-slate-400 text-sm">Chưa có tồn kho</div>}
+
+        {rows.map((p) => {
+          const pOpen = openP.has(p.product_id);
+          return (
+            <div key={p.product_id} className="border-b border-slate-100 last:border-0">
+              {/* Cấp 1: Sản phẩm */}
+              <button onClick={() => toggle(openP, setOpenP, p.product_id)}
+                className="w-full grid grid-cols-12 px-4 py-3 items-center hover:bg-slate-50/70 text-left">
+                <div className="col-span-7 flex items-center gap-2 min-w-0">
+                  <ChevronRight size={16} className={`text-slate-400 transition-transform shrink-0 ${pOpen ? "rotate-90" : ""}`} />
+                  <Boxes size={16} className="text-blue-500 shrink-0" />
+                  <span className="font-semibold text-blue-600 shrink-0">{p.product_code}</span>
+                  <span className="text-slate-700 truncate">{p.product_name}</span>
+                  <span className={`ml-1 inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClass(p.product_type)}`}>{p.product_type}</span>
+                  <span className="text-xs text-slate-400">· {p.groups.length} nhóm</span>
+                </div>
+                <div className="col-span-3 text-slate-400 text-sm">—</div>
+                <div className="col-span-2 text-right font-bold text-slate-800">{fmt(p.total)} <span className="text-xs font-normal text-slate-500">{p.unit}</span></div>
+              </button>
+
+              {/* Cấp 2: Nhóm thông số kỹ thuật */}
+              {pOpen && p.groups.map((g) => {
+                const gkey = p.product_id + "|" + g.spec_key;
+                const gOpen = openG.has(gkey);
+                const label = specShort(g.specs) || "(không có thông số)";
+                return (
+                  <div key={gkey} className="bg-slate-50/40">
+                    <button onClick={() => toggle(openG, setOpenG, gkey)}
+                      className="w-full grid grid-cols-12 px-4 py-2.5 items-center hover:bg-slate-100/60 text-left border-t border-slate-100">
+                      <div className="col-span-7 flex items-center gap-2 pl-6 min-w-0">
+                        <ChevronRight size={14} className={`text-slate-400 transition-transform shrink-0 ${gOpen ? "rotate-90" : ""}`} />
+                        <Layers size={14} className="text-violet-500 shrink-0" />
+                        <span className="text-slate-700 text-sm truncate">{label}</span>
+                        <span className="text-xs text-slate-400 shrink-0">· {g.lots.length} lô</span>
+                      </div>
+                      <div className="col-span-3 text-slate-400 text-sm">—</div>
+                      <div className="col-span-2 text-right font-semibold text-slate-700">{fmt(g.total)} <span className="text-xs font-normal text-slate-400">{p.unit}</span></div>
+                    </button>
+
+                    {/* Cấp 3: Các lô sản xuất */}
+                    {gOpen && g.lots.map((lot) => (
+                      <div key={lot.id} className="grid grid-cols-12 px-4 py-2 items-center border-t border-slate-100 text-sm">
+                        <div className="col-span-7 flex items-center gap-2 pl-14 min-w-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-300 shrink-0" />
+                          <span className="font-medium text-slate-600 shrink-0">{lot.lot_code || "(không lô)"}</span>
+                          {lot.expiry_date && <span className="text-xs text-slate-400">· HSD {fmtDate(lot.expiry_date)}</span>}
+                        </div>
+                        <div className="col-span-3 text-slate-500">{lot.warehouse_name ? `${lot.warehouse_name}${lot.location_name ? " · " + lot.location_name : ""}` : "(chưa xác định)"}</div>
+                        <div className={`col-span-2 text-right font-medium ${Number(lot.quantity) < 0 ? "text-rose-600" : "text-slate-700"}`}>{fmt(lot.quantity)} <span className="text-xs font-normal text-slate-400">{lot.unit || p.unit}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
-      <Pager />
 
       {adjusting && <AdjustModal lookups={lookups} onClose={() => setAdjusting(false)} onSaved={() => { setAdjusting(false); load(); }} />}
     </div>
@@ -144,58 +222,37 @@ function StockTab({ lookups, onOpenProduct }) {
 const TRX_COLOR = { "Nhập": "bg-emerald-50 text-emerald-700", "Xuất": "bg-rose-50 text-rose-700", "Điều chỉnh": "bg-amber-50 text-amber-700" };
 function TransactionsTab() {
   const [rows, setRows] = useState([]);
-  const [filters, setFilters] = useState({ trx_type: "", q: "" });
-  const { slice, Pager, Filler } = usePager(rows);
   const load = useCallback(async () => {
-    try { setRows(await inventory.transactions(filters)); } catch (e) { alert("Lỗi tải lịch sử: " + e.message); }
-  }, [filters]);
+    try { setRows(await inventory.transactions({})); } catch (e) { alert("Lỗi tải lịch sử: " + e.message); }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
-  return (
-    <div className="space-y-4">
-      <div className="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input placeholder="Tìm sản phẩm / mã chứng từ" className={inputCls} value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
-        <select className={inputCls} value={filters.trx_type} onChange={(e) => setFilters({ ...filters, trx_type: e.target.value })}>
-          <option value="">Tất cả loại</option><option>Nhập</option><option>Xuất</option><option>Điều chỉnh</option>
-        </select>
-      </div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>{["Thời gian", "Loại", "Mã SP", "Sản phẩm", "Thuộc tính", "Số lượng", "Kho/Vị trí", "Chứng từ", "Ghi chú"].map((h) =>
-              <th key={h} className="text-left px-3 py-3 font-semibold">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((t) => (
-              <tr key={t.id} className="hover:bg-slate-50/70">
-                <td className="px-3 py-3 text-slate-500">{new Date(t.created_at).toLocaleString("vi-VN")}</td>
-                <td className="px-3 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[t.trx_type] || ""}`}>{t.trx_type}</span></td>
-                <td className="px-3 py-3 font-medium text-blue-600">{t.product_code}</td>
-                <td className="px-3 py-3 text-slate-800">{t.product_name}</td>
-                <td className="px-3 py-3 text-slate-500">{[t.attr_color, t.attr_size, t.attr_thickness].filter(Boolean).join(" · ") || "—"}</td>
-                <td className={`px-3 py-3 text-right font-semibold ${t.trx_type === "Xuất" ? "text-rose-600" : "text-emerald-600"}`}>{t.trx_type === "Xuất" ? "−" : "+"}{fmt(t.quantity)}</td>
-                <td className="px-3 py-3 text-slate-600">{t.warehouse_name ? `${t.warehouse_name} · ${t.location_name}` : "—"}</td>
-                <td className="px-3 py-3 text-slate-600">{t.ref_code || "—"}</td>
-                <td className="px-3 py-3 text-slate-400">{t.note || ""}</td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={9} className="px-4 py-10 text-center text-slate-400">Chưa có giao dịch</td></tr>}
-            <Filler cols={9} />
-          </tbody>
-        </table>
-      </div>
-      <Pager />
-    </div>
-  );
+  const columns = [
+    { key: "created_at", label: "Thời gian", filter: "date", tdClass: "text-slate-500", render: (t) => new Date(t.created_at).toLocaleString("vi-VN") },
+    { key: "trx_type", label: "Loại", filter: "select", render: (t) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[t.trx_type] || ""}`}>{t.trx_type}</span> },
+    { key: "product_code", label: "Mã SP", filter: "text", tdClass: "font-medium text-blue-600" },
+    { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
+    { key: "_specs", label: "Thông số", filter: "text", tdClass: "text-slate-500",
+      filterValue: (t) => specShort(t.specs),
+      render: (t) => specShort(t.specs) || "—" },
+    { key: "lot_code", label: "Lô", filter: "text", tdClass: "text-slate-600", render: (t) => t.lot_code || "—" },
+    { key: "quantity", label: "Số lượng", align: "right", render: (t) => <span className={`font-semibold ${t.trx_type === "Xuất" ? "text-rose-600" : "text-emerald-600"}`}>{t.trx_type === "Xuất" ? "−" : "+"}{fmt(t.quantity)}</span> },
+    { key: "warehouse_name", label: "Kho/Vị trí", filter: "select", tdClass: "text-slate-600", render: (t) => t.warehouse_name ? `${t.warehouse_name} · ${t.location_name}` : "—" },
+    { key: "ref_code", label: "Chứng từ", filter: "text", tdClass: "text-slate-600", render: (t) => t.ref_code || "—" },
+    { key: "note", label: "Ghi chú", filter: "text", tdClass: "text-slate-400", render: (t) => t.note || "" },
+  ];
+
+  return <DataTable dense columns={columns} rows={rows} rowKey={(t) => t.id} emptyText="Chưa có giao dịch" />;
 }
 
 /* ---- Hub Kho ---- */
-export default function InventoryModule({ lookups, onOpenProduct }) {
+export default function InventoryModule({ lookups }) {
   const [tab, setTab] = useState("stock");
   const tabs = [
     { key: "stock", label: "Tồn kho", icon: Warehouse },
     { key: "trx", label: "Lịch sử giao dịch", icon: History },
   ];
+
   return (
     <div className="space-y-5">
       <ListHeader title="Kho" />
@@ -208,7 +265,7 @@ export default function InventoryModule({ lookups, onOpenProduct }) {
           </button>
         ))}
       </div>
-      {tab === "stock" ? <StockTab lookups={lookups} onOpenProduct={onOpenProduct} /> : <TransactionsTab />}
+      {tab === "stock" ? <TreeTab lookups={lookups} /> : <TransactionsTab />}
     </div>
   );
 }

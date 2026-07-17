@@ -1,34 +1,37 @@
 import React, { useState, useEffect, useCallback } from "react";
-import QRCode from "qrcode";
-import { Printer, QrCode } from "lucide-react";
+import { Printer, Tag } from "lucide-react";
 import { ListHeader } from "../components.jsx";
 import { production } from "../mesApi.js";
 import { inputCls, fmt, fmtDate } from "../ui.js";
 
-/* Ảnh QR sinh từ chuỗi text */
-function QR({ text, size }) {
-  const [url, setUrl] = useState("");
-  useEffect(() => { QRCode.toDataURL(text || " ", { width: size, margin: 1 }).then(setUrl).catch(() => {}); }, [text, size]);
-  return url ? <img src={url} width={size} height={size} alt="QR" /> : <div style={{ width: size, height: size }} className="bg-slate-100 rounded" />;
-}
-
-const ALL_FIELDS = [
-  { key: "sales_order", label: "Mã đơn hàng" },
-  { key: "po", label: "Mã lệnh SX" },
-  { key: "task", label: "Mã lô" },
-  { key: "stage", label: "Công đoạn" },
-  { key: "type", label: "Loại (TP/BTP)" },
+// Các thông tin có thể in lên tem (khách không có máy quét QR → in chữ to, rõ)
+const PROD_FIELDS = [
   { key: "product", label: "Sản phẩm" },
   { key: "color", label: "Màu sắc" },
   { key: "size", label: "Kích thước" },
   { key: "thickness", label: "Độ dày" },
   { key: "qty", label: "Số lượng" },
+  { key: "type", label: "Loại (TP/BTP)" },
   { key: "machine", label: "Máy" },
   { key: "date", label: "Ngày SX" },
-  { key: "customer", label: "Khách hàng" },
+  { key: "sales_order", label: "Mã đơn hàng" },
+  { key: "po", label: "Mã lệnh SX" },
+  { key: "task", label: "Mã lô" },
 ];
-const DEFAULT_ON = ["sales_order", "task", "stage", "type", "product", "color", "size", "qty", "date"];
-const QR_PX = { S: 84, M: 116, L: 150 };
+const CUST_FIELDS = [
+  { key: "customer", label: "Khách hàng" },
+  { key: "customer_phone", label: "Điện thoại" },
+  { key: "customer_address", label: "Địa chỉ" },
+];
+const ALL_FIELDS = [...PROD_FIELDS, ...CUST_FIELDS];
+const DEFAULT_ON = ["product", "color", "size", "thickness", "qty", "type", "date", "sales_order", "task", "customer", "customer_phone", "customer_address"];
+
+// Cỡ chữ theo cỡ tem
+const SIZE_CFG = {
+  S: { w: 300, title: "text-base", value: "text-sm", label: "text-[11px]", head: "text-lg" },
+  M: { w: 380, title: "text-lg", value: "text-base", label: "text-xs", head: "text-2xl" },
+  L: { w: 480, title: "text-xl", value: "text-lg", label: "text-sm", head: "text-3xl" },
+};
 
 export default function QrLabelsModule() {
   const [orderList, setOrderList] = useState([]);
@@ -64,19 +67,27 @@ export default function QrLabelsModule() {
     machine: t.machine_name || "—",
     date: fmtDate(t.planned_date),
     customer: order.customer_name || "—",
+    customer_phone: order.customer_phone || "—",
+    customer_address: order.customer_address || "—",
   });
-  const activeFields = ALL_FIELDS.filter((f) => fields[f.key]);
-  const linesOf = (d) => activeFields.map((f) => `${f.label}: ${d[f.key]}`);
+  const on = (k) => fields[k];
   const toggle = (k) => setFields((s) => ({ ...s, [k]: !s[k] }));
 
   // mở rộng theo số bản in
   const labels = [];
   tasks.forEach((t) => { for (let i = 0; i < Math.max(1, copies); i++) labels.push(t); });
-  const qrpx = QR_PX[size];
+  const cfg = SIZE_CFG[size];
+
+  const Row = ({ label, value }) => (
+    <div className="flex gap-2 items-baseline">
+      <span className={`${cfg.label} text-slate-500 shrink-0`}>{label}:</span>
+      <span className={`${cfg.value} font-bold text-slate-900 break-words`}>{value}</span>
+    </div>
+  );
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Tem QR sản xuất" />
+      <ListHeader title="Tem dán sản xuất" />
 
       {/* Cấu hình */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 no-print">
@@ -119,7 +130,7 @@ export default function QrLabelsModule() {
       </div>
 
       {/* Khu tem */}
-      {!order && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 no-print">Chọn một lệnh sản xuất để sinh tem QR cho từng lô.</div>}
+      {!order && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 no-print">Chọn một lệnh sản xuất để tạo tem dán cho từng lô.</div>}
       {order && tasks.length === 0 && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 no-print">Lệnh này chưa được chia lô (phân công). Vào <b>Sản xuất → mở lệnh → Phân công</b> trước.</div>}
 
       {order && tasks.length > 0 && (
@@ -127,12 +138,46 @@ export default function QrLabelsModule() {
           {labels.map((t, i) => {
             const d = dataOf(t);
             return (
-              <div key={i} className="qr-label flex gap-3 border border-slate-300 rounded-lg p-3 bg-white" style={{ width: size === "L" ? 360 : size === "M" ? 300 : 250 }}>
-                <div className="shrink-0"><QR text={[d.task, ...linesOf(d)].join("\n")} size={qrpx} /></div>
-                <div className="text-[11px] leading-snug text-slate-700 min-w-0">
-                  {activeFields.map((f) => (
-                    <div key={f.key} className="truncate"><span className="text-slate-400">{f.label}:</span> <b>{d[f.key]}</b></div>
-                  ))}
+              <div key={i} className="qr-label border-2 border-slate-800 rounded-lg bg-white overflow-hidden" style={{ width: cfg.w }}>
+                {/* Đầu tem: công đoạn + mã lô (to, nổi bật) */}
+                <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between">
+                  <span className={`${cfg.head} font-extrabold leading-none`}>{d.stage}</span>
+                  {on("task") && <span className={`${cfg.title} font-bold`}>{d.task}</span>}
+                </div>
+
+                <div className="px-4 py-3 space-y-2">
+                  {/* Sản phẩm nổi bật nhất */}
+                  {on("product") && <div className={`${cfg.head} font-extrabold text-slate-900 leading-tight`}>{d.product}</div>}
+
+                  {/* Thông số */}
+                  {(on("color") || on("size") || on("thickness")) && (
+                    <div className={`${cfg.value} font-bold text-slate-800`}>
+                      {[on("color") && d.color, on("size") && d.size, on("thickness") && d.thickness].filter(Boolean).join("  ·  ")}
+                    </div>
+                  )}
+                  {on("qty") && <div className={`${cfg.head} font-extrabold text-blue-700`}>SL: {d.qty}</div>}
+
+                  <div className="space-y-0.5">
+                    {on("type") && <Row label="Loại" value={d.type} />}
+                    {on("machine") && <Row label="Máy" value={d.machine} />}
+                    {on("date") && <Row label="Ngày SX" value={d.date} />}
+                    {on("sales_order") && <Row label="Mã ĐH" value={d.sales_order} />}
+                    {on("po") && <Row label="Mã LSX" value={d.po} />}
+                  </div>
+
+                  {/* Khối khách hàng */}
+                  {(on("customer") || on("customer_phone") || on("customer_address")) && (
+                    <div className="mt-2 pt-2 border-t-2 border-dashed border-slate-300">
+                      {on("customer") && (
+                        <div className="flex gap-2 items-baseline">
+                          <span className={`${cfg.label} text-slate-500 shrink-0`}>Khách hàng:</span>
+                          <span className={`${cfg.head} font-extrabold text-slate-900 break-words`}>{d.customer}</span>
+                        </div>
+                      )}
+                      {on("customer_phone") && <Row label="Điện thoại" value={d.customer_phone} />}
+                      {on("customer_address") && <Row label="Địa chỉ" value={d.customer_address} />}
+                    </div>
+                  )}
                 </div>
               </div>
             );

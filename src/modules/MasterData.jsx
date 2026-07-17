@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Pencil, Save, Upload, Download, FileDown } from "lucide-react";
 import * as XLSX from "xlsx";
-import { resource } from "../mesApi.js";
+import { resource, customerOrders, machineOrders, nextCode } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
-import { ListHeader, usePager } from "../components.jsx";
-import { inputCls, statusClass } from "../ui.js";
+import { ListHeader, DataTable, PageHeader, Section } from "../components.jsx";
+import { inputCls, statusClass, fmt, fmtDate } from "../ui.js";
 
 const isObjOptions = (f) => f.type === "select" && f.options && typeof f.options[0] === "object";
 
@@ -17,8 +17,8 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-/* ---- Modal thêm/sửa tổng quát ---- */
-function RecordModal({ cfg, record, onClose, onSaved }) {
+/* ---- Trang thêm/sửa tổng quát ---- */
+function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductionOrder }) {
   const isEdit = !!record?.id;
   const [f, setF] = useState(() => {
     const init = {};
@@ -27,6 +27,25 @@ function RecordModal({ cfg, record, onClose, onSaved }) {
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const api = resource(cfg.resource);
+
+  // Mã: hiện mã thật khi sửa, mã dự kiến khi thêm mới
+  const codeKey = cfg.columns[0]?.key;
+  const [code, setCode] = useState(isEdit ? (record?.[codeKey] || "") : "");
+  useEffect(() => { if (!isEdit) nextCode(cfg.resource).then(setCode).catch(() => {}); }, [isEdit, cfg.resource]); // eslint-disable-line
+
+  // Dữ liệu liên quan: đơn hàng đã mua (chỉ với khách hàng, chế độ sửa)
+  const showOrders = cfg.resource === "customers" && isEdit;
+  const [orders, setOrders] = useState([]);
+  useEffect(() => {
+    if (showOrders) customerOrders(record.id).then(setOrders).catch(() => {});
+  }, [showOrders, record?.id]); // eslint-disable-line
+
+  // Dữ liệu liên quan: lệnh sản xuất đã chạy (chỉ với máy móc, chế độ sửa)
+  const showMachine = cfg.resource === "machines" && isEdit;
+  const [mTasks, setMTasks] = useState([]);
+  useEffect(() => {
+    if (showMachine) machineOrders(record.id).then(setMTasks).catch(() => {});
+  }, [showMachine, record?.id]); // eslint-disable-line
 
   const save = async () => {
     for (const fl of cfg.fields)
@@ -38,14 +57,22 @@ function RecordModal({ cfg, record, onClose, onSaved }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-slate-800">{isEdit ? "Sửa" : "Thêm"} {cfg.title.toLowerCase()}</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {cfg.fields.map((fl) => (
-            <div key={fl.key} className={fl.full ? "col-span-2" : ""}>
+    <div className="space-y-5">
+      <PageHeader title={`${isEdit ? "Sửa" : "Thêm"} ${cfg.title.toLowerCase()}`} onBack={onBack}
+        actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>} />
+      <Section title="Thông tin">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+          <Field label={cfg.columns[0]?.label || "Mã"}>
+            <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={code || "(tự sinh khi lưu)"} />
+          </Field>
+          {cfg.fields.filter((fl) => !(fl.readOnly && !isEdit)).map((fl) => (
+            <div key={fl.key} className={fl.full ? "md:col-span-2 lg:col-span-3" : ""}>
               <Field label={fl.label} required={fl.required}>
-                {fl.type === "select" ? (
+                {fl.readOnly ? (
+                  fl.badge
+                    ? <div className="pt-1"><span className={`inline-flex px-2.5 py-1 rounded-full text-sm font-medium ${statusClass(record?.[fl.key])}`}>{record?.[fl.key] || "—"}</span></div>
+                    : <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={record?.[fl.key] ?? "—"} />
+                ) : fl.type === "select" ? (
                   <select className={inputCls} value={f[fl.key]} onChange={(e) => set(fl.key, e.target.value)}>
                     <option value="">-- Chọn --</option>
                     {fl.options.map((o) =>
@@ -61,22 +88,85 @@ function RecordModal({ cfg, record, onClose, onSaved }) {
             </div>
           ))}
         </div>
-        <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="btn-ghost">Hủy</button>
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>
-        </div>
-      </div>
+      </Section>
+
+      {showOrders && (
+        <Section title={`Đơn hàng đã mua (${orders.length})`}>
+          {orders.length === 0 ? (
+            <div className="text-slate-400 text-sm">Khách hàng này chưa có đơn hàng.</div>
+          ) : (
+            <div className="space-y-3">
+              {orders.map((o) => (
+                <div key={o.id} className="border border-slate-200 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => onOpenOrder?.(o.id)} className="font-semibold text-blue-600 hover:underline">{o.order_code}</button>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span>
+                    </div>
+                    <div className="text-xs text-slate-500">Đặt: {fmtDate(o.order_date)} · Giao: {fmtDate(o.due_date)}</div>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead className="text-slate-400 text-xs uppercase">
+                      <tr>{["Sản phẩm", "Số lượng", "Màu", "Kích thước", "Độ dày"].map((h) =>
+                        <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {o.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="px-4 py-2 text-slate-800">{it.product_name} <span className="text-slate-400">({it.product_code})</span></td>
+                          <td className="px-4 py-2">{fmt(it.quantity)} {it.unit || ""}</td>
+                          <td className="px-4 py-2">{it.attr_color || "—"}</td>
+                          <td className="px-4 py-2">{it.attr_size || "—"}</td>
+                          <td className="px-4 py-2">{it.attr_thickness || "—"}</td>
+                        </tr>
+                      ))}
+                      {!o.items.length && <tr><td colSpan={5} className="px-4 py-3 text-center text-slate-400">Không có dòng hàng</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {showMachine && (
+        <Section title={`Lệnh sản xuất đã chạy trên máy (${mTasks.length})`} bodyClass="p-0">
+          {mTasks.length === 0 ? (
+            <div className="p-6 text-slate-400 text-sm">Máy này chưa có phân công sản xuất nào.</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                <tr>{["Mã lệnh", "Sản phẩm", "Công đoạn", "Sản lượng", "Ngày SX", "Ca", "Trạng thái"].map((h) =>
+                  <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {mTasks.map((t) => (
+                  <tr key={t.id} className="hover:bg-slate-50/70">
+                    <td className="px-4 py-3"><button onClick={() => onOpenProductionOrder?.(t.production_order_id)} className="font-medium text-blue-600 hover:underline">{t.order_code}</button></td>
+                    <td className="px-4 py-3 text-slate-800">{t.product_name} <span className="text-slate-400">({t.product_code})</span></td>
+                    <td className="px-4 py-3">{t.stage}</td>
+                    <td className="px-4 py-3">{fmt(t.quantity)}</td>
+                    <td className="px-4 py-3">{fmtDate(t.planned_date)}</td>
+                    <td className="px-4 py-3">{t.shift || "—"}</td>
+                    <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(t.status)}`}>{t.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
+      )}
     </div>
   );
 }
 
 /* ---- Bảng danh mục tổng quát ---- */
-function MasterTable({ cfg }) {
+function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   const { can } = usePerm();
   const [rows, setRows] = useState([]);
   const [editing, setEditing] = useState(null); // record hoặc {} để thêm mới
   const api = resource(cfg.resource);
-  const { slice, Pager, Filler } = usePager(rows);
 
   const load = useCallback(async () => {
     try { setRows(await api.list()); } catch (e) { alert("Lỗi tải: " + e.message); }
@@ -122,8 +212,10 @@ function MasterTable({ cfg }) {
       const wb = XLSX.read(await file.arrayBuffer());
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const codeCol = cfg.columns[0]; // cột mã (vd Mã NV) — gửi lên để backend chặn trùng
       const payloads = json.map((row) => {
         const p = {};
+        if (codeCol) { const cv = row[codeCol.label]; if (cv !== undefined && cv !== "") p[codeCol.key] = String(cv).trim(); }
         cfg.fields.forEach((f) => {
           let v = row[f.label];
           if (v === undefined || v === "") return;
@@ -131,7 +223,7 @@ function MasterTable({ cfg }) {
           p[f.key] = typeof v === "string" ? v.trim() : v;
         });
         return p;
-      }).filter((p) => Object.keys(p).length);
+      }).filter((p) => Object.keys(p).filter((k) => k !== (codeCol && codeCol.key)).length);
       if (!payloads.length) return alert("Không đọc được dòng dữ liệu hợp lệ. Kiểm tra tiêu đề cột khớp file mẫu.");
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} dòng.`;
@@ -140,6 +232,30 @@ function MasterTable({ cfg }) {
       load();
     } catch (e) { alert("Lỗi đọc file: " + e.message); }
   };
+
+  const dtCols = [
+    ...cfg.columns.map((c, ci) => ({
+      key: c.key, label: c.label,
+      filter: c.badge ? "select" : (c.filter || "text"),
+      filterValue: c.render && !c.badge ? c.render : undefined,
+      render: ci === 0
+        ? (r) => <button onClick={() => setEditing(r)} className="font-medium text-blue-600 hover:underline">{r[c.key] || "—"}</button>
+        : c.badge
+          ? (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r[c.key])}`}>{r[c.key]}</span>
+          : c.render ? c.render : (r) => (r[c.key] || "—"),
+    })),
+    {
+      key: "__act", label: "", align: "right",
+      render: (r) => (<>
+        {can("masterdata", "edit") && <button onClick={() => setEditing(r)} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>}
+        {can("masterdata", "delete") && <button onClick={() => del(r.id)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>}
+      </>),
+    },
+  ];
+
+  if (editing)
+    return <RecordForm cfg={cfg} record={editing.id ? editing : null} onOpenOrder={onOpenOrder} onOpenProductionOrder={onOpenProductionOrder}
+      onBack={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />;
 
   return (
     <div className="space-y-4">
@@ -155,40 +271,7 @@ function MasterTable({ cfg }) {
         <button onClick={exportExcel} className="btn-ghost"><Download size={16} /> Xuất Excel</button>
         {can("masterdata", "create") && <button onClick={() => setEditing({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide sticky top-[68px] z-10">
-            <tr>
-              {cfg.columns.map((c) => <th key={c.key} className="text-left px-4 py-3 font-semibold">{c.label}</th>)}
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50/70">
-                {cfg.columns.map((c, ci) => (
-                  <td key={c.key} className="px-4 py-3 text-slate-700">
-                    {ci === 0 ? <button onClick={() => setEditing(r)} className="font-medium text-blue-600 hover:underline">{r[c.key] || "—"}</button>
-                      : c.badge ? <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r[c.key])}`}>{r[c.key]}</span>
-                      : c.render ? c.render(r) : (r[c.key] || "—")}
-                  </td>
-                ))}
-                <td className="px-4 py-3 text-right">
-                  {can("masterdata", "edit") && <button onClick={() => setEditing(r)} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>}
-                  {can("masterdata", "delete") && <button onClick={() => del(r.id)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>}
-                </td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={cfg.columns.length + 1} className="px-4 py-10 text-center text-slate-400">Chưa có dữ liệu</td></tr>}
-            <Filler cols={cfg.columns.length + 1} />
-          </tbody>
-        </table>
-      </div>
-      <Pager />
-      {editing && (
-        <RecordModal cfg={cfg} record={editing.id ? editing : null}
-          onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />
-      )}
+      <DataTable rows={rows} rowKey={(r) => r.id} emptyText="Chưa có dữ liệu" columns={dtCols} />
     </div>
   );
 }
@@ -203,7 +286,7 @@ function buildConfigs(lookups) {
       title: "Khách hàng", resource: "customers",
       columns: [
         { key: "customer_code", label: "Mã KH" }, { key: "name", label: "Tên khách hàng" },
-        { key: "customer_type", label: "Loại" }, { key: "phone", label: "Điện thoại" },
+        { key: "customer_type", label: "Loại", filter: "select" }, { key: "phone", label: "Điện thoại" },
         { key: "address", label: "Địa chỉ" }, { key: "status", label: "Trạng thái", badge: true },
       ],
       fields: [
@@ -218,25 +301,29 @@ function buildConfigs(lookups) {
       title: "Máy móc", resource: "machines",
       columns: [
         { key: "machine_code", label: "Mã máy" }, { key: "name", label: "Tên máy" },
-        { key: "factory", label: "Nhà máy" }, { key: "machine_type", label: "Loại máy" },
-        { key: "status", label: "Trạng thái", badge: true },
+        { key: "factory", label: "Nhà máy", filter: "select" }, { key: "machine_type", label: "Loại máy", filter: "select" },
+        { key: "production_status", label: "Trạng thái SX", badge: true },
+        { key: "status", label: "Tình trạng", badge: true },
       ],
       fields: [
         { key: "name", label: "Tên máy", required: true, full: true },
         { key: "factory", label: "Nhà máy", type: "select", required: true, options: ["Nhà máy thổi", "Nhà máy cắt"] },
         { key: "machine_type", label: "Loại máy", placeholder: "Máy thổi lớn / Máy cắt..." },
-        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Bảo trì", "Ngừng"], default: "Hoạt động" },
+        { key: "production_status", label: "Trạng thái SX (tự động)", readOnly: true, badge: true },
+        { key: "status", label: "Tình trạng máy", type: "select", options: ["Hoạt động", "Bảo trì", "Ngừng"], default: "Hoạt động" },
       ],
     },
     warehouses: {
       title: "Kho", resource: "warehouses",
       columns: [
         { key: "warehouse_code", label: "Mã kho" }, { key: "name", label: "Tên kho" },
-        { key: "warehouse_type", label: "Loại kho" },
+        { key: "warehouse_type", label: "Loại kho", filter: "select" },
+        { key: "status", label: "Trạng thái", badge: true },
       ],
       fields: [
         { key: "name", label: "Tên kho", required: true, full: true },
         { key: "warehouse_type", label: "Loại kho", type: "select", options: ["NVL", "BTP", "TP"], default: "NVL" },
+        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Đang kiểm đếm", "Không hoạt động"], default: "Hoạt động" },
       ],
     },
     locations: {
@@ -268,8 +355,8 @@ function buildConfigs(lookups) {
       title: "Nhân viên", resource: "employees",
       columns: [
         { key: "employee_code", label: "Mã NV" }, { key: "name", label: "Họ và tên" },
-        { key: "factory", label: "Đơn vị" }, { key: "position", label: "Chức vụ" },
-        { key: "skill_level", label: "Bậc thợ" }, { key: "phone", label: "Điện thoại" },
+        { key: "factory", label: "Đơn vị", filter: "select" }, { key: "position", label: "Chức vụ", filter: "select" },
+        { key: "skill_level", label: "Bậc thợ", filter: "select" }, { key: "phone", label: "Điện thoại" },
         { key: "status", label: "Trạng thái", badge: true },
       ],
       fields: [
@@ -297,8 +384,8 @@ function buildConfigs(lookups) {
 }
 
 /* ---- Màn 1 danh mục (mỗi danh mục là 1 app riêng dưới nhóm Danh mục) ---- */
-export default function MasterDataScreen({ lookups, entity }) {
+export default function MasterDataScreen({ lookups, entity, onOpenOrder, onOpenProductionOrder }) {
   const cfg = buildConfigs(lookups)[entity];
   if (!cfg) return <div className="text-slate-400 text-sm py-10">Danh mục không hợp lệ.</div>;
-  return <MasterTable key={entity} cfg={cfg} />;
+  return <MasterTable key={entity} cfg={cfg} onOpenOrder={onOpenOrder} onOpenProductionOrder={onOpenProductionOrder} />;
 }

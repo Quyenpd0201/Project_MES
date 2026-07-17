@@ -1,26 +1,29 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import * as XLSX from "xlsx";
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
-  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch,
+  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers,
 } from "lucide-react";
-import { getLookups, getDashboard, auth, setToken } from "./src/mesApi.js";
+import { getLookups, getDashboard, auth, setToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
-import { fmt, fmtDate, statusClass } from "./src/ui.js";
+import { fmt, fmtDate, statusClass, dueTone } from "./src/ui.js";
 import ProductionModule from "./src/modules/Production.jsx";
-import PlanningModule from "./src/modules/Planning.jsx";
+import ExecutionModule from "./src/modules/Execution.jsx";
+import PlanningModule, { OrderStatusModule } from "./src/modules/Planning.jsx";
 import InventoryModule from "./src/modules/Inventory.jsx";
 import MasterDataScreen from "./src/modules/MasterData.jsx";
 import BomModule from "./src/modules/Bom.jsx";
 import OrdersModule from "./src/modules/Orders.jsx";
+import DeliveriesModule from "./src/modules/Deliveries.jsx";
 import WorkScheduleModule from "./src/modules/WorkSchedule.jsx";
 import QrLabelsModule from "./src/modules/QrLabels.jsx";
 import QrScanModule from "./src/modules/QrScan.jsx";
 import ProcessModule from "./src/modules/Process.jsx";
 import PermissionsModule from "./src/modules/Permissions.jsx";
-import { PageHeader, Section, ListHeader, usePager } from "./src/components.jsx";
+import { PageHeader, Section, ListHeader, usePager, DataTable, Logo } from "./src/components.jsx";
 
 /* =====================================================================
    MES — Quản lý Sản phẩm & Dashboard (single-file demo)
@@ -29,8 +32,7 @@ import { PageHeader, Section, ListHeader, usePager } from "./src/components.jsx"
    ===================================================================== */
 
 /* ----------------------------- Mock data ----------------------------- */
-const PRODUCT_TYPES = ["Thành phẩm", "Bán thành phẩm", "NVL", "Dịch vụ"];
-const ATTRIBUTE_NAMES = ["Kích thước", "Độ dày", "Màu sắc", "Trọng lượng", "Chất liệu"];
+const PRODUCT_TYPES = ["Thành phẩm", "Bán thành phẩm", "Nguyên vật liệu"];
 const AREAS = ["Xưởng thổi", "Xưởng cắt"];
 
 /* ----------------------------- API client ----------------------------- */
@@ -66,7 +68,23 @@ const api = {
   create: (payload) => http(`/api/products`, { method: "POST", body: JSON.stringify(payload) }),
   update: (id, payload) => http(`/api/products/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   remove: (id) => http(`/api/products/${id}`, { method: "DELETE" }),
+  importRows: (rows) => http(`/api/products/import`, { method: "POST", body: JSON.stringify({ rows }) }),
 };
+
+// Cột Excel cho Sản phẩm (nhãn ↔ key) — dùng cho Tải mẫu / Nhập / Xuất
+const PRODUCT_XLSX_COLS = [
+  { key: "product_code", label: "Mã SP" },
+  { key: "product_name", label: "Tên sản phẩm" },
+  { key: "product_type", label: "Loại" },
+  { key: "production_area", label: "Khu vực SX" },
+  { key: "category", label: "Danh mục" },
+  { key: "product_group", label: "Nhóm SP" },
+  { key: "unit", label: "Đơn vị tính" },
+  { key: "barcode_type", label: "Loại mã vạch" },
+  { key: "tracking_type", label: "Hình thức theo dõi" },
+  { key: "status", label: "Trạng thái" },
+  { key: "description", label: "Mô tả" },
+];
 
 /* ----------------------------- UI helpers ----------------------------- */
 const StatusBadge = ({ status }) => {
@@ -96,13 +114,16 @@ const inputCls =
 /* ============================== SIDEBAR ============================== */
 function Sidebar({ active, onNav, user, onLogout }) {
   const allItems = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, always: true },
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { key: "products", label: "Sản phẩm", icon: Package },
     { key: "bom", label: "Định mức (BOM)", icon: FlaskConical },
     { key: "process", label: "Quy trình CN", icon: GitBranch },
     { key: "orders", label: "Đơn hàng", icon: ShoppingCart },
+    { key: "deliveries", label: "Phiếu giao hàng", icon: FileText },
     { key: "planning", label: "Kế hoạch", icon: ClipboardList },
     { key: "production", label: "Sản xuất", icon: Factory },
+    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "planning" },
+    { key: "execution", label: "Thực thi SX", icon: Hammer },
     { key: "qrlabels", label: "Tem QR", icon: QrCode },
     { key: "qrscan", label: "Quét QR", icon: ScanLine },
     { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays },
@@ -131,16 +152,14 @@ function Sidebar({ active, onNav, user, onLogout }) {
   const items = allItems.filter(canSee);
   const [expanded, setExpanded] = useState({});
   const itemCls = (on) =>
-    `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition ${
-      on ? "bg-blue-600 text-white" : "hover:bg-slate-800 hover:text-white"}`;
+    `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+      on ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
 
   return (
-    <aside className="w-60 shrink-0 bg-slate-900 text-slate-300 h-screen flex flex-col">
-      <div className="px-4 py-5 border-b border-slate-800 shrink-0">
-        <div className="bg-white rounded-lg px-3 py-2.5">
-          <img src="/logo.png" alt="Bao Bì Ngọc An Thư" className="w-full h-auto" />
-        </div>
-        <div className="text-[11px] text-slate-400 mt-2 text-center">Bao Bì Ngọc An Thư · Hệ thống MES</div>
+    <aside className="w-60 shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col">
+      <div className="px-4 py-4 border-b border-slate-100 shrink-0 text-center">
+        <Logo className="max-h-20 max-w-full w-auto mx-auto object-contain" />
+        <div className="text-[11px] text-slate-400 mt-1">Hệ thống MES</div>
       </div>
       <nav className="nav-scroll flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
         {items.map((it) => {
@@ -156,11 +175,11 @@ function Sidebar({ active, onNav, user, onLogout }) {
                   <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />
                 </button>
                 {open && (
-                  <div className="mt-1 ml-4 pl-3 border-l border-slate-700 space-y-1">
+                  <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {it.children.map((c) => (
                       <button key={c.key} onClick={() => onNav(c.key)}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
-                          active === c.key ? "bg-blue-600 text-white" : "hover:bg-slate-800 hover:text-white"}`}>
+                          active === c.key ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
                         <c.icon size={15} /> {c.label}
                       </button>
                     ))}
@@ -177,17 +196,17 @@ function Sidebar({ active, onNav, user, onLogout }) {
           );
         })}
       </nav>
-      <div className="px-4 py-3 border-t border-slate-800 shrink-0">
+      <div className="px-4 py-3 border-t border-slate-100 shrink-0">
         <div className="flex items-center gap-2 mb-2">
           <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
             {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <div className="text-sm text-white truncate">{user?.full_name || user?.username}</div>
+            <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
             <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
           </div>
         </div>
-        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition">
+        <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition">
           <LogOut size={16} /> Đăng xuất
         </button>
       </div>
@@ -196,97 +215,131 @@ function Sidebar({ active, onNav, user, onLogout }) {
 }
 
 /* ============================ PRODUCT LIST ============================ */
-function ProductList({ onOpen, onCreate }) {
+function ProductList({ onOpen, onCreate, onCopy }) {
   const { can } = usePerm();
-  const [filters, setFilters] = useState({ area: "", code: "", name: "", type: "" });
   const [rows, setRows] = useState([]);
-  const { slice, Pager, Filler } = usePager(rows);
 
   const load = useCallback(async () => {
-    try { setRows(await api.list(filters)); }
+    try { setRows(await api.list({})); }
     catch (e) { console.error(e); alert("Lỗi tải danh sách: " + e.message); }
-  }, [filters]);
+  }, []);
   useEffect(() => { load(); }, [load]);
 
-  const reset = () => setFilters({ area: "", code: "", name: "", type: "" });
   const del = async (id) => {
     if (!confirm("Xóa sản phẩm này?")) return;
     try { await api.remove(id); load(); }
     catch (e) { alert("Lỗi xóa sản phẩm: " + e.message); }
   };
 
+  // Tải file mẫu (chỉ tiêu đề)
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([PRODUCT_XLSX_COLS.map((c) => c.label)]);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "SanPham");
+    XLSX.writeFile(wb, "mau-san-pham.xlsx");
+  };
+  // Xuất danh sách hiện tại
+  const exportExcel = () => {
+    const data = rows.map((r) => {
+      const o = {};
+      PRODUCT_XLSX_COLS.forEach((c) => {
+        o[c.label] = c.key === "product_type"
+          ? (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type)
+          : (r[c.key] ?? "");
+      });
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(data, { header: PRODUCT_XLSX_COLS.map((c) => c.label) });
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "SanPham");
+    XLSX.writeFile(wb, "san-pham.xlsx");
+  };
+  // Nhập từ Excel — chặn trùng mã/tên ở backend
+  const importExcel = async (file) => {
+    try {
+      const wb = XLSX.read(await file.arrayBuffer());
+      const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      const payloads = json.map((row) => {
+        const p = {};
+        PRODUCT_XLSX_COLS.forEach((c) => { const v = row[c.label]; if (v !== undefined && v !== "") p[c.key] = typeof v === "string" ? v.trim() : v; });
+        return p;
+      }).filter((p) => p.product_name);
+      if (!payloads.length) return alert("Không đọc được dòng hợp lệ. Kiểm tra cột tiêu đề khớp file mẫu (cần cột 'Tên sản phẩm').");
+      const res = await api.importRows(payloads);
+      let msg = `Đã nhập ${res.inserted}/${payloads.length} sản phẩm.`;
+      if (res.failed) msg += `\nBỏ qua ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
+      alert(msg); load();
+    } catch (e) { alert("Lỗi đọc file: " + e.message); }
+  };
+
+  const columns = [
+    { key: "product_code", label: "Mã SP", filter: "text", render: (p) => <button onClick={() => onOpen(p.id)} className="text-blue-600 font-medium hover:underline">{p.product_code}</button> },
+    { key: "product_name", label: "Tên sản phẩm", filter: "text", tdClass: "text-slate-800" },
+    { key: "status", label: "Trạng thái", filter: "select", render: (p) => <StatusBadge status={p.status} /> },
+    { key: "product_type", label: "Loại", filter: "select", tdClass: "text-slate-600",
+      filterValue: (r) => (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type),
+      render: (r) => (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type) },
+    { key: "description", label: "Mô tả", filter: "text", tdClass: "text-slate-500 max-w-xs truncate" },
+    { key: "_act", label: "Hành động", align: "center", render: (p) => (<>
+        {can("products", "create") && <button onClick={() => onCopy(p.id)} title="Sao chép thành SP mới" className="text-slate-400 hover:text-blue-600 transition p-1"><Copy size={16} /></button>}
+        <button onClick={() => del(p.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 transition p-1"><Trash2 size={16} /></button>
+      </>) },
+  ];
+
   return (
     <div className="space-y-5">
       <ListHeader title="Danh sách sản phẩm" actions={<>
-        <button className="btn-ghost"><Download size={16} /> Xuất file</button>
-        <button className="btn-ghost"><Upload size={16} /> Nhập file</button>
-        <button onClick={reset} className="btn-ghost"><RotateCcw size={16} /> Đặt lại</button>
+        <button onClick={downloadTemplate} className="btn-ghost"><FileText size={16} /> Tải mẫu</button>
+        {can("products", "create") && (
+          <label className="btn-ghost cursor-pointer"><Upload size={16} /> Nhập Excel
+            <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { if (e.target.files[0]) importExcel(e.target.files[0]); e.target.value = ""; }} />
+          </label>
+        )}
+        <button onClick={exportExcel} className="btn-ghost"><Download size={16} /> Xuất Excel</button>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Tải lại</button>
         {can("products", "create") && <button onClick={onCreate} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
-
-      {/* Search bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
-        <select value={filters.area} onChange={(e) => setFilters({ ...filters, area: e.target.value })} className={inputCls}>
-          <option value="">Đơn vị sản xuất</option>
-          {AREAS.map((a) => <option key={a}>{a}</option>)}
-        </select>
-        <input placeholder="Mã sản phẩm" value={filters.code}
-          onChange={(e) => setFilters({ ...filters, code: e.target.value })} className={inputCls} />
-        <input placeholder="Tên sản phẩm" value={filters.name}
-          onChange={(e) => setFilters({ ...filters, name: e.target.value })} className={inputCls} />
-        <select value={filters.type} onChange={(e) => setFilters({ ...filters, type: e.target.value })} className={inputCls}>
-          <option value="">Loại sản phẩm</option>
-          {PRODUCT_TYPES.map((t) => <option key={t}>{t}</option>)}
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>
-              <th className="text-left px-4 py-3 font-semibold">Mã SP</th>
-              <th className="text-left px-4 py-3 font-semibold">Tên sản phẩm</th>
-              <th className="text-left px-4 py-3 font-semibold">Trạng thái</th>
-              <th className="text-left px-4 py-3 font-semibold">Loại</th>
-              <th className="text-left px-4 py-3 font-semibold">Mô tả</th>
-              <th className="text-center px-4 py-3 font-semibold">Hành động</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((p) => (
-              <tr key={p.id} className="hover:bg-slate-50/70">
-                <td className="px-4 py-3">
-                  <button onClick={() => onOpen(p.id)} className="text-blue-600 font-medium hover:underline">
-                    {p.product_code}
-                  </button>
-                </td>
-                <td className="px-4 py-3 text-slate-800">{p.product_name}</td>
-                <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                <td className="px-4 py-3 text-slate-600">{p.product_type}</td>
-                <td className="px-4 py-3 text-slate-500 max-w-xs truncate">{p.description}</td>
-                <td className="px-4 py-3 text-center">
-                  <button onClick={() => del(p.id)} className="text-slate-400 hover:text-rose-600 transition p-1">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!rows.length && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">Không có dữ liệu</td></tr>
-            )}
-            <Filler cols={6} />
-          </tbody>
-        </table>
-      </div>
-      <Pager />
+      <DataTable columns={columns} rows={rows} rowKey={(p) => p.id} emptyText="Không có dữ liệu" />
     </div>
   );
 }
 
 /* ===== Trường thông tin sản phẩm — DÙNG CHUNG cho màn xem & sửa ===== */
 /* disabled=true → chế độ xem (chỉ đọc); false → chỉnh sửa. Cùng một layout. */
-function ProductFields({ form, set, attributes, addAttr, removeAttr, updateAttr, disabled }) {
+/* Dropdown chọn nhiều giá trị (value list), hiển thị như ô select thường */
+function MultiSelect({ options, value, onChange, disabled, placeholder = "-- Chọn --" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const arr = value || [];
+  const toggle = (o) => onChange(arr.includes(o) ? arr.filter((x) => x !== o) : [...arr, o]);
+  return (
+    <div className="relative" ref={ref}>
+      <button type="button" disabled={disabled} onClick={() => setOpen((v) => !v)}
+        className={inputCls + " flex items-center justify-between text-left" + (disabled ? " bg-slate-50 text-slate-800" : "")}>
+        <span className={arr.length ? "text-slate-800 truncate" : "text-slate-400"}>{arr.length ? arr.join(", ") : placeholder}</span>
+        <ChevronDown size={16} className="text-slate-400 shrink-0 ml-2" />
+      </button>
+      {open && !disabled && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg py-1">
+          {options.map((o) => {
+            const on = arr.includes(o);
+            return (
+              <button type="button" key={o} onClick={() => toggle(o)}
+                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-slate-50 ${on ? "text-blue-600 font-medium bg-blue-50/50" : "text-slate-700"}`}>
+                {o}{on && <Check size={15} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProductFields({ form, set, disabled, code }) {
   const { fperm } = usePerm();
   const hid = (k) => fperm("products", k) === "hidden";
   const dis = (k) => disabled || fperm("products", k) !== "edit";
@@ -295,40 +348,49 @@ function ProductFields({ form, set, attributes, addAttr, removeAttr, updateAttr,
     <>
       <Section title="Thông tin chung">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+          {/* Hàng 1: định danh */}
+          <Field label="Mã sản phẩm">
+            <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={code || "(tự sinh khi lưu)"} />
+          </Field>
           {!hid("product_name") && <Field label="Tên sản phẩm" required>
             <input className={cls("product_name")} disabled={dis("product_name")} value={form.product_name} onChange={(e) => set("product_name", e.target.value)} />
+          </Field>}
+          {!hid("description") && <Field label="Mô tả">
+            <input className={cls("description")} disabled={dis("description")} value={form.description || ""} onChange={(e) => set("description", e.target.value)} />
+          </Field>}
+
+          {/* Hàng 2: phân loại sản xuất */}
+          {!hid("product_type") && <Field label="Loại sản phẩm" required>
+            <MultiSelect options={PRODUCT_TYPES} value={form.product_types} disabled={dis("product_type")}
+              onChange={(v) => set("product_types", v)} />
           </Field>}
           {!hid("production_area") && <Field label="Khu vực sản xuất">
             <select className={cls("production_area")} disabled={dis("production_area")} value={form.production_area || ""} onChange={(e) => set("production_area", e.target.value)}>
               <option value="">-- Chọn --</option>{AREAS.map((a) => <option key={a}>{a}</option>)}
             </select>
           </Field>}
+          {!hid("unit") && <Field label="Đơn vị tính">
+            <input className={cls("unit")} disabled={dis("unit")} value={form.unit || ""} onChange={(e) => set("unit", e.target.value)} placeholder="kg, cái, cuộn..." />
+          </Field>}
+
+          {/* Hàng 3: phân nhóm */}
           {!hid("category") && <Field label="Danh mục">
             <input className={cls("category")} disabled={dis("category")} value={form.category || ""} onChange={(e) => set("category", e.target.value)} />
-          </Field>}
-          {!hid("product_type") && <Field label="Loại sản phẩm" required>
-            <select className={cls("product_type")} disabled={dis("product_type")} value={form.product_type} onChange={(e) => set("product_type", e.target.value)}>
-              {PRODUCT_TYPES.map((t) => <option key={t}>{t}</option>)}
-            </select>
           </Field>}
           {!hid("product_group") && <Field label="Nhóm sản phẩm">
             <input className={cls("product_group")} disabled={dis("product_group")} value={form.product_group || ""} onChange={(e) => set("product_group", e.target.value)} />
           </Field>}
-          {!hid("unit") && <Field label="Đơn vị tính">
-            <input className={cls("unit")} disabled={dis("unit")} value={form.unit || ""} onChange={(e) => set("unit", e.target.value)} placeholder="kg, cái, cuộn..." />
-          </Field>}
-          {!hid("barcode_type") && <Field label="Loại mã vạch">
-            <select className={cls("barcode_type")} disabled={dis("barcode_type")} value={form.barcode_type || ""} onChange={(e) => set("barcode_type", e.target.value)}>
-              <option value="">-- Chọn --</option><option>CODE128</option><option>QR</option><option>EAN13</option>
-            </select>
-          </Field>}
+
+          {/* Hàng 4: theo dõi / mã vạch */}
           {!hid("tracking_type") && <Field label="Hình thức theo dõi">
             <select className={cls("tracking_type")} disabled={dis("tracking_type")} value={form.tracking_type || ""} onChange={(e) => set("tracking_type", e.target.value)}>
               <option>Theo lô</option><option>Theo serial</option>
             </select>
           </Field>}
-          {!hid("description") && <Field label="Mô tả">
-            <input className={cls("description")} disabled={dis("description")} value={form.description || ""} onChange={(e) => set("description", e.target.value)} />
+          {!hid("barcode_type") && <Field label="Loại mã vạch">
+            <select className={cls("barcode_type")} disabled={dis("barcode_type")} value={form.barcode_type || ""} onChange={(e) => set("barcode_type", e.target.value)}>
+              <option value="">-- Chọn --</option><option>CODE128</option><option>QR</option><option>EAN13</option>
+            </select>
           </Field>}
           <div className="flex items-end gap-6">
             {!hid("is_pqc_required") && <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -346,56 +408,50 @@ function ProductFields({ form, set, attributes, addAttr, removeAttr, updateAttr,
         </div>
       </Section>
 
-      {!hid("attributes") && (
-      <Section title="Thuộc tính sản phẩm"
-        action={!dis("attributes") && <button onClick={addAttr} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm thuộc tính</button>}>
-        {attributes.length === 0 && (
-          <p className="text-sm text-slate-400 py-4 text-center">{dis("attributes") ? "Không có thuộc tính" : 'Chưa có thuộc tính. Bấm "Thêm thuộc tính".'}</p>
-        )}
-        <div className="space-y-2">
-          {attributes.map((attr) => (
-            <div key={attr._key} className="flex items-center gap-3 attr-row">
-              <select className={cls("attributes", " flex-1")} disabled={dis("attributes")} value={attr.name}
-                onChange={(e) => updateAttr(attr._key, "name", e.target.value)}>
-                <option value="">-- Tên thuộc tính --</option>
-                {[...new Set([...ATTRIBUTE_NAMES, attr.name].filter(Boolean))].map((n) => <option key={n}>{n}</option>)}
-              </select>
-              <input className={cls("attributes", " flex-1")} disabled={dis("attributes")} placeholder="Giá trị" value={attr.value}
-                onChange={(e) => updateAttr(attr._key, "value", e.target.value)} />
-              {!dis("attributes") && (
-                <button onClick={() => removeAttr(attr._key)}
-                  className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition">
-                  <Trash2 size={18} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </Section>
-      )}
     </>
   );
 }
 
 /* ============================ PRODUCT FORM ============================ */
-function ProductForm({ productId, onBack, onSaved }) {
+function ProductForm({ productId, copyId, onBack, onSaved }) {
   const [form, setForm] = useState({
-    product_name: "", production_area: "", category: "", product_type: "Thành phẩm",
+    product_name: "", production_area: "", category: "", product_types: ["Thành phẩm"],
     product_group: "", unit: "", barcode_type: "", tracking_type: "Theo lô",
     is_pqc_required: false, status: "Hoạt động", description: "",
   });
   // mỗi attr có _key ổn định để React render mượt khi thêm/xóa
   const [attributes, setAttributes] = useState([{ _key: 1, name: "", value: "" }]);
   const [keySeq, setKeySeq] = useState(2);
+  const [code, setCode] = useState("");
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Mã dự kiến khi thêm mới
+  useEffect(() => { if (!productId) nextCode("products").then(setCode).catch(() => {}); }, [productId]);
+
+  // Sao chép từ sản phẩm nguồn → SP mới
+  useEffect(() => {
+    if (productId || !copyId) return;
+    api.get(copyId).then((d) => {
+      setForm({
+        product_name: (d.product_name || "") + " (copy)", production_area: d.production_area || "", category: d.category || "",
+        product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
+        barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
+      });
+      const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
+      setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
+      setKeySeq((attrs.length || 1) + 1);
+    }).catch((e) => alert("Lỗi tải SP nguồn: " + e.message));
+  }, [copyId, productId]);
 
   // Nạp dữ liệu khi sửa
   useEffect(() => {
     if (!productId) return;
     api.get(productId).then((d) => {
+      setCode(d.product_code || "");
       setForm({
         product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
-        product_type: d.product_type || "Thành phẩm", product_group: d.product_group || "", unit: d.unit || "",
+        product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
         barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
         is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
       });
@@ -429,11 +485,10 @@ function ProductForm({ productId, onBack, onSaved }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={productId ? "Sửa sản phẩm" : "Thêm mới sản phẩm"} onBack={onBack}
+      <PageHeader title={productId ? "Sửa sản phẩm" : (copyId ? "Thêm mới sản phẩm (sao chép)" : "Thêm mới sản phẩm")} onBack={onBack}
         actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu sản phẩm</button>} />
 
-      <ProductFields form={form} set={set} attributes={attributes}
-        addAttr={addAttr} removeAttr={removeAttr} updateAttr={updateAttr} disabled={false} />
+      <ProductFields form={form} set={set} code={code} disabled={false} />
 
       <style>{`
         .attr-row { animation: slideIn .18s ease; }
@@ -444,10 +499,11 @@ function ProductForm({ productId, onBack, onSaved }) {
 }
 
 /* =========================== PRODUCT DETAIL =========================== */
-function ProductDetail({ id, onBack, onDeleted }) {
+function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrder }) {
   const { can } = usePerm();
   const [tab, setTab] = useState("info");
   const [p, setP] = useState(null);
+  const [related, setRelated] = useState({ salesOrders: [], productionOrders: [] });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [attributes, setAttributes] = useState([]);
@@ -461,7 +517,7 @@ function ProductDetail({ id, onBack, onDeleted }) {
     setP(d);
     setForm({
       product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
-      product_type: d.product_type || "Thành phẩm", product_group: d.product_group || "", unit: d.unit || "",
+      product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
       barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
       is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
     });
@@ -470,6 +526,31 @@ function ProductDetail({ id, onBack, onDeleted }) {
     setKeySeq((attrs.length || 1) + 1);
   }).catch((e) => alert("Lỗi tải chi tiết: " + e.message));
   useEffect(() => { load(); }, [id]); // eslint-disable-line
+  useEffect(() => { productRelated(id).then(setRelated).catch(() => {}); }, [id]);
+
+  // Tài liệu / hình ảnh đính kèm
+  const [files, setFiles] = useState([]);
+  const [preview, setPreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const loadFiles = () => productFiles.list(id).then((r) => { setFiles(r.data || []); setPreview(r.preview || null); }).catch(() => {});
+  useEffect(() => { loadFiles(); }, [id]); // eslint-disable-line
+  const onUpload = async (fileList) => {
+    const arr = [...(fileList || [])]; if (!arr.length) return;
+    setUploading(true);
+    try {
+      for (const f of arr) {
+        const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+        await productFiles.add(id, { name: f.name, content_type: f.type, data: dataUrl });
+      }
+      loadFiles();
+    } catch (e) { alert("Lỗi tải lên: " + e.message); }
+    finally { setUploading(false); }
+  };
+  const viewFile = async (att) => {
+    try { const f = await productFiles.file(id, att.id); const w = window.open("", "_blank"); if (w) w.document.write(`<title>${f.name}</title><iframe src="${f.data}" style="border:0;position:fixed;inset:0;width:100%;height:100%"></iframe>`); }
+    catch (e) { alert("Lỗi xem tài liệu: " + e.message); }
+  };
+  const delFile = async (att) => { if (!confirm("Xóa tài liệu này?")) return; try { await productFiles.remove(id, att.id); loadFiles(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
 
   const del = async () => {
     if (!confirm("Xóa sản phẩm này?")) return;
@@ -487,13 +568,14 @@ function ProductDetail({ id, onBack, onDeleted }) {
     { key: "info", label: "Thông tin sản phẩm" },
     { key: "prod", label: "Thông tin sản xuất" },
     { key: "stock", label: "Thông tin tồn kho" },
+    { key: "related", label: "Đơn hàng & Lệnh SX" },
   ];
 
   if (!p || !form) return <div className="text-slate-400 text-sm py-10">Đang tải chi tiết sản phẩm…</div>;
 
   return (
     <div className="space-y-5">
-      <PageHeader title={p.product_name} onBack={onBack}
+      <PageHeader title={<span className="inline-flex items-center gap-2">{preview && <img src={preview.data} alt="" className="w-8 h-8 rounded-md object-cover border border-slate-200" />}{p.product_name}</span>} onBack={onBack}
         badge={<StatusBadge status={p.status} />} subtitle={p.product_code}
         actions={editing ? (<>
           <button onClick={cancel} className="btn-ghost">Hủy</button>
@@ -514,8 +596,60 @@ function ProductDetail({ id, onBack, onDeleted }) {
       </div>
 
       {tab === "info" && (
-        <ProductFields disabled={!editing} form={form} set={set}
-          attributes={attributes} addAttr={addAttr} removeAttr={removeAttr} updateAttr={updateAttr} />
+        <>
+          <ProductFields disabled={!editing} form={form} set={set} code={p.product_code} />
+
+          <Section title="Hình ảnh & tài liệu"
+            action={can("products", "edit") && (
+              <label className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50 cursor-pointer">
+                <Upload size={16} /> Tải lên
+                <input type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden"
+                  onChange={(e) => { onUpload(e.target.files); e.target.value = ""; }} />
+              </label>
+            )}>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Ô preview hình ảnh mới nhất */}
+              <div>
+                {preview ? (
+                  <a href={preview.data} target="_blank" rel="noreferrer" title="Bấm để xem lớn">
+                    <img src={preview.data} alt={preview.name} className="w-full rounded-lg border border-slate-200 object-contain max-h-56 bg-slate-50" />
+                  </a>
+                ) : (
+                  <div className="h-44 rounded-lg border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 text-sm gap-2">
+                    <ImageIcon size={26} /> Chưa có hình ảnh
+                  </div>
+                )}
+                {preview && <div className="text-xs text-slate-400 mt-2 truncate">{preview.name}</div>}
+              </div>
+
+              {/* Danh sách tài liệu */}
+              <div className="lg:col-span-2">
+                {uploading && <div className="text-sm text-blue-600 mb-2">Đang tải lên…</div>}
+                {!files.length ? (
+                  <div className="text-sm text-slate-400 py-6 text-center border border-dashed border-slate-200 rounded-lg h-full flex items-center justify-center">
+                    Chưa có tài liệu. Bấm "Tải lên" để thêm ảnh / PDF / Word / Excel.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {files.map((f) => (
+                      <div key={f.id} className="flex items-center gap-3 py-2.5">
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${f.is_image ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-500"}`}>
+                          {f.is_image ? <ImageIcon size={18} /> : <FileText size={18} />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm text-slate-800 truncate">{f.name}</div>
+                          <div className="text-[11px] text-slate-400">{f.content_type || "—"} · {fmtDate(f.created_at)}</div>
+                        </div>
+                        <button onClick={() => viewFile(f)} className="text-slate-400 hover:text-blue-600 p-1" title="Xem"><Eye size={16} /></button>
+                        {can("products", "edit") && <button onClick={() => delFile(f)} className="text-slate-400 hover:text-rose-600 p-1" title="Xóa"><Trash2 size={16} /></button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Section>
+        </>
       )}
 
       {tab === "prod" && (
@@ -573,6 +707,56 @@ function ProductDetail({ id, onBack, onDeleted }) {
           </table>
         </div>
       )}
+
+      {tab === "related" && (
+        <div className="space-y-6">
+          <Section title={`Đơn hàng có sản phẩm này (${related.salesOrders.length})`} bodyClass="p-0">
+            {related.salesOrders.length === 0 ? <div className="p-6 text-slate-400 text-sm">Chưa có đơn hàng.</div> : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                  <tr>{["Mã đơn", "Khách hàng", "Ngày đặt", "Số lượng", "Trạng thái"].map((h) =>
+                    <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {related.salesOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3"><button onClick={() => onOpenOrder?.(o.id)} className="font-medium text-blue-600 hover:underline">{o.order_code}</button></td>
+                      <td className="px-4 py-3 text-slate-700">{o.customer_name || "—"}</td>
+                      <td className="px-4 py-3">{fmtDate(o.order_date)}</td>
+                      <td className="px-4 py-3">{fmt(o.quantity)} {o.unit || ""}</td>
+                      <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Section>
+
+          <Section title={`Lệnh sản xuất của sản phẩm này (${related.productionOrders.length})`} bodyClass="p-0">
+            {related.productionOrders.length === 0 ? <div className="p-6 text-slate-400 text-sm">Chưa có lệnh sản xuất.</div> : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                  <tr>{["Mã lệnh", "Khách hàng", "Máy", "Số lượng", "Ngày SX", "Trạng thái"].map((h) =>
+                    <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>)}</tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {related.productionOrders.map((o) => (
+                    <tr key={o.id} className="hover:bg-slate-50/70">
+                      <td className="px-4 py-3"><button onClick={() => onOpenProductionOrder?.(o.id)} className="font-medium text-blue-600 hover:underline">{o.order_code}</button></td>
+                      <td className="px-4 py-3 text-slate-700">{o.customer_name || "—"}</td>
+                      <td className="px-4 py-3 text-slate-600">{o.machine_name || "—"}</td>
+                      <td className="px-4 py-3">{fmt(o.quantity)} {o.unit || ""}</td>
+                      <td className="px-4 py-3">{fmtDate(o.planned_date)}</td>
+                      <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </Section>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -583,17 +767,49 @@ const KPI_COLOR = {
   amber: "bg-amber-50 text-amber-600", rose: "bg-rose-50 text-rose-600",
 };
 
-function Dashboard() {
+/* Icon máy công nghiệp (SVG tự vẽ) */
+const MachineBlow = ({ size = 24, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <ellipse cx="12" cy="4.5" rx="3" ry="2.2" />
+    <path d="M9.2 5.2 C 9 9, 9.8 11, 10 13" />
+    <path d="M14.8 5.2 C 15 9, 14.2 11, 14 13" />
+    <rect x="4.5" y="13" width="15" height="7" rx="1.5" />
+    <path d="M7.5 16.5 h3.5" />
+    <circle cx="16" cy="16.8" r="1.1" />
+    <path d="M3 20.5 h18" />
+  </svg>
+);
+const MachineCut = ({ size = 24, className = "" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3.5" y="13.5" width="17" height="6.5" rx="1.5" />
+    <path d="M2 12 h20" />
+    <path d="M8 12 V6 h7" />
+    <path d="M15 6 v2.6" />
+    <path d="M13.6 8.6 h2.8 l-1.4 2.2 z" fill="currentColor" stroke="none" />
+    <circle cx="7" cy="16.7" r="1.1" />
+    <circle cx="17" cy="16.7" r="1.1" />
+  </svg>
+);
+const machineIconOf = (m) => {
+  const s = `${m.factory || ""} ${m.name || ""} ${m.machine_type || ""}`;
+  if (/c[ắa]t/i.test(s)) return MachineCut;
+  return MachineBlow; // thổi / HD / mặc định
+};
+const workshopRank = (f) => /th[ổô]i/i.test(f || "") ? 0 : /c[ắa]t/i.test(f || "") ? 1 : 2;
+
+function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
+  const { fpermSecret } = usePerm();
+  const showMoney = fpermSecret("deliveries", "amounts") !== "hidden";
   const [data, setData] = useState(null);
   useEffect(() => { getDashboard().then(setData).catch((e) => console.error("Dashboard lỗi:", e.message)); }, []);
   if (!data) return <div className="text-slate-400 text-sm py-10">Đang tải số liệu…</div>;
 
-  const { kpi, machines, in_progress, due_soon, status_breakdown } = data;
+  const { kpi, machines, in_progress, due_soon, status_breakdown, overdue_payments = [], finance } = data;
   const kpis = [
-    { label: "Đơn hàng đang mở", value: kpi.open_orders, icon: ShoppingCart, color: "blue" },
-    { label: "Lệnh SX đang chạy", value: kpi.po_active, icon: Factory, color: "amber" },
-    { label: "Lệnh SX hoàn thành", value: kpi.po_done, icon: CheckCircle2, color: "emerald" },
-    { label: "Dòng đơn chờ kế hoạch", value: kpi.demand_pending, icon: ClipboardList, color: "rose" },
+    { label: "Đơn hàng đang mở", value: kpi.open_orders, icon: ShoppingCart, color: "blue", nav: "orders" },
+    { label: "Lệnh SX đang chạy", value: kpi.po_active, icon: Factory, color: "amber", nav: "production" },
+    { label: "Lệnh SX hoàn thành", value: kpi.po_done, icon: CheckCircle2, color: "emerald", nav: "production" },
+    { label: "Dòng đơn chờ kế hoạch", value: kpi.demand_pending, icon: ClipboardList, color: "rose", nav: "planning" },
   ];
   const busy = machines.filter((m) => m.current_task).length;
 
@@ -601,16 +817,63 @@ function Dashboard() {
     <div className="space-y-6">
       <ListHeader title="Tổng quan" />
 
-      {/* KPI */}
+      {/* KPI — click để mở app liên quan */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {kpis.map((k) => (
-          <div key={k.label} className="bg-white rounded-xl border border-slate-200 p-5">
+          <button key={k.label} onClick={() => onNav?.(k.nav)}
+            className="bg-white rounded-xl border border-slate-200 p-5 text-left hover:border-blue-300 hover:shadow-sm transition group">
             <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${KPI_COLOR[k.color]}`}><k.icon size={20} /></div>
             <div className="text-2xl font-bold text-slate-800">{fmt(k.value)}</div>
-            <div className="text-sm text-slate-500 mt-1">{k.label}</div>
-          </div>
+            <div className="text-sm text-slate-500 mt-1 group-hover:text-blue-600">{k.label} →</div>
+          </button>
         ))}
       </div>
+
+      {/* Kế toán — chỉ admin/quản lý/kế toán (theo quyền field tiền) */}
+      {showMoney && finance && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+            <Database size={16} className="text-blue-500" />
+            <h2 className="text-sm font-semibold text-slate-700">Kế toán · Công nợ</h2>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-slate-100">
+            {[
+              { label: "Doanh thu (phiếu)", value: finance.revenue, cls: "text-slate-800", sub: `${fmt(finance.note_count)} phiếu` },
+              { label: "Đã thu", value: finance.paid, cls: "text-emerald-600" },
+              { label: "Còn phải thu (công nợ)", value: finance.debt, cls: "text-rose-600", nav: "deliveries" },
+              { label: "Phiếu chưa thu đủ", value: finance.unpaid_count, cls: "text-amber-600", isCount: true, nav: "deliveries" },
+            ].map((c) => (
+              <button key={c.label} onClick={() => c.nav && setView(c.nav)} disabled={!c.nav}
+                className={`px-5 py-4 text-left ${c.nav ? "hover:bg-slate-50" : ""}`}>
+                <div className="text-xs text-slate-500 mb-1">{c.label}{c.nav ? " →" : ""}</div>
+                <div className={`text-xl font-bold ${c.cls}`}>{fmt(c.value)}{c.isCount ? "" : " đ"}</div>
+                {c.sub && <div className="text-[11px] text-slate-400 mt-0.5">{c.sub}</div>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cảnh báo: phiếu đã giao > 30 ngày chưa thanh toán đủ */}
+      {showMoney && overdue_payments.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-rose-200 flex items-center gap-2">
+            <Activity size={18} className="text-rose-600" />
+            <h2 className="text-sm font-semibold text-rose-800">Công nợ quá hạn — {overdue_payments.length} phiếu đã giao trên 30 ngày chưa thanh toán đủ</h2>
+          </div>
+          <div className="divide-y divide-rose-100">
+            {overdue_payments.map((d) => (
+              <button key={d.id} onClick={() => onNav?.("deliveries")} className="w-full grid grid-cols-12 gap-2 px-5 py-2.5 items-center text-left hover:bg-rose-100/50 text-sm">
+                <span className="col-span-2 font-medium text-rose-700">{d.note_code}</span>
+                <span className="col-span-4 text-slate-700 truncate">{d.customer_name || "—"}</span>
+                <span className="col-span-2 text-slate-600">{fmtDate(d.delivery_date)}</span>
+                <span className="col-span-2 text-right font-semibold text-slate-800">{showMoney ? `${fmt(d.total_amount)} đ` : ""}</span>
+                <span className="col-span-2 text-right text-rose-600 font-semibold">Trễ {d.days_overdue} ngày</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Lệnh đang sản xuất + tiến độ */}
@@ -620,15 +883,15 @@ function Dashboard() {
             {in_progress.map((o) => {
               const pct = Math.min(100, Math.round((Number(o.produced_qty) / Number(o.quantity)) * 100));
               return (
-                <div key={o.id}>
+                <button key={o.id} onClick={() => onOpenProductionOrder?.(o.id)} className="block w-full text-left group">
                   <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="font-medium text-slate-700">{o.order_code} · {o.product_name}</span>
+                    <span className="font-medium text-slate-700 group-hover:text-blue-600 group-hover:underline">{o.order_code} · {o.product_name}</span>
                     <span className="text-slate-400">{fmt(o.produced_qty)}/{fmt(o.quantity)} ({pct}%)</span>
                   </div>
                   <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                     <div className={`h-full rounded-full ${pct >= 100 ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${Math.max(pct, 2)}%` }} />
                   </div>
-                </div>
+                </button>
               );
             })}
             {!in_progress.length && <div className="text-sm text-slate-400 text-center py-4">Không có lệnh đang sản xuất.</div>}
@@ -638,19 +901,30 @@ function Dashboard() {
         {/* Đơn hàng sắp đến hạn + phân bố trạng thái */}
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50"><h2 className="text-sm font-semibold text-slate-700">Đơn hàng sắp đến hạn</h2></div>
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-700">Đơn hàng sắp đến hạn</h2>
+              <div className="flex items-center gap-2.5 text-[11px] text-slate-400">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500" />≤2 ngày</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400" />3–5</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" />&gt;5</span>
+              </div>
+            </div>
             <table className="w-full text-sm">
               <tbody className="divide-y divide-slate-100">
-                {due_soon.map((o) => (
-                  <tr key={o.order_code}>
-                    <td className="px-5 py-2.5 font-medium text-blue-600">{o.order_code}</td>
-                    <td className="px-2 py-2.5 text-slate-600">{o.customer_name}</td>
-                    <td className="px-2 py-2.5 text-slate-500">{o.item_count} dòng</td>
-                    <td className="px-2 py-2.5 text-rose-600">{fmtDate(o.due_date)}</td>
-                    <td className="px-5 py-2.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span></td>
-                  </tr>
-                ))}
-                {!due_soon.length && <tr><td className="px-5 py-4 text-slate-400">Không có đơn hàng mở.</td></tr>}
+                {due_soon.map((o) => {
+                  const tone = dueTone(o.due_date);
+                  return (
+                    <tr key={o.id || o.order_code} onClick={() => onOpenOrder?.(o.id)} className="cursor-pointer hover:bg-slate-50/70">
+                      <td className="pl-5 pr-1 py-2.5"><span className={`inline-block w-2.5 h-2.5 rounded-full ${tone.dot}`} title={tone.label} /></td>
+                      <td className="px-2 py-2.5 font-medium text-blue-600 hover:underline">{o.order_code}</td>
+                      <td className="px-2 py-2.5 text-slate-600 truncate max-w-[140px]">{o.customer_name}</td>
+                      <td className={`px-2 py-2.5 font-medium ${tone.text}`}>{fmtDate(o.due_date)}</td>
+                      <td className="px-2 py-2.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${tone.soft}`}>{tone.label}</span></td>
+                      <td className="px-5 py-2.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span></td>
+                    </tr>
+                  );
+                })}
+                {!due_soon.length && <tr><td className="px-5 py-4 text-slate-400" colSpan={6}>Không có đơn hàng mở.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -658,7 +932,8 @@ function Dashboard() {
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50"><h2 className="text-sm font-semibold text-slate-700">Phân bố trạng thái lệnh SX</h2></div>
             <div className="p-5 flex flex-wrap gap-2">
               {status_breakdown.map((s) => (
-                <span key={s.status} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${statusClass(s.status)}`}>{s.status}: {s.n}</span>
+                <button key={s.status} onClick={() => onNav?.("production")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium hover:ring-2 hover:ring-blue-200 transition ${statusClass(s.status)}`}>{s.status}: {s.n}</button>
               ))}
               {!status_breakdown.length && <span className="text-sm text-slate-400">Chưa có lệnh sản xuất.</span>}
             </div>
@@ -673,22 +948,47 @@ function Dashboard() {
           <h2 className="text-sm font-semibold text-slate-700">Trạng thái máy hôm nay</h2>
           <span className="text-xs text-slate-400">· {busy}/{machines.length} máy đang chạy</span>
         </div>
-        <div className="p-5 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {machines.map((m) => {
-            const t = m.current_task;
-            return (
-              <div key={m.id} className={`rounded-lg border p-3 ${t ? "border-blue-200 bg-blue-50/40" : "border-slate-200"}`}>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-800 text-sm">{m.name}</span>
-                  <span className={`w-2 h-2 rounded-full ${t ? "bg-blue-500" : "bg-slate-300"}`} />
+        <div className="p-5 space-y-5">
+          {Object.entries(machines.reduce((acc, m) => { const k = m.factory || "Khác"; (acc[k] = acc[k] || []).push(m); return acc; }, {}))
+            .sort((a, b) => workshopRank(a[0]) - workshopRank(b[0]))
+            .map(([factory, list]) => {
+              const Wicon = machineIconOf({ factory });
+              const run = list.filter((m) => m.current_task).length;
+              return (
+                <div key={factory}>
+                  <div className="flex items-center gap-2 mb-2.5 pb-1.5 border-b border-dashed border-slate-200">
+                    <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center"><Wicon size={16} /></span>
+                    <span className="text-sm font-semibold text-slate-700">{factory}</span>
+                    <span className="text-xs text-slate-400">· {run}/{list.length} đang chạy</span>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {list.map((m) => {
+                      const t = m.current_task;
+                      const MIcon = machineIconOf(m);
+                      return (
+                        <button key={m.id} onClick={() => t ? onOpenProductionOrder?.(t.production_order_id) : onNav?.("md:machines")}
+                          className={`text-left rounded-lg border p-3 hover:shadow-sm transition ${t ? "border-blue-300 bg-blue-50/50 hover:border-blue-400" : "border-slate-200 hover:border-slate-300"}`}>
+                          <div className="flex items-start gap-3">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${t ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
+                              <MIcon size={28} className={t ? "animate-pulse" : ""} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="font-medium text-slate-800 text-sm truncate">{m.name}</span>
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${t ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                              </div>
+                              {t ? (
+                                <div className="mt-1 text-xs text-slate-600">{t.order_code} · {t.stage}<div className="text-slate-400 truncate">{t.product}</div></div>
+                              ) : <div className="mt-1 text-xs text-slate-400">Trống</div>}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="text-[11px] text-slate-400">{m.factory}</div>
-                {t ? (
-                  <div className="mt-1.5 text-xs text-slate-600">{t.order_code} · {t.stage}<div className="text-slate-400 truncate">{t.product}</div></div>
-                ) : <div className="mt-1.5 text-xs text-slate-400">Trống</div>}
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
       </div>
     </div>
@@ -701,7 +1001,12 @@ export default function MesApp() {
   const [detailId, setDetailId] = useState(null);
   const [detailBack, setDetailBack] = useState("products"); // màn quay lại từ chi tiết SP
   const [productEditId, setProductEditId] = useState(null); // sản phẩm đang sửa (null = thêm mới)
+  const [productCopyId, setProductCopyId] = useState(null);  // sản phẩm nguồn để sao chép
   const [focusOrderId, setFocusOrderId] = useState(null);   // mở sẵn chi tiết 1 lệnh SX
+  const [focusSalesOrderId, setFocusSalesOrderId] = useState(null); // mở sẵn 1 đơn hàng
+  const [deliveryOrderId, setDeliveryOrderId] = useState(null); // tạo phiếu giao hàng từ 1 đơn
+  const [prodOrderBack, setProdOrderBack] = useState(null); // nơi quay lại sau khi xem 1 lệnh SX (mở chéo)
+  const [planningTab, setPlanningTab] = useState("orders"); // nhớ tab Kế hoạch
   const [lookups, setLookups] = useState(null);
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -713,14 +1018,27 @@ export default function MesApp() {
 
   const logout = () => { auth.logout().catch(() => {}); setToken(""); setUser(null); setView("dashboard"); };
 
-  // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập
+  // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập,
+  // và làm mới mỗi khi đổi màn để các dropdown luôn có dữ liệu mới nhất.
   useEffect(() => {
     if (user) getLookups().then(setLookups).catch((e) => console.error("Lookups lỗi:", e.message));
+  }, [user, view]);
+
+  // Khi đăng nhập: nếu không có quyền xem Dashboard → vào thẳng màn đầu tiên được phép
+  useEffect(() => {
+    if (!user || user.is_admin) return;
+    const perms = user.permissions || {};
+    if (perms.dashboard?.view) return; // được xem dashboard thì giữ nguyên
+    const order = ["execution", "production", "planning", "orders", "deliveries", "products", "bom", "process", "inventory", "qrlabels", "qrscan", "workschedule", "masterdata"];
+    const firstKey = order.find((k) => perms[k]?.view);
+    if (firstKey) setView(firstKey === "masterdata" ? "md:customers" : firstKey);
   }, [user]);
 
   // Điều hướng chéo module
   const goProductDetail = (id, back = "products") => { setDetailId(id); setDetailBack(back); setView("product-detail"); };
-  const goProductionOrder = (id) => { setFocusOrderId(id); setView("production"); };
+  const goProductionOrder = (id) => { setFocusOrderId(id); setProdOrderBack(view); setView("production"); };
+  const goSalesOrder = (id) => { setFocusSalesOrderId(id); setView("orders"); };
+  const goNewDelivery = (id) => { setDeliveryOrderId(id); setView("deliveries"); };
 
   const needLookups = (Comp) =>
     lookups ? <Comp lookups={lookups} /> : <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
@@ -728,35 +1046,44 @@ export default function MesApp() {
 
   const render = () => {
     switch (view) {
-      case "dashboard": return <Dashboard />;
+      case "dashboard": return <Dashboard onNav={setView} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
       case "products":
-        return <ProductList onCreate={() => { setProductEditId(null); setView("product-form"); }}
+        return <ProductList onCreate={() => { setProductEditId(null); setProductCopyId(null); setView("product-form"); }}
+          onCopy={(id) => { setProductEditId(null); setProductCopyId(id); setView("product-form"); }}
           onOpen={(id) => { setDetailId(id); setDetailBack("products"); setView("product-detail"); }} />;
       case "product-form":
-        return <ProductForm productId={productEditId}
-          onBack={() => setView(productEditId ? "product-detail" : "products")}
-          onSaved={() => setView(productEditId ? "product-detail" : "products")} />;
+        return <ProductForm productId={productEditId} copyId={productCopyId}
+          onBack={() => { setProductCopyId(null); setView(productEditId ? "product-detail" : "products"); }}
+          onSaved={() => { setProductCopyId(null); setView(productEditId ? "product-detail" : "products"); }} />;
       case "product-detail":
         return <ProductDetail id={detailId} onBack={() => setView(detailBack)}
-          onDeleted={() => setView(detailBack)} />;
+          onDeleted={() => setView(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
       case "planning":
-        return lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "planning")} /> : loadingEl;
+        return lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl;
       case "production":
-        return lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)} /> : loadingEl;
+        return lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
+          onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); setView(b); } : null} /> : loadingEl;
+      case "orderstatus":
+        return lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl;
+      case "execution":
+        return needLookups(ExecutionModule);
       case "inventory":
         return lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "inventory")} /> : loadingEl;
       case "md:customers": case "md:machines": case "md:warehouses": case "md:locations":
       case "md:employees": case "md:shifts": case "md:roles":
-        return lookups ? <MasterDataScreen lookups={lookups} entity={view.slice(3)} /> : loadingEl;
+        return lookups ? <MasterDataScreen lookups={lookups} entity={view.slice(3)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl;
       case "workschedule": return needLookups(WorkScheduleModule);
       case "qrlabels": return <QrLabelsModule />;
       case "qrscan": return <QrScanModule />;
       case "permissions": return <PermissionsModule />;
-      case "users": return <UsersModule />;
+      case "users": return needLookups(UsersModule);
       case "bom": return needLookups(BomModule);
       case "process": return needLookups(ProcessModule);
-      case "orders": return needLookups(OrdersModule);
-      default: return <Dashboard />;
+      case "orders":
+        return lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl;
+      case "deliveries":
+        return lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl;
+      default: return <Dashboard onNav={setView} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />;
     }
   };
 

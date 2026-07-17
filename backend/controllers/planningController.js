@@ -9,22 +9,30 @@ const db = require('../db');
  */
 exports.groups = async (req, res) => {
   try {
-    const onlyPending = req.query.pending !== 'false'; // mặc định chỉ lấy lệnh chưa hoàn thành
-    const statusFilter = onlyPending
-      ? `AND po.status IN ('Chờ duyệt','Đã lên kế hoạch')`
-      : '';
+    // Lọc theo nhóm trạng thái (status=comma-list). Mặc định: lệnh chưa lên lịch xong.
+    const params = [];
+    let statusFilter = '';
+    if (req.query.status) {
+      const sts = req.query.status.split(',').map((s) => s.trim()).filter(Boolean);
+      if (sts.length) { params.push(sts); statusFilter = `AND po.status = ANY($1)`; }
+    } else if (req.query.pending !== 'false') {
+      statusFilter = `AND po.status IN ('Chờ duyệt','Đã lên kế hoạch')`;
+    }
     const { rows } = await db.query(`
       SELECT po.id, po.order_code, po.quantity, po.unit, po.due_date, po.status,
              po.attr_color, po.attr_size, po.attr_thickness, po.group_key,
              po.machine_id, po.planned_date, po.shift,
-             p.product_name, p.product_code, c.name AS customer_name, m.name AS machine_name
+             p.product_name, p.product_code, c.name AS customer_name, m.name AS machine_name,
+             COALESCE((SELECT SUM(COALESCE(t.actual_qty, t.quantity)) FROM production_tasks t
+                       WHERE t.production_order_id = po.id AND t.status = 'Hoàn thành'
+                         AND t.stage = (CASE WHEN EXISTS (SELECT 1 FROM production_tasks tf WHERE tf.production_order_id = po.id AND tf.stage = 'Cắt') THEN 'Cắt' ELSE 'Thổi' END)), 0) AS produced_qty
       FROM production_orders po
       JOIN products p ON p.id = po.product_id
       LEFT JOIN customers c ON c.id = po.customer_id
       LEFT JOIN machines m ON m.id = po.machine_id
       WHERE po.is_deleted = FALSE ${statusFilter}
       ORDER BY po.due_date NULLS LAST, po.created_at
-    `);
+    `, params);
 
     const map = new Map();
     for (const r of rows) {
@@ -33,13 +41,14 @@ exports.groups = async (req, res) => {
         map.set(key, {
           group_key: key,
           attr_color: r.attr_color, attr_size: r.attr_size,
-          order_count: 0, total_quantity: 0, earliest_due: null, orders: [],
+          order_count: 0, total_quantity: 0, total_produced: 0, earliest_due: null, orders: [],
         });
       }
       const g = map.get(key);
       g.orders.push(r);
       g.order_count += 1;
       g.total_quantity += Number(r.quantity) || 0;
+      g.total_produced += Number(r.produced_qty) || 0;
       if (r.due_date && (!g.earliest_due || r.due_date < g.earliest_due)) g.earliest_due = r.due_date;
     }
     // sắp nhóm theo ngày giao sớm nhất
@@ -60,31 +69,34 @@ exports.groups = async (req, res) => {
 exports.fromOrders = async (_req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT it.id AS item_id, it.product_id, it.quantity, it.unit,
-             it.attr_size, it.attr_thickness, it.attr_color,
+      SELECT it.id AS item_id, it.product_id, it.quantity, it.planned_qty, it.unit,
+             (it.quantity - it.planned_qty) AS remaining,
+             it.specs, it.spec_key, it.attr_size, it.attr_thickness, it.attr_color,
              so.id AS sales_order_id, so.order_code, so.due_date, so.customer_id,
              c.name AS customer_name, p.product_name, p.product_code
       FROM sales_order_items it
       JOIN sales_orders so ON so.id = it.sales_order_id
       JOIN products p ON p.id = it.product_id
       LEFT JOIN customers c ON c.id = so.customer_id
-      WHERE so.is_deleted = FALSE AND so.status IN ('Mới','Đang sản xuất') AND it.is_planned = FALSE
+      WHERE so.is_deleted = FALSE AND so.status IN ('Mới','Đang sản xuất')
+        AND (it.quantity - it.planned_qty) > 0
       ORDER BY so.due_date NULLS LAST, so.created_at
     `);
 
     const map = new Map();
     for (const r of rows) {
-      const key = [r.product_id, r.attr_color || '', r.attr_size || '', r.attr_thickness || ''].join('|');
+      const key = [r.product_id, r.spec_key || ''].join('||');
       if (!map.has(key)) {
         map.set(key, {
           batch_key: key, product_id: r.product_id, product_name: r.product_name, product_code: r.product_code,
+          specs: r.specs || {}, spec_key: r.spec_key,
           attr_color: r.attr_color, attr_size: r.attr_size, attr_thickness: r.attr_thickness,
           unit: r.unit, total_quantity: 0, earliest_due: null, items: [],
         });
       }
       const g = map.get(key);
       g.items.push(r);
-      g.total_quantity += Number(r.quantity) || 0;
+      g.total_quantity += Number(r.remaining) || 0;
       if (r.due_date && (!g.earliest_due || r.due_date < g.earliest_due)) g.earliest_due = r.due_date;
     }
     const batches = [...map.values()].sort((a, b) => {
@@ -104,30 +116,44 @@ exports.fromOrders = async (_req, res) => {
 exports.generate = async (req, res) => {
   const client = await db.pool.connect();
   try {
-    const { item_ids, machine_id, planned_date, shift, assigned_team } = req.body;
-    if (!Array.isArray(item_ids) || !item_ids.length)
-      return res.status(400).json({ message: 'Chưa chọn dòng nhu cầu để tạo lệnh' });
+    const { items: planItems, item_ids, machine_id, planned_date, shift, assigned_team, assigned_worker } = req.body;
+    // Hỗ trợ cả 2 dạng: items[{item_id, qty}] (lập một phần) hoặc item_ids[] (lập hết phần còn lại)
+    const list = Array.isArray(planItems) && planItems.length
+      ? planItems
+      : (Array.isArray(item_ids) ? item_ids.map((id) => ({ item_id: id })) : []);
+    if (!list.length) return res.status(400).json({ message: 'Chưa chọn dòng nhu cầu để tạo lệnh' });
+    const ids = list.map((x) => x.item_id);
+    const qtyById = Object.fromEntries(list.map((x) => [x.item_id, x.qty]));
 
     await client.query('BEGIN');
     const items = (await client.query(`
       SELECT it.*, so.customer_id, so.due_date, so.id AS so_id
       FROM sales_order_items it JOIN sales_orders so ON so.id = it.sales_order_id
-      WHERE it.id = ANY($1::uuid[]) AND it.is_planned = FALSE`, [item_ids])).rows;
+      WHERE it.id = ANY($1::uuid[])`, [ids])).rows;
 
     const status = machine_id ? 'Đã lên kế hoạch' : 'Chờ duyệt';
     const created = [];
     for (const it of items) {
-      const gk = [it.attr_color || '', it.attr_size || ''].join('|');
+      const remaining = Number(it.quantity) - Number(it.planned_qty || 0);
+      let q = qtyById[it.id];
+      q = (q === undefined || q === null || q === '') ? remaining : Number(q);
+      if (!(q > 0)) continue;                 // bỏ qua dòng không nhập SL
+      if (q > remaining) q = remaining;       // không vượt quá số còn lại
+      const gk = [it.product_id, it.spec_key || ''].join('||');
       const r = await client.query(`
         INSERT INTO production_orders
           (sales_order_id, sales_order_item_id, customer_id, product_id, quantity, unit,
-           attr_size, attr_thickness, attr_color, machine_id, planned_date, shift, assigned_team, group_key, due_date, status)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING order_code`,
-        [it.so_id, it.id, it.customer_id, it.product_id, it.quantity, it.unit,
+           specs, spec_key, attr_size, attr_thickness, attr_color, machine_id, planned_date, shift, assigned_team, group_key, due_date, status, assigned_worker)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING order_code`,
+        [it.so_id, it.id, it.customer_id, it.product_id, q, it.unit,
+         JSON.stringify(it.specs || {}), it.spec_key || '',
          it.attr_size, it.attr_thickness, it.attr_color, machine_id || null, planned_date || null,
-         shift || null, assigned_team || null, gk, it.due_date, status]);
+         shift || null, assigned_team || null, gk, it.due_date, status, assigned_worker || null]);
       created.push(r.rows[0].order_code);
-      await client.query(`UPDATE sales_order_items SET is_planned = TRUE WHERE id = $1`, [it.id]);
+      const newPlanned = Number(it.planned_qty || 0) + q;
+      await client.query(
+        `UPDATE sales_order_items SET planned_qty = $1, is_planned = ($1 >= quantity) WHERE id = $2`,
+        [newPlanned, it.id]);
     }
     await client.query('COMMIT');
     res.status(201).json({ created });

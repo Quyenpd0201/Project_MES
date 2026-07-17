@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical } from "lucide-react";
+import { Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, GitBranch } from "lucide-react";
 import { resource } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
 import { inputCls, fmt, statusClass } from "../ui.js";
-import { PageHeader, Section, ListHeader, usePager } from "../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable } from "../components.jsx";
 
 const bomApi = resource("boms");
+const procApi = resource("processes");
 const BOM_TYPES = ["Định mức NVL", "Công thức pha màu"];
 
 const Field = ({ label, required, children }) => (
@@ -18,38 +19,61 @@ const Field = ({ label, required, children }) => (
 );
 
 /* ---- Form định mức ---- */
-function BomForm({ lookups, editId, onBack, onSaved }) {
+function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   const { can, fperm } = usePerm();
   const fhid = (k) => fperm("bom", k) === "hidden";
   const fdis = (k) => fperm("bom", k) !== "edit";
-  const outputs = lookups.products.filter((p) => ["Thành phẩm", "Bán thành phẩm"].includes(p.product_type));
-  const materials = lookups.products.filter((p) => ["NVL", "Bán thành phẩm"].includes(p.product_type));
+  const unitOf = (id) => (lookups.products.find((p) => p.id === id)?.unit) || "";
+  const typesOf = (p) => (p.product_types && p.product_types.length ? p.product_types : (p.product_type ? [p.product_type] : []));
+  const hasType = (p, list) => typesOf(p).some((t) => list.includes(t));
+  const outputs = lookups.products.filter((p) => hasType(p, ["Thành phẩm", "Bán thành phẩm"]));
+  const materials = lookups.products.filter((p) => hasType(p, ["Nguyên vật liệu", "Bán thành phẩm"]));
 
   const [f, setF] = useState({
     product_id: "", name: "", bom_type: "Định mức NVL",
-    output_quantity: 1, output_unit: "", status: "Hoạt động", note: "",
+    output_quantity: 1, output_unit: "", status: "Hoạt động", note: "", process_id: "",
   });
   const [lines, setLines] = useState([{ _k: 1, material_id: "", quantity: "", unit: "", ratio_percent: "", note: "" }]);
   const [seq, setSeq] = useState(2);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
+  const [procList, setProcList] = useState([]);
+  const isLinked = !!f.process_id; // đã gắn Quy trình → dòng NVL lấy từ quy trình (khóa)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  useEffect(() => { procApi.list({}).then(setProcList).catch(() => {}); }, []);
 
   const loadData = useCallback(() => {
     if (!editId) return;
     bomApi.get(editId).then((d) => {
       setF({ product_id: d.product_id, name: d.name, bom_type: d.bom_type,
-        output_quantity: d.output_quantity, output_unit: d.output_unit || "", status: d.status, note: d.note || "" });
+        output_quantity: d.output_quantity, output_unit: d.output_unit || unitOf(d.product_id), status: d.status, note: d.note || "", process_id: d.process_id || "" });
       setLines((d.lines || []).map((l, i) => ({
-        _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || "",
+        _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || unitOf(l.material_id),
         ratio_percent: l.ratio_percent ?? "", note: l.note || "" })));
       setSeq((d.lines?.length || 0) + 1);
     }).catch((e) => alert("Lỗi tải định mức: " + e.message));
   }, [editId]);
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Sao chép từ định mức nguồn → bản mới
+  useEffect(() => {
+    if (editId || !copyId) return;
+    bomApi.get(copyId).then((d) => {
+      setF({ product_id: d.product_id, name: (d.name || "") + " (copy)", bom_type: d.bom_type,
+        output_quantity: d.output_quantity, output_unit: d.output_unit || unitOf(d.product_id), status: d.status, note: d.note || "", process_id: "" });
+      setLines((d.lines || []).map((l, i) => ({ _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || unitOf(l.material_id), ratio_percent: l.ratio_percent ?? "", note: l.note || "" })));
+      setSeq((d.lines?.length || 0) + 1);
+    }).catch((e) => alert("Lỗi tải định mức nguồn: " + e.message));
+  }, [copyId, editId]); // eslint-disable-line
+
   const addLine = () => { setLines((a) => [...a, { _k: seq, material_id: "", quantity: "", unit: "", ratio_percent: "", note: "" }]); setSeq((s) => s + 1); };
   const rmLine = (k) => setLines((a) => a.filter((x) => x._k !== k));
-  const upLine = (k, field, v) => setLines((a) => a.map((x) => (x._k === k ? { ...x, [field]: v } : x)));
+  const upLine = (k, field, v) => setLines((a) => a.map((x) => {
+    if (x._k !== k) return x;
+    const nx = { ...x, [field]: v };
+    // Chọn nguyên liệu → tự lấy đơn vị theo sản phẩm
+    if (field === "material_id") { const p = lookups.products.find((pp) => pp.id === v); if (p) nx.unit = p.unit || ""; }
+    return nx;
+  }));
 
   const isColor = f.bom_type === "Công thức pha màu";
   const ratioSum = lines.reduce((s, l) => s + (Number(l.ratio_percent) || 0), 0);
@@ -71,7 +95,7 @@ function BomForm({ lookups, editId, onBack, onSaved }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={!editId ? "Tạo định mức / công thức" : editing ? "Sửa định mức / công thức" : "Chi tiết định mức / công thức"} onBack={onBack}
+      <PageHeader title={!editId ? (copyId ? "Tạo định mức (sao chép)" : "Tạo định mức / công thức") : editing ? "Sửa định mức / công thức" : "Chi tiết định mức / công thức"} onBack={onBack}
         actions={editId && !editing ? (<>
           {can("bom", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("bom", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
@@ -80,12 +104,20 @@ function BomForm({ lookups, editId, onBack, onSaved }) {
           <button onClick={save} className="btn-primary"><Save size={16} /> Lưu định mức</button>
         </>)} />
 
+      {isLinked && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-800 flex items-center gap-2">
+          <GitBranch size={16} className="shrink-0" />
+          <span>Định mức này đang <b>gắn với Quy trình công nghệ</b> — dòng NVL & số lượng <b>lấy từ quy trình</b> (chỉ xem). Bỏ chọn quy trình ở ô "Gắn Quy trình CN" nếu muốn nhập tay.</span>
+        </div>
+      )}
+
       <fieldset disabled={!editing} className="space-y-5">
 
       <Section title="Thông tin chung">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           {!fhid("product_id") && <Field label="Sản phẩm đầu ra" required>
-            <select className={inputCls} disabled={fdis("product_id")} value={f.product_id} onChange={(e) => set("product_id", e.target.value)}>
+            <select className={inputCls} disabled={fdis("product_id")} value={f.product_id}
+              onChange={(e) => { const id = e.target.value; const p = lookups.products.find((pp) => pp.id === id); setF((s) => ({ ...s, product_id: id, output_unit: p?.unit || s.output_unit })); }}>
               <option value="">-- Chọn TP / BTP --</option>
               {outputs.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
             </select>
@@ -108,14 +140,21 @@ function BomForm({ lookups, editId, onBack, onSaved }) {
             </select>
           </Field>
           <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
+          <Field label={<span className="inline-flex items-center gap-1.5"><GitBranch size={14} className="text-blue-500" /> Gắn Quy trình CN</span>}>
+            <select className={inputCls} value={f.process_id} onChange={(e) => set("process_id", e.target.value)}>
+              <option value="">-- Không gắn (nhập tay) --</option>
+              {procList.map((p) => <option key={p.id} value={p.id}>{p.process_code} · {p.name}</option>)}
+            </select>
+          </Field>
         </div>
       </Section>
 
       {!fhid("lines") && (
       <Section
-        title={<span className="flex items-center gap-2">{isColor && <FlaskConical size={16} className="text-blue-500" />}{isColor ? "Thành phần pha (NVL / phụ gia)" : "Nguyên liệu / bán thành phẩm đầu vào"}</span>}
-        action={!fdis("lines") && <button onClick={addLine} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm dòng</button>}>
-        <fieldset disabled={fdis("lines")}>
+        title={<span className="flex items-center gap-2">{isColor && <FlaskConical size={16} className="text-blue-500" />}{isColor ? "Thành phần pha (NVL / phụ gia)" : "Nguyên liệu / bán thành phẩm đầu vào"}
+          {isLinked && <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">lấy từ Quy trình CN</span>}</span>}
+        action={!fdis("lines") && !isLinked && <button onClick={addLine} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm dòng</button>}>
+        <fieldset disabled={fdis("lines") || isLinked}>
         <table className="w-full text-sm">
           <thead className="text-slate-400 text-xs uppercase">
             <tr>
@@ -163,13 +202,13 @@ export default function BomModule({ lookups }) {
   const { can } = usePerm();
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
+  const [copyId, setCopyId] = useState(null);
   const [rows, setRows] = useState([]);
-  const [q, setQ] = useState("");
-  const { slice, Pager, Filler } = usePager(rows);
+  const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
   const load = useCallback(async () => {
-    try { setRows(await bomApi.list({ q })); } catch (e) { alert("Lỗi tải định mức: " + e.message); }
-  }, [q]);
+    try { setRows(await bomApi.list({})); } catch (e) { alert("Lỗi tải định mức: " + e.message); }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
@@ -178,48 +217,34 @@ export default function BomModule({ lookups }) {
   };
 
   if (view === "form")
-    return <BomForm lookups={lookups} editId={editId} onBack={() => { setView("list"); setEditId(null); }}
-      onSaved={() => { setView("list"); setEditId(null); load(); }} />;
+    return <BomForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }}
+      onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
+
+  const columns = [
+    { key: "bom_code", label: "Mã", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.bom_code}</button> },
+    { key: "name", label: "Tên định mức", filter: "text", tdClass: "text-slate-800", render: (r) => (
+        <span className="inline-flex items-center gap-1.5">{r.name}
+          {r.process_id && <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700"><GitBranch size={11} /> từ QT</span>}</span>
+      ) },
+    { key: "product_name", label: "Sản phẩm đầu ra", filter: "text", tdClass: "text-slate-600" },
+    { key: "bom_type", label: "Loại", filter: "select", render: (r) => r.bom_type === "Công thức pha màu"
+        ? <span className="inline-flex items-center gap-1 text-blue-600"><FlaskConical size={14} /> {r.bom_type}</span> : r.bom_type },
+    { key: "line_count", label: "Số dòng", align: "center" },
+    { key: "output_quantity", label: "Định mức", render: (r) => `${fmt(r.output_quantity)} ${r.output_unit || ""}` },
+    { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
+    { key: "_act", label: "", align: "right", render: (r) => (<>
+        {can("bom", "create") && <button onClick={() => openForm({ copy: r.id })} title="Sao chép" className="text-slate-400 hover:text-blue-600 p-1"><Copy size={15} /></button>}
+        <button onClick={() => openForm({ edit: r.id })} title="Sửa" className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>
+        <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>
+      </>) },
+  ];
 
   return (
     <div className="space-y-5">
       <ListHeader title="Định mức / Công thức (BOM)" actions={
-        can("bom", "create") && <button onClick={() => { setEditId(null); setView("form"); }} className="btn-primary"><Plus size={16} /> Tạo định mức</button>
+        can("bom", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo định mức</button>
       } />
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <input placeholder="Tìm mã / tên định mức / sản phẩm" className={inputCls + " md:w-1/2"} value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>{["Mã", "Tên định mức", "Sản phẩm đầu ra", "Loại", "Số dòng", "Định mức", "Trạng thái", ""].map((h) =>
-              <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50/70">
-                <td className="px-4 py-3">
-                  <button onClick={() => { setEditId(r.id); setView("form"); }} className="font-medium text-blue-600 hover:underline">{r.bom_code}</button>
-                </td>
-                <td className="px-4 py-3 text-slate-800">{r.name}</td>
-                <td className="px-4 py-3 text-slate-600">{r.product_name}</td>
-                <td className="px-4 py-3">{r.bom_type === "Công thức pha màu"
-                  ? <span className="inline-flex items-center gap-1 text-blue-600"><FlaskConical size={14} /> {r.bom_type}</span> : r.bom_type}</td>
-                <td className="px-4 py-3 text-center">{r.line_count}</td>
-                <td className="px-4 py-3">{fmt(r.output_quantity)} {r.output_unit}</td>
-                <td className="px-4 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span></td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => { setEditId(r.id); setView("form"); }} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>
-                  <button onClick={() => del(r.id)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>
-                </td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-400">Chưa có định mức</td></tr>}
-            <Filler cols={8} />
-          </tbody>
-        </table>
-      </div>
-      <Pager />
+      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có định mức" />
     </div>
   );
 }

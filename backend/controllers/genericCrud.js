@@ -15,6 +15,8 @@ function makeCrud(cfg) {
   const {
     table, columns, searchCols = [], exactCols = [],
     softDelete = true, orderBy = 'created_at DESC',
+    codeCol = null, // cột mã định danh (vd employee_code) — dùng để chặn trùng khi import
+    extraSelect = '', // biểu thức SELECT bổ sung (vd cột suy ra), bắt đầu bằng dấu phẩy
   } = cfg;
 
   const list = async (req, res) => {
@@ -46,7 +48,7 @@ function makeCrud(cfg) {
       const totalRes = await db.query(`SELECT COUNT(*)::int AS total FROM ${table} ${whereSql}`, params);
       const total = totalRes.rows[0].total;
       const dataRes = await db.query(
-        `SELECT * FROM ${table} ${whereSql} ORDER BY ${orderBy} LIMIT $${i++} OFFSET $${i++}`,
+        `SELECT * ${extraSelect} FROM ${table} ${whereSql} ORDER BY ${orderBy} LIMIT $${i++} OFFSET $${i++}`,
         [...params, pageSize, offset]
       );
       res.json({ data: dataRes.rows, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
@@ -56,7 +58,7 @@ function makeCrud(cfg) {
   const getById = async (req, res) => {
     try {
       const sd = softDelete ? 'AND is_deleted = FALSE' : '';
-      const { rows } = await db.query(`SELECT * FROM ${table} WHERE id = $1 ${sd}`, [req.params.id]);
+      const { rows } = await db.query(`SELECT * ${extraSelect} FROM ${table} WHERE id = $1 ${sd}`, [req.params.id]);
       if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy bản ghi' });
       res.json(rows[0]);
     } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết' }); }
@@ -96,6 +98,20 @@ function makeCrud(cfg) {
 
   const remove = async (req, res) => {
     try {
+      // Chặn xóa khi đang ở trạng thái HOẠT ĐỘNG / ĐANG TIẾN HÀNH (chỉ xóa khi đã kết thúc).
+      // Không xóa cứng — luôn chỉ soft delete (is_deleted) để giữ liên kết dữ liệu các phân hệ khác.
+      const blocked = cfg.blockDeleteStatuses || (cfg.blockDeleteActive ? [cfg.blockDeleteActive] : []);
+      if (blocked.length) {
+        const sd = softDelete ? 'AND is_deleted = FALSE' : '';
+        const r = await db.query(`SELECT status FROM ${table} WHERE id = $1 ${sd}`, [req.params.id]);
+        if (!r.rows.length) return res.status(404).json({ message: 'Không tìm thấy bản ghi' });
+        if (blocked.includes(r.rows[0].status)) {
+          return res.status(400).json({
+            message: cfg.blockDeleteMessage ||
+              `Không thể xóa khi đang "${r.rows[0].status}". Chỉ xóa được khi đã chuyển sang trạng thái kết thúc (Không hoạt động / Đã nghỉ / Hủy / Ngừng). Vui lòng đổi trạng thái trước.`,
+          });
+        }
+      }
       const q = softDelete
         ? `UPDATE ${table} SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE`
         : `DELETE FROM ${table} WHERE id = $1`;
@@ -105,22 +121,51 @@ function makeCrud(cfg) {
     } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi xóa' }); }
   };
 
-  // Nhập hàng loạt (import Excel) — bỏ qua dòng lỗi, trả thống kê
+  // Cột được phép insert khi import (kèm cột mã nếu có)
+  const importCols = codeCol ? [codeCol, ...columns] : columns;
+  const pickImport = (body) => {
+    const cols = [], vals = [];
+    for (const c of importCols) {
+      if (body[c] !== undefined) { cols.push(c); vals.push(body[c] === '' ? null : body[c]); }
+    }
+    return { cols, vals };
+  };
+
+  // Nhập hàng loạt (import Excel) — CHẶN TRÙNG MÃ, bỏ qua dòng lỗi, trả thống kê
   const bulkCreate = async (req, res) => {
     try {
       const rows = Array.isArray(req.body.rows) ? req.body.rows : [];
       if (!rows.length) return res.status(400).json({ message: 'Không có dòng nào để nhập' });
+
+      // Tập mã đã có trên hệ thống (để chặn trùng)
+      let existing = new Set();
+      if (codeCol) {
+        const sd = softDelete ? 'WHERE is_deleted = FALSE' : '';
+        const er = await db.query(`SELECT ${codeCol} AS c FROM ${table} ${sd}`);
+        existing = new Set(er.rows.map((r) => String(r.c).trim().toUpperCase()).filter(Boolean));
+      }
+      const seen = new Set(); // mã đã gặp trong chính file này
+
       let inserted = 0; const errors = [];
       for (let idx = 0; idx < rows.length; idx++) {
-        const { cols, vals } = pick(rows[idx] || {});
+        const row = rows[idx] || {};
+        const rawCode = codeCol && row[codeCol] != null ? String(row[codeCol]).trim() : '';
+        const codeKey = rawCode.toUpperCase();
+        // Chặn trùng theo mã
+        if (rawCode) {
+          if (seen.has(codeKey)) { errors.push({ row: idx + 2, message: `Mã "${rawCode}" bị trùng trong file — đã bỏ qua` }); continue; }
+          if (existing.has(codeKey)) { errors.push({ row: idx + 2, message: `Mã "${rawCode}" đã tồn tại trên hệ thống — đã bỏ qua` }); continue; }
+        }
+        const { cols, vals } = pickImport(row);
         if (!cols.length) { errors.push({ row: idx + 2, message: 'Dòng trống / thiếu dữ liệu' }); continue; }
         try {
           const ph = cols.map((_, k) => `$${k + 1}`).join(',');
           await db.query(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${ph})`, vals);
           inserted++;
+          if (rawCode) { seen.add(codeKey); existing.add(codeKey); }
         } catch (e) { errors.push({ row: idx + 2, message: e.detail || e.message }); }
       }
-      res.json({ inserted, failed: errors.length, errors: errors.slice(0, 30) });
+      res.json({ inserted, failed: errors.length, errors: errors.slice(0, 50) });
     } catch (err) { console.error(err); res.status(500).json({ message: `Lỗi khi nhập ${table}` }); }
   };
 

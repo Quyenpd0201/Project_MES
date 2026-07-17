@@ -1,0 +1,32 @@
+// src/specs.js — bộ thông số kỹ thuật chuẩn cho Đơn hàng & Kho (đồng bộ backend/lib/specs.js)
+// kind: "select" (chọn) | "num" (số + đơn vị cố định) | "numunit" (số + chọn đơn vị)
+export const PRODUCT_SPECS = [
+  { name: "Số lớp", kind: "select", options: ["1 lớp", "2 lớp"] },
+  { name: "Chiều dài", kind: "num", unit: "mm" },
+  { name: "Chiều ngang", kind: "num", unit: "mm" },
+  { name: "Độ dày", kind: "numunit", units: ["dem", "cem", "zem"] },
+  { name: "Màu sắc", kind: "select", options: ["Trắng", "Đỏ", "Cam", "Vàng", "Lục", "Lam", "Chàm", "Tím"] },
+];
+export const SPEC_NAMES = PRODUCT_SPECS.map((s) => s.name);
+
+// tách "120 mm" -> { num: "120", unit: "mm" }
+export const splitNU = (v) => {
+  const m = String(v || "").trim().match(/^([\d.,]+)?\s*(\S+)?$/);
+  return { num: (m && m[1]) || "", unit: (m && m[2]) || "" };
+};
+
+// chỉ giữ thông số có giá trị
+export const cleanSpecs = (specs = {}) => {
+  const o = {};
+  for (const n of SPEC_NAMES) { const v = specs?.[n]; if (v != null && String(v).trim() !== "") o[n] = String(v).trim(); }
+  return o;
+};
+
+// khoá gom nhóm (phải khớp backend)
+export const buildSpecKey = (specs = {}) => SPEC_NAMES.map((n) => String(specs?.[n] || "").trim()).join("|");
+
+// nhãn đầy đủ: "Số lớp: 2 lớp · Chiều dài: 120 mm · ..."
+export const specLabel = (specs = {}) => SPEC_NAMES.filter((n) => specs?.[n]).map((n) => `${n}: ${specs[n]}`).join(" · ");
+
+// nhãn gọn: "2 lớp · 120 mm · 80 mm · 2.5 cem · Lục"
+export const specShort = (specs = {}) => SPEC_NAMES.filter((n) => specs?.[n]).map((n) => specs[n]).join(" · ");

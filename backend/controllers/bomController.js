@@ -1,5 +1,8 @@
 // backend/controllers/bomController.js — Định mức (BOM) & công thức pha màu
 const db = require('../db');
+const { upUnit } = require('../lib/units');
+const { guardDelete } = require('../lib/deleteGuard');
+const { syncLinkedBom } = require('../lib/bomSync');
 
 exports.list = async (req, res) => {
   try {
@@ -21,8 +24,9 @@ exports.list = async (req, res) => {
 exports.getById = async (req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT b.*, p.product_name, p.product_code, p.unit AS product_unit
+      SELECT b.*, p.product_name, p.product_code, p.unit AS product_unit, pr.name AS process_name
       FROM boms b JOIN products p ON p.id = b.product_id
+      LEFT JOIN tech_processes pr ON pr.id = b.process_id
       WHERE b.id = $1 AND b.is_deleted = FALSE`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy định mức' });
     const bom = rows[0];
@@ -42,7 +46,7 @@ async function saveLines(client, bomId, lines) {
     await client.query(
       `INSERT INTO bom_lines (bom_id, material_id, quantity, unit, ratio_percent, line_no, note)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [bomId, l.material_id, l.quantity || 0, l.unit || null,
+      [bomId, l.material_id, l.quantity || 0, upUnit(l.unit),
        l.ratio_percent === '' || l.ratio_percent == null ? null : l.ratio_percent, n++, l.note || null]);
   }
 }
@@ -54,11 +58,13 @@ exports.create = async (req, res) => {
     if (!b.product_id || !b.name) return res.status(400).json({ message: 'Thiếu Sản phẩm đầu ra hoặc Tên định mức' });
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO boms (product_id, name, bom_type, output_quantity, output_unit, status, note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      `INSERT INTO boms (product_id, name, bom_type, output_quantity, output_unit, status, note, process_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [b.product_id, b.name, b.bom_type || 'Định mức NVL', b.output_quantity || 1,
-       b.output_unit || null, b.status || 'Hoạt động', b.note || null]);
-    await saveLines(client, rows[0].id, b.lines);
+       upUnit(b.output_unit), b.status || 'Hoạt động', b.note || null, b.process_id || null]);
+    // Gắn quy trình → lấy NVL từ quy trình; ngược lại lưu dòng nhập tay
+    if (b.process_id) await syncLinkedBom(client, b.process_id);
+    else await saveLines(client, rows[0].id, b.lines);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi tạo định mức' }); }
@@ -69,15 +75,22 @@ exports.update = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const b = req.body;
+    const cur = (await client.query(`SELECT process_id FROM boms WHERE id = $1 AND is_deleted = FALSE`, [req.params.id])).rows[0];
+    if (!cur) return res.status(404).json({ message: 'Không tìm thấy định mức' });
+    // process_id hiệu lực sau cập nhật (nếu client gửi thì dùng, không thì giữ nguyên)
+    const effPid = b.process_id !== undefined ? (b.process_id || null) : (cur.process_id || null);
+
     await client.query('BEGIN');
-    const fields = ['product_id','name','bom_type','output_quantity','output_unit','status','note'];
+    const fields = ['product_id','name','bom_type','output_quantity','output_unit','status','note','process_id'];
     const cols = [], vals = []; let i = 1;
-    for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(b[f] === '' ? null : b[f]); }
+    for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(f === 'output_unit' ? upUnit(b[f]) : (b[f] === '' ? null : b[f])); }
     if (cols.length) {
       const r = await client.query(`UPDATE boms SET ${cols.join(', ')} WHERE id = $${i} AND is_deleted = FALSE RETURNING id`, [...vals, req.params.id]);
       if (!r.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Không tìm thấy định mức' }); }
     }
-    if (b.lines !== undefined) await saveLines(client, req.params.id, b.lines);
+    // Gắn quy trình → dòng NVL lấy từ quy trình (bỏ qua dòng nhập tay); ngược lại lưu dòng nhập tay
+    if (effPid) await syncLinkedBom(client, effPid);
+    else if (b.lines !== undefined) await saveLines(client, req.params.id, b.lines);
     await client.query('COMMIT');
     res.json({ message: 'Đã cập nhật định mức' });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi cập nhật' }); }
@@ -86,6 +99,13 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
+    const g = await guardDelete('boms', req.params.id, {
+      blocked: ['Hoạt động'],
+      message: 'Không thể xóa định mức đang "Hoạt động" — có thể đang dùng để tính NVL/sản xuất. Vui lòng chuyển sang "Không hoạt động" trước, rồi mới xóa.',
+    });
+    if (g.notFound) return res.status(404).json({ message: 'Không tìm thấy định mức' });
+    if (g.blocked) return res.status(400).json({ message: g.message });
+
     const { rowCount } = await db.query(`UPDATE boms SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE`, [req.params.id]);
     if (!rowCount) return res.status(404).json({ message: 'Không tìm thấy định mức' });
     res.json({ message: 'Đã xóa định mức' });

@@ -23,3 +23,6 @@ Thumbs.db
 
 # pgAdmin (có thể chứa thông tin kết nối)
 pgadmin-servers.json
+
+# Thư mục dựng PDF tạm
+.pdfbuild/

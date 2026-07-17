@@ -1,5 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+
+/**
+ * Logo Ngọc An Thư (SVG) — dùng chung cho sidebar, đăng nhập, và mọi biểu mẫu in.
+ * Vẽ vector nên nét ở mọi kích thước & khi xuất PDF.
+ *  - light: chữ trắng (đặt trên nền tối).
+ *  - withText: kèm chữ "NGỌC AN THƯ" (false = chỉ biểu tượng).
+ */
+// Dùng đúng file ảnh logo gốc tại public/logo.png — thay file là đổi logo toàn hệ thống.
+export function Logo({ className = "" }) {
+  return <img src="/logo.png" alt="Ngọc An Thư" className={className} />;
+}
 
 /**
  * Thanh header trang: breadcrumb/back + tiêu đề + (badge) + nút hành động.
@@ -48,16 +59,25 @@ export function ListHeader({ title, subtitle, actions }) {
  * Khối section: header (tiêu đề + hành động phụ) có viền dưới phân cách,
  * thân nội dung padding riêng — mỗi section nhìn tách bạch.
  */
-export function Section({ title, action, children, bodyClass = "p-6", className = "" }) {
+export function Section({ title, action, children, bodyClass = "p-6", className = "", collapsible = true, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const canToggle = collapsible && !!title;
   return (
     <div className={`bg-white rounded-xl border border-slate-200 overflow-hidden ${className}`}>
       {title && (
-        <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-100 bg-slate-50/50">
-          <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
-          {action}
+        <div className={`flex items-center justify-between px-6 py-3.5 bg-slate-50/50 ${open ? "border-b border-slate-100" : ""}`}>
+          {canToggle ? (
+            <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 -ml-1 group">
+              <ChevronDown size={16} className={`text-slate-400 group-hover:text-slate-600 transition-transform ${open ? "" : "-rotate-90"}`} />
+              <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+            </button>
+          ) : (
+            <h2 className="text-sm font-semibold text-slate-700">{title}</h2>
+          )}
+          {open && action}
         </div>
       )}
-      <div className={bodyClass}>{children}</div>
+      {open && <div className={bodyClass}>{children}</div>}
     </div>
   );
 }
@@ -130,4 +150,88 @@ export function usePager(rows, initialSize = 10) {
     ))}</>
   );
   return { slice, Pager, Filler };
+}
+
+/* ---- Bảng dữ liệu có bộ lọc theo từng cột ---- */
+// Bỏ dấu tiếng Việt để lọc "gần đúng"
+const stripAccent = (s) => String(s ?? "").toLowerCase().normalize("NFD")
+  .replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+
+const alignCls = (a) => a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
+
+/**
+ * Bảng dùng chung: có hàng bộ lọc ngay trên hàng tiêu đề cột.
+ * columns: [{ key, label, filter?: 'text'|'select'|'date', filterValue?(row), filterKey?,
+ *             render?(row), align?, tdClass? }]
+ * Lọc nhiều cột cùng lúc (AND), text = gần đúng (bỏ dấu), tự cập nhật danh sách.
+ */
+export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "Không có dữ liệu", dense = false }) {
+  const [filters, setFilters] = useState({});
+  const setF = (k, v) => setFilters((s) => ({ ...s, [k]: v }));
+  const cellValue = (c, r) => c.filterValue ? c.filterValue(r) : r[c.filterKey || c.key];
+
+  const distinct = (c) => {
+    const set = new Set();
+    rows.forEach((r) => { const v = cellValue(c, r); if (v !== null && v !== undefined && v !== "") set.add(String(v)); });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  };
+
+  const filtered = rows.filter((r) => columns.every((c) => {
+    if (!c.filter) return true;
+    const fv = filters[c.key];
+    if (!fv) return true;
+    const cell = cellValue(c, r);
+    if (c.filter === "select") return String(cell ?? "") === fv;
+    if (c.filter === "date") return String(cell ?? "").slice(0, 10) === fv;
+    return stripAccent(cell).includes(stripAccent(fv));
+  }));
+
+  const { slice, Pager, Filler } = usePager(filtered, pageSize);
+  const pad = dense ? "px-3 py-2" : "px-4 py-3";
+  const inputCls = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none";
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm whitespace-nowrap">
+          <thead>
+            <tr className="bg-slate-50/70 border-b border-slate-100">
+              {columns.map((c) => (
+                <th key={c.key} className={`${pad} align-top font-normal`}>
+                  {c.filter === "select" ? (
+                    <select value={filters[c.key] || "__ph"} onChange={(e) => setF(c.key, e.target.value === "__ph" ? "" : e.target.value)} className={inputCls + " bg-white"}>
+                      <option value="__ph" hidden>{c.label}</option>
+                      <option value="">---</option>
+                      {distinct(c).map((v) => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  ) : c.filter === "date" ? (
+                    <input type="date" value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} className={inputCls} />
+                  ) : c.filter === "text" ? (
+                    <input value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} placeholder={c.label} className={inputCls} />
+                  ) : null}
+                </th>
+              ))}
+            </tr>
+            <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+              {columns.map((c) => <th key={c.key} className={`${pad} font-semibold ${alignCls(c.align)}`}>{c.label}</th>)}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {slice.map((r) => (
+              <tr key={rowKey(r)} className="hover:bg-slate-50/70">
+                {columns.map((c) => (
+                  <td key={c.key} className={`${pad} ${alignCls(c.align)} ${c.tdClass || "text-slate-700"}`}>
+                    {c.render ? c.render(r) : (r[c.key] ?? "—")}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {!filtered.length && <tr><td colSpan={columns.length} className={`${pad} py-10 text-center text-slate-400`}>{emptyText}</td></tr>}
+            <Filler cols={columns.length} />
+          </tbody>
+        </table>
+      </div>
+      <Pager />
+    </div>
+  );
 }

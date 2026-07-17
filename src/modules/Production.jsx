@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch, Copy } from "lucide-react";
 import { production, processes } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass } from "../ui.js";
-import { PageHeader, Section, ListHeader, usePager } from "../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable } from "../components.jsx";
 import Qr from "../Qr.jsx";
 import ProductionGantt from "./ProductionGantt.jsx";
 
 const STATUSES = ["Chờ duyệt", "Đã lên kế hoạch", "Đang sản xuất", "Hoàn thành", "Đã hủy"];
 
 /* ---- Form tạo / sửa lệnh sản xuất ---- */
-function ProductionForm({ lookups, editId, onBack, onSaved }) {
+function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const { can, fperm } = usePerm();
   const fhid = (k) => fperm("production", k) === "hidden";
   const fdis = (k) => fperm("production", k) !== "edit";
@@ -28,30 +28,60 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
   const [tasks, setTasks] = useState([]);
   const [taskSeq, setTaskSeq] = useState(1);
   const addTask = () => {
-    setTasks((a) => [...a, { _k: taskSeq, stage: "Thổi", quantity: "", actual_qty: "", scrap_qty: "", machine_id: "", shift: "", planned_date: "", planned_end_date: "", assigned_team: "", status: "Chờ" }]);
+    setTasks((a) => [...a, { _k: taskSeq, stage: "Thổi", quantity: "", actual_qty: "", scrap_qty: "", machine_id: "", shift: "", planned_date: "", planned_end_date: "", assigned_team: "", assigned_worker: "", status: "Chờ" }]);
     setTaskSeq((s) => s + 1);
   };
   const rmTask = (k) => setTasks((a) => a.filter((x) => x._k !== k));
   const upTask = (k, field, v) => setTasks((a) => a.map((x) => (x._k === k ? { ...x, [field]: v } : x)));
+  // Đội / Công nhân (chọn từ danh sách, công nhân lọc theo đội)
+  const emps = lookups.employees || [];
+  const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
+  const workersOf = (team) => emps.filter((e) => !team || e.factory === team);
+  const setTaskTeam = (k, v) => setTasks((a) => a.map((x) => {
+    if (x._k !== k) return x;
+    const keep = emps.find((e) => e.name === x.assigned_worker && (!v || e.factory === v));
+    return { ...x, assigned_team: v, assigned_worker: keep ? x.assigned_worker : "" };
+  }));
 
-  // Sinh phân công theo Quy trình công nghệ của sản phẩm
-  const applyProcess = async () => {
-    if (!f.product_id) return alert("Hãy chọn Sản phẩm trước.");
+  // Sinh phân công theo Quy trình công nghệ của sản phẩm (silent = tự động, không báo)
+  const genFromProcess = async (productId, quantity, { silent = false } = {}) => {
+    if (!productId) { if (!silent) alert("Hãy chọn Sản phẩm trước."); return; }
     try {
-      const list = await processes.list({ product_id: f.product_id });
-      if (!list.length) return alert("Sản phẩm này chưa có quy trình công nghệ. Tạo ở mục Quy trình CN.");
+      const list = await processes.list({ product_id: productId });
+      if (!list.length) { if (!silent) alert("Sản phẩm này chưa có quy trình công nghệ. Tạo ở mục Quy trình CN."); return; }
       const proc = await processes.get(list[0].id);
-      if (!proc.steps?.length) return alert("Quy trình chưa có bước nào.");
-      const mapStage = (s) => /c[ắa]t/i.test(`${s.name || ""} ${s.machine_type || ""}`) ? "Cắt" : "Thổi";
-      let k = taskSeq;
-      const newTasks = proc.steps.map((s) => ({
-        _k: k++, stage: mapStage(s), quantity: f.quantity || "", actual_qty: "", scrap_qty: "",
-        machine_id: "", shift: "", planned_date: "", planned_end_date: "", assigned_team: "", status: "Chờ",
-      }));
-      setTasks(newTasks); setTaskSeq(k);
-      alert(`Đã tạo ${newTasks.length} phân công theo quy trình "${proc.name}". Hãy xếp máy/ca rồi Lưu.`);
-    } catch (e) { alert("Lỗi: " + e.message); }
+      if (!proc.steps?.length) { if (!silent) alert("Quy trình chưa có bước nào."); return; }
+      let avail = [];
+      try { avail = await production.machineAvailability(); } catch { /* không chặn nếu lỗi */ }
+      const mapStage = (s) => /c[ắa]t/i.test(`${s.name || ""} ${s.workshop || ""} ${s.machine_name || ""} ${s.machine_type || ""}`) ? "Cắt" : "Thổi";
+      // Gợi ý máy: ưu tiên máy đang rảnh (Hoạt động + tải thấp nhất) và DÙNG 1 MÁY xuyên suốt cho cùng công đoạn
+      const chosen = {}; // xưởng/công đoạn -> machine_id đã chọn
+      const pickMachine = (s, stage) => {
+        if (s.machine_id) { chosen[s.workshop || stage] = s.machine_id; return s.machine_id; } // quy trình đã chỉ định máy
+        const wantWs = s.workshop || (stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi");
+        if (chosen[wantWs]) return chosen[wantWs];                       // tái dùng máy đã chọn cho công đoạn này
+        let pool = avail.filter((m) => m.status === "Hoạt động" && m.factory === wantWs);
+        if (!pool.length) pool = avail.filter((m) => m.status === "Hoạt động" &&
+          (stage === "Cắt" ? /c[ắa]t/i.test(`${m.factory} ${m.machine_type}`) : /th[ổô]i/i.test(`${m.factory} ${m.machine_type}`)));
+        if (!pool.length) return "";
+        pool = [...pool].sort((a, b) => (a.load || 0) - (b.load || 0) || String(a.name).localeCompare(String(b.name), "vi"));
+        chosen[wantWs] = pool[0].id;
+        return pool[0].id;
+      };
+      const base = Date.now();
+      const newTasks = proc.steps.map((s, idx) => {
+        const stage = mapStage(s);
+        return { _k: base + idx, stage, quantity: quantity || "", actual_qty: "", scrap_qty: "",
+          machine_id: pickMachine(s, stage), shift: "", planned_date: "", planned_end_date: "", assigned_team: "", assigned_worker: "", status: "Chờ" };
+      });
+      setTasks(newTasks); setTaskSeq(base + newTasks.length + 1);
+      if (!silent) {
+        const nMc = newTasks.filter((t) => t.machine_id).length;
+        alert(`Đã tạo ${newTasks.length} phân công theo quy trình "${proc.name}". Gợi ý máy rảnh cho ${nMc}/${newTasks.length} công đoạn (ưu tiên 1 máy/công đoạn). Hãy kiểm tra ca/ngày rồi Lưu.`);
+      }
+    } catch (e) { if (!silent) alert("Lỗi: " + e.message); }
   };
+  const applyProcess = () => genFromProcess(f.product_id, f.quantity);
 
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [meta, setMeta] = useState(null); // dữ liệu lệnh đã nạp (mã lệnh, SP, đơn...) cho tem QR
@@ -69,23 +99,49 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
       setFinishing(names.map((name) => ({ name, checked: saved.get(name) || false })));
+      production.getTasks(editId).then((rows) => {
+        if (rows && rows.length) {
+          setTasks(rows.map((t, i) => ({
+            _k: i + 1, task_code: t.task_code, stage: t.stage, quantity: t.quantity, actual_qty: t.actual_qty ?? "", scrap_qty: t.scrap_qty ?? "",
+            machine_id: t.machine_id || "", shift: t.shift || "",
+            planned_date: t.planned_date?.slice(0, 10) || "", planned_end_date: t.planned_end_date?.slice(0, 10) || "",
+            assigned_team: t.assigned_team || "", assigned_worker: t.assigned_worker || "", status: t.status,
+          })));
+          setTaskSeq(rows.length + 1);
+        } else {
+          // Mặc định: chưa có phân công → tự dựng theo quy trình công nghệ, SL = SL lệnh
+          genFromProcess(d.product_id, d.quantity, { silent: true });
+        }
+      }).catch(() => {});
     }).catch((e) => alert("Lỗi tải lệnh sản xuất: " + e.message));
-    production.getTasks(editId).then((rows) => {
-      setTasks((rows || []).map((t, i) => ({
-        _k: i + 1, task_code: t.task_code, stage: t.stage, quantity: t.quantity, actual_qty: t.actual_qty ?? "", scrap_qty: t.scrap_qty ?? "",
-        machine_id: t.machine_id || "", shift: t.shift || "",
-        planned_date: t.planned_date?.slice(0, 10) || "", planned_end_date: t.planned_end_date?.slice(0, 10) || "",
-        assigned_team: t.assigned_team || "", status: t.status,
-      })));
-      setTaskSeq((rows?.length || 0) + 1);
-    }).catch(() => {});
   }, [editId]); // eslint-disable-line
   useEffect(() => { loadData(); }, [loadData]);
 
-  // auto đổ đơn vị theo sản phẩm
+  // Sao chép từ lệnh nguồn → lệnh mới (không copy phân công; sẽ tự dựng theo quy trình khi mở sửa)
+  useEffect(() => {
+    if (editId || !copyId) return;
+    production.get(copyId).then((d) => {
+      setF({
+        product_id: d.product_id, customer_id: d.customer_id || "", quantity: d.quantity, unit: d.unit || "",
+        attr_size: d.attr_size || "", attr_thickness: d.attr_thickness || "", attr_color: d.attr_color || "",
+        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "",
+      });
+      const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
+      const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
+      setFinishing(names.map((name) => ({ name, checked: saved.get(name) || false })));
+    }).catch((e) => alert("Lỗi tải lệnh nguồn: " + e.message));
+  }, [copyId, editId]); // eslint-disable-line
+
+  // auto đổ đơn vị theo sản phẩm + tự dựng phân công theo quy trình (khi tạo mới)
   const onProduct = (id) => {
     const p = lookups.products.find((x) => x.id === id);
     setF((s) => ({ ...s, product_id: id, unit: p?.unit || s.unit }));
+    if (!editId && id) genFromProcess(id, f.quantity, { silent: true });
+  };
+  // đổi SL lệnh → đồng bộ vào các phân công chưa có sản lượng thực tế
+  const onQuantity = (v) => {
+    setF((s) => ({ ...s, quantity: v }));
+    setTasks((a) => a.map((t) => (t.actual_qty === "" || t.actual_qty == null ? { ...t, quantity: v } : t)));
   };
 
   const save = async () => {
@@ -109,7 +165,7 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={!editId ? "Tạo lệnh sản xuất" : editing ? "Sửa lệnh sản xuất" : "Chi tiết lệnh sản xuất"} onBack={onBack}
+      <PageHeader title={!editId ? (copyId ? "Tạo lệnh sản xuất (sao chép)" : "Tạo lệnh sản xuất") : editing ? "Sửa lệnh sản xuất" : "Chi tiết lệnh sản xuất"} onBack={onBack}
         actions={editId && !editing ? (<>
           {can("production", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("production", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
@@ -134,7 +190,7 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
             </select>
           </Field>}
           {!fhid("quantity") && <Field label="Số lượng cần sản xuất" required>
-            <input type="number" min="0" className={inputCls} disabled={fdis("quantity")} value={f.quantity} onChange={(e) => set("quantity", e.target.value)} />
+            <input type="number" min="0" className={inputCls} disabled={fdis("quantity")} value={f.quantity} onChange={(e) => onQuantity(e.target.value)} />
           </Field>}
           <Field label="Đơn vị">
             <input className={inputCls} list="units" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="cái, cuộn, kg..." />
@@ -148,6 +204,42 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
           </Field>
         </div>
       </Section>
+
+      {editId && meta && (() => {
+        const target = Number(f.quantity) || 0;
+        const produced = Number(meta.produced_qty) || 0;
+        const scrap = Number(meta.scrap_qty) || 0;
+        const pctDone = target > 0 ? Math.min(100, Math.round((produced / target) * 100)) : 0;
+        const pctScrap = produced + scrap > 0 ? Math.round((scrap / (produced + scrap)) * 100) : 0;
+        const remain = Math.max(0, target - produced);
+        const stat = (label, value, sub, cls = "text-slate-800") => (
+          <div className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+            <div className="text-xs text-slate-500 mb-1">{label}</div>
+            <div className={`text-2xl font-bold ${cls}`}>{value}</div>
+            {sub && <div className="text-[11px] text-slate-400 mt-0.5">{sub}</div>}
+          </div>
+        );
+        return (
+          <Section title="Kết quả thực tế">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {stat("Trạng thái", <span className={`inline-flex px-2.5 py-0.5 rounded-full text-sm font-medium ${statusClass(meta.status)}`}>{meta.status}</span>, `${meta.task_done || 0}/${meta.task_count || 0} việc xong`)}
+              {stat("Số lượng cần SX", fmt(target), f.unit)}
+              {stat("Đã sản xuất", fmt(produced), `Còn lại ${fmt(remain)} ${f.unit || ""}`, pctDone >= 100 ? "text-emerald-600" : "text-blue-600")}
+              {stat("% đã sản xuất", pctDone + "%", null, pctDone >= 100 ? "text-emerald-600" : "text-blue-600")}
+              {stat("Phế phẩm", fmt(scrap), f.unit, scrap > 0 ? "text-rose-600" : "text-slate-800")}
+              {stat("% phế phẩm", pctScrap + "%", "trên tổng SX", pctScrap > 0 ? "text-rose-600" : "text-slate-800")}
+            </div>
+            <div className="mt-3">
+              <div className="flex justify-between text-xs text-slate-500 mb-1">
+                <span>Tiến độ sản xuất</span><span>{fmt(produced)}/{fmt(target)} {f.unit}</span>
+              </div>
+              <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                <div className={`h-full rounded-full ${pctDone >= 100 ? "bg-emerald-500" : "bg-blue-500"}`} style={{ width: `${Math.max(pctDone, 2)}%` }} />
+              </div>
+            </div>
+          </Section>
+        );
+      })()}
 
       {!fhid("attributes") && (
       <Section title={<>Thông số đặc thù <span className="text-slate-400 font-normal">(kế thừa xuyên suốt)</span></>}>
@@ -203,7 +295,8 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
                   <th className="text-left py-2 font-medium w-24">Ca</th>
                   <th className="text-left py-2 font-medium w-36">Từ ngày</th>
                   <th className="text-left py-2 font-medium w-36">Đến ngày</th>
-                  <th className="text-left py-2 font-medium w-40">Đội / nhân công</th>
+                  <th className="text-left py-2 font-medium w-36">Đội</th>
+                  <th className="text-left py-2 font-medium w-40">Công nhân</th>
                   <th className="text-left py-2 font-medium w-24">Thực tế</th>
                   <th className="text-left py-2 font-medium w-24">Phế phẩm</th>
                   <th className="text-left py-2 font-medium w-32">Trạng thái</th>
@@ -222,7 +315,18 @@ function ProductionForm({ lookups, editId, onBack, onSaved }) {
                       <td className="py-1.5 pr-2"><select className={inputCls} value={t.shift} onChange={(e) => upTask(t._k, "shift", e.target.value)}><option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}</select></td>
                       <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
                       <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_end_date} onChange={(e) => upTask(t._k, "planned_end_date", e.target.value)} /></td>
-                      <td className="py-1.5 pr-2"><input className={inputCls} list="emp-dl" value={t.assigned_team} onChange={(e) => upTask(t._k, "assigned_team", e.target.value)} placeholder="Chọn NV / đội" /></td>
+                      <td className="py-1.5 pr-2">
+                        <select className={inputCls} value={t.assigned_team} onChange={(e) => setTaskTeam(t._k, e.target.value)}>
+                          <option value="">-- Đội --</option>
+                          {teams.map((tm) => <option key={tm}>{tm}</option>)}
+                        </select>
+                      </td>
+                      <td className="py-1.5 pr-2">
+                        <select className={inputCls} value={t.assigned_worker} onChange={(e) => upTask(t._k, "assigned_worker", e.target.value)}>
+                          <option value="">-- Công nhân --</option>
+                          {workersOf(t.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
+                        </select>
+                      </td>
                       <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.actual_qty} onChange={(e) => upTask(t._k, "actual_qty", e.target.value)} placeholder="SL thực" /></td>
                       <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.scrap_qty} onChange={(e) => upTask(t._k, "scrap_qty", e.target.value)} /></td>
                       <td className="py-1.5 pr-2"><select className={inputCls} value={t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Hoàn thành</option><option>Đã hủy</option></select></td>
@@ -296,8 +400,12 @@ const Field = ({ label, required, children }) => (
 export function ScheduleModal({ lookups, order, onClose, onSaved }) {
   const [s, setS] = useState({
     machine_id: order.machine_id || "", planned_date: order.planned_date?.slice(0, 10) || "",
-    shift: order.shift || "", assigned_team: order.assigned_team || "",
+    shift: order.shift || "", assigned_team: order.assigned_team || "", assigned_worker: order.assigned_worker || "",
   });
+  const emps = lookups.employees || [];
+  const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
+  const workers = emps.filter((e) => !s.assigned_team || e.factory === s.assigned_team);
+  const setTeam = (v) => setS((p) => ({ ...p, assigned_team: v, assigned_worker: emps.find((e) => e.name === p.assigned_worker && (!v || e.factory === v)) ? p.assigned_worker : "" }));
   const save = async () => {
     try { await production.schedule(order.id, s); onSaved(); }
     catch (e) { alert("Lỗi lập lịch: " + e.message); }
@@ -323,9 +431,20 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
             </select>
           </Field>
         </div>
-        <Field label="Đội / nhân công">
-          <input className={inputCls} value={s.assigned_team} onChange={(e) => setS({ ...s, assigned_team: e.target.value })} placeholder="vd: Đội thổi A" />
-        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Đội">
+            <select className={inputCls} value={s.assigned_team} onChange={(e) => setTeam(e.target.value)}>
+              <option value="">-- Chọn đội --</option>
+              {teams.map((t) => <option key={t}>{t}</option>)}
+            </select>
+          </Field>
+          <Field label="Công nhân">
+            <select className={inputCls} value={s.assigned_worker} onChange={(e) => setS({ ...s, assigned_worker: e.target.value })}>
+              <option value="">-- Chọn công nhân --</option>
+              {workers.map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ""}</option>)}
+            </select>
+          </Field>
+        </div>
         <div className="flex justify-end gap-2 pt-2">
           <button onClick={onClose} className="btn-ghost">Hủy</button>
           <button onClick={save} className="btn-primary"><Save size={16} /> Lưu lịch</button>
@@ -336,26 +455,33 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
 }
 
 /* ---- Module chính ---- */
-export default function ProductionModule({ lookups, focusId, onFocusConsumed }) {
+export default function ProductionModule({ lookups, focusId, onFocusConsumed, onExit }) {
   const { can } = usePerm();
   const [view, setView] = useState("list");
   const [mode, setMode] = useState("table"); // table | gantt
   const [editId, setEditId] = useState(null);
+  const [copyId, setCopyId] = useState(null);
   const [rows, setRows] = useState([]);
-  const [filters, setFilters] = useState({ status: "", machine_id: "", q: "" });
   const [scheduling, setScheduling] = useState(null);
-  const { slice, Pager, Filler } = usePager(rows);
+  const [cameFromFocus, setCameFromFocus] = useState(false); // mở từ module khác → back về đúng chỗ
 
   const load = useCallback(async () => {
-    try { setRows(await production.list(filters)); }
+    try { setRows(await production.list({})); }
     catch (e) { alert("Lỗi tải lệnh sản xuất: " + e.message); }
-  }, [filters]);
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   // Mở sẵn chi tiết lệnh khi được điều hướng từ module khác (vd: Kế hoạch)
   useEffect(() => {
-    if (focusId) { setEditId(focusId); setView("form"); onFocusConsumed?.(); }
+    if (focusId) { setEditId(focusId); setView("form"); setCameFromFocus(true); onFocusConsumed?.(); }
   }, [focusId]);
+
+  const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
+  const backFromForm = () => {
+    setCopyId(null);
+    if (cameFromFocus && onExit) { setCameFromFocus(false); setEditId(null); onExit(); }
+    else { setView("list"); setEditId(null); }
+  };
 
   const del = async (id) => {
     if (!confirm("Xóa lệnh sản xuất này?")) return;
@@ -363,9 +489,40 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed }) 
   };
 
   if (view === "form")
-    return <ProductionForm lookups={lookups} editId={editId}
-      onBack={() => { setView("list"); setEditId(null); }}
-      onSaved={() => { setView("list"); setEditId(null); load(); }} />;
+    return <ProductionForm lookups={lookups} editId={editId} copyId={copyId}
+      onBack={backFromForm}
+      onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
+
+  const columns = [
+    { key: "order_code", label: "Mã lệnh", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },
+    { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
+    { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
+    { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
+    { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },
+    { key: "attr_size", label: "Kích thước", filter: "select", render: (r) => r.attr_size || "—" },
+    { key: "machine_name", label: "Máy", filter: "select", render: (r) => r.machine_name || <span className="text-slate-400">Chưa xếp</span> },
+    { key: "planned_date", label: "Ngày SX", filter: "date", render: (r) => `${fmtDate(r.planned_date)}${r.shift ? " · " + r.shift : ""}` },
+    { key: "due_date", label: "Ngày giao", filter: "date", render: (r) => fmtDate(r.due_date) },
+    { key: "_progress", label: "Tiến độ", render: (r) => r.task_count > 0 ? (
+        <div className="w-28">
+          <div className="flex justify-between text-xs text-slate-500 mb-0.5">
+            <span>{fmt(r.produced_qty)}/{fmt(r.quantity)}</span>
+            <span>{Math.min(100, Math.round((Number(r.produced_qty) / Number(r.quantity)) * 100))}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div className={`h-full rounded-full ${Number(r.produced_qty) >= Number(r.quantity) ? "bg-emerald-500" : "bg-blue-500"}`}
+              style={{ width: `${Math.max(Math.min(100, (Number(r.produced_qty) / Number(r.quantity)) * 100), 2)}%` }} />
+          </div>
+          <div className="text-[11px] text-slate-400 mt-0.5">{r.task_done}/{r.task_count} việc xong{Number(r.scrap_qty) > 0 && <span className="text-rose-500"> · phế {fmt(r.scrap_qty)}</span>}</div>
+        </div>
+      ) : <span className="text-slate-400 text-xs">Chưa phân công</span> },
+    { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
+    { key: "_act", label: "", align: "right", render: (r) => (<>
+        <button onClick={() => setScheduling(r)} title="Lập lịch" className="text-slate-400 hover:text-blue-600 p-1"><CalendarClock size={16} /></button>
+        {can("production", "create") && <button onClick={() => openForm({ copy: r.id })} title="Sao chép" className="text-slate-400 hover:text-blue-600 p-1"><Copy size={16} /></button>}
+        <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
+      </>) },
+  ];
 
   return (
     <div className="space-y-5">
@@ -374,74 +531,12 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed }) 
           <button onClick={() => setMode("table")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "table" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><List size={15} /> Bảng</button>
           <button onClick={() => setMode("gantt")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "gantt" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><GanttChartSquare size={15} /> Gantt</button>
         </div>
-        {can("production", "create") && <button onClick={() => { setEditId(null); setView("form"); }} className="btn-primary"><Plus size={16} /> Tạo lệnh SX</button>}
+        {can("production", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo lệnh SX</button>}
       </>} />
 
-      {mode === "gantt" && <ProductionGantt onOpenOrder={(id) => { setEditId(id); setView("form"); }} />}
+      {mode === "gantt" && <ProductionGantt onOpenOrder={(id) => openForm({ edit: id })} />}
 
-      {mode === "table" && (<>
-      <div className="bg-white rounded-xl border border-slate-200 p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-        <input placeholder="Tìm mã lệnh / sản phẩm" className={inputCls} value={filters.q}
-          onChange={(e) => setFilters({ ...filters, q: e.target.value })} />
-        <select className={inputCls} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
-          <option value="">Tất cả trạng thái</option>{STATUSES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <select className={inputCls} value={filters.machine_id} onChange={(e) => setFilters({ ...filters, machine_id: e.target.value })}>
-          <option value="">Tất cả máy</option>{lookups.machines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-        </select>
-      </div>
-
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm whitespace-nowrap">
-          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
-            <tr>
-              {["Mã lệnh", "Sản phẩm", "Khách hàng", "SL", "Màu", "Kích thước", "Máy", "Ngày SX", "Ngày giao", "Tiến độ", "Trạng thái", ""].map((h) =>
-                <th key={h} className="text-left px-3 py-3 font-semibold">{h}</th>)}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {slice.map((r) => (
-              <tr key={r.id} className="hover:bg-slate-50/70">
-                <td className="px-3 py-3">
-                  <button onClick={() => { setEditId(r.id); setView("form"); }} className="font-medium text-blue-600 hover:underline">{r.order_code}</button>
-                </td>
-                <td className="px-3 py-3 text-slate-800">{r.product_name}</td>
-                <td className="px-3 py-3 text-slate-600">{r.customer_name || "—"}</td>
-                <td className="px-3 py-3 text-right">{fmt(r.quantity)} {r.unit}</td>
-                <td className="px-3 py-3">{r.attr_color || "—"}</td>
-                <td className="px-3 py-3">{r.attr_size || "—"}</td>
-                <td className="px-3 py-3">{r.machine_name || <span className="text-slate-400">Chưa xếp</span>}</td>
-                <td className="px-3 py-3">{fmtDate(r.planned_date)}{r.shift ? ` · ${r.shift}` : ""}</td>
-                <td className="px-3 py-3">{fmtDate(r.due_date)}</td>
-                <td className="px-3 py-3">
-                  {r.task_count > 0 ? (
-                    <div className="w-28">
-                      <div className="flex justify-between text-xs text-slate-500 mb-0.5">
-                        <span>{fmt(r.produced_qty)}/{fmt(r.quantity)}</span>
-                        <span>{Math.min(100, Math.round((Number(r.produced_qty) / Number(r.quantity)) * 100))}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div className={`h-full rounded-full ${Number(r.produced_qty) >= Number(r.quantity) ? "bg-emerald-500" : "bg-blue-500"}`}
-                          style={{ width: `${Math.max(Math.min(100, (Number(r.produced_qty) / Number(r.quantity)) * 100), 2)}%` }} />
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">{r.task_done}/{r.task_count} việc xong{Number(r.scrap_qty) > 0 && <span className="text-rose-500"> · phế {fmt(r.scrap_qty)}</span>}</div>
-                    </div>
-                  ) : <span className="text-slate-400 text-xs">Chưa phân công</span>}
-                </td>
-                <td className="px-3 py-3"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span></td>
-                <td className="px-3 py-3 text-right">
-                  <button onClick={() => setScheduling(r)} title="Lập lịch" className="text-slate-400 hover:text-blue-600 p-1"><CalendarClock size={16} /></button>
-                  <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
-            {!rows.length && <tr><td colSpan={12} className="px-4 py-10 text-center text-slate-400">Chưa có lệnh sản xuất</td></tr>}
-            <Filler cols={12} />
-          </tbody>
-        </table>
-      </div>
-      <Pager />
-      </>)}
+      {mode === "table" && <DataTable dense columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có lệnh sản xuất" />}
 
       {scheduling && (
         <ScheduleModal lookups={lookups} order={scheduling}
