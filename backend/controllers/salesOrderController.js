@@ -9,9 +9,9 @@ exports.list = async (req, res) => {
     const where = ['so.is_deleted = FALSE'];
     const params = []; let i = 1;
     const { q, status, customer_id } = req.query;
-    if (status)      { where.push(`so.status = $${i++}`); params.push(status); }
+    if (status) { where.push(`so.status = $${i++}`); params.push(status); }
     if (customer_id) { where.push(`so.customer_id = $${i++}`); params.push(customer_id); }
-    if (q)           { where.push(`(so.order_code ILIKE $${i} OR c.name ILIKE $${i})`); params.push(`%${q}%`); i++; }
+    if (q) { where.push(`(so.order_code ILIKE $${i} OR c.name ILIKE $${i})`); params.push(`%${q}%`); i++; }
     const { rows } = await db.query(`
       SELECT so.*, c.name AS customer_name, c.phone AS customer_phone,
              (SELECT COUNT(*)::int FROM sales_order_items it WHERE it.sales_order_id = so.id) AS item_count,
@@ -111,8 +111,8 @@ async function saveItems(client, orderId, items) {
     const specs = specsFromBody(it);
     const a = legacyAttrs(specs);
     const base = [it.product_id, it.quantity, upUnit(it.unit), JSON.stringify(specs), buildSpecKey(specs),
-      a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
-      it.planned_start_date || null, it.planned_end_date || null];
+    a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
+    it.planned_start_date || null, it.planned_end_date || null];
     if (it.id) {
       await client.query(
         `UPDATE sales_order_items SET product_id=$1, quantity=$2, unit=$3, specs=$4::jsonb, spec_key=$5,
@@ -124,10 +124,10 @@ async function saveItems(client, orderId, items) {
         `INSERT INTO sales_order_items
            (sales_order_id, product_id, quantity, unit, specs, spec_key, attr_size, attr_thickness, attr_color,
             core_weight, total_weight, note, planned_start_date, planned_end_date)
-         VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [orderId, it.product_id, it.quantity, upUnit(it.unit), JSON.stringify(specs), buildSpecKey(specs),
-         a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
-         it.planned_start_date || null, it.planned_end_date || null]);
+          a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
+          it.planned_start_date || null, it.planned_end_date || null]);
     }
   }
 }

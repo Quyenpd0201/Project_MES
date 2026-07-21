@@ -1,6 +1,7 @@
-// backend/migrate.js — nạp schema.sql vào database (thay cho psql)
+// backend/scripts/migrate.js — nạp schema.sql vào database (thay cho psql)
 const path = require('path');
-require('dotenv').config({ path: path.join(__dirname, '.env') });
+const ROOT = path.join(__dirname, '..');
+require('dotenv').config({ path: path.join(ROOT, '.env') });
 const fs = require('fs');
 const { Pool } = require('pg');
 
@@ -13,8 +14,9 @@ async function main() {
     database: process.env.PGDATABASE || 'mes',
   });
 
-  // Nạp tuần tự mọi file schema*.sql (schema.sql trước, rồi schema_v2.sql, ...)
-  const files = fs.readdirSync(__dirname)
+  // Nạp tuần tự mọi file schema*.sql từ migrations/ (schema.sql trước, rồi schema_v2.sql, ...)
+  const migrationsDir = path.join(ROOT, 'migrations');
+  const files = fs.readdirSync(migrationsDir)
     .filter(f => /^schema.*\.sql$/i.test(f))
     .sort((a, b) => {
       if (a === 'schema.sql') return -1;
@@ -25,7 +27,7 @@ async function main() {
     });
   try {
     for (const f of files) {
-      const sql = fs.readFileSync(path.join(__dirname, f), 'utf8');
+      const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
       await pool.query(sql);
       console.log(`  ✓ đã nạp ${f}`);
     }

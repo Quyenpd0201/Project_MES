@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, ArrowLeft, Save, Printer, FileText } from "lucide-react";
+import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, Printer, FileText } from "lucide-react";
 import { deliveries as api, resource } from "../mesApi.js";
 
 const ordersApi = resource("sales-orders");
 import { usePerm } from "../perm.jsx";
-import { inputCls, fmt, fmtDate, statusClass } from "../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast } from "../ui.js";
 import { specShort } from "../specs.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo } from "../components.jsx";
 
@@ -47,7 +47,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
       setF({ sales_order_id: d.sales_order_id || "", customer_id: d.customer_id, delivery_date: d.delivery_date?.slice(0, 10) || today(), status: d.status, note: d.note || "", paid_amount: d.paid_amount ?? "" });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id || "", product_name: it.product_name || "", specs: it.specs || {}, quantity: it.quantity, unit: it.unit || "", unit_price: it.unit_price })));
       setSeq((d.items?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải phiếu: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải phiếu: " + e.message));
   }, [editId]);
   useEffect(() => { load(); }, [load]);
   // Mở từ chi tiết đơn hàng → tự nạp sẵn
@@ -62,7 +62,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
       setF((s) => ({ ...s, sales_order_id: d.sales_order_id, customer_id: d.customer_id || s.customer_id }));
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id || "", product_name: it.product_name || "", specs: it.specs || {}, quantity: it.quantity, unit: it.unit || "", unit_price: "" })));
       setSeq((d.items?.length || 0) + 1);
-    } catch (e) { alert("Lỗi nạp đơn hàng: " + e.message); }
+    } catch (e) { toast.error("Lỗi nạp đơn hàng: " + e.message); }
   };
 
   const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", product_name: "", specs: {}, quantity: "", unit: "", unit_price: "" }]); setSeq((s) => s + 1); };
@@ -78,15 +78,15 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
   const debt = total - (Number(f.paid_amount) || 0);
 
   const save = async () => {
-    if (!f.customer_id) return alert("Chọn khách hàng");
+    if (!f.customer_id) return toast.error("Chọn khách hàng");
     const valid = items.filter((it) => (it.product_id || it.product_name) && it.quantity);
-    if (!valid.length) return alert("Cần ít nhất 1 dòng hàng");
+    if (!valid.length) return toast.error("Cần ít nhất 1 dòng hàng");
     try {
       if (editId) await api.update(editId, { ...f, items: valid }); else await api.create({ ...f, items: valid });
-      onSaved();
-    } catch (e) { alert("Lỗi lưu phiếu: " + e.message); }
+      toast.success("Đã lưu thành công"); onSaved();
+    } catch (e) { toast.error("Lỗi lưu phiếu: " + e.message); }
   };
-  const del = async () => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(editId); onSaved(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async () => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   return (
     <div className="space-y-5">
@@ -158,7 +158,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                     </td>
                     <td className="px-4 py-1.5 text-slate-500">{specShort(it.specs) || "—"}</td>
                     <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upItem(it._k, "quantity", e.target.value)} /></td>
-                    <td className="px-4 py-1.5"><input className={inputCls} value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} /></td>
+                    <td className="px-4 py-1.5"><input className={inputCls} list="units" value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} /></td>
                     {showMoney && <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} disabled={!moneyEdit} value={it.unit_price} onChange={(e) => upItem(it._k, "unit_price", e.target.value)} /></td>}
                     {showMoney && <td className="px-4 py-1.5 text-right font-semibold text-slate-800">{fmt(amount)}</td>}
                     <td className="px-4 py-1.5 text-center">{editing && <button onClick={() => rmItem(it._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>}</td>
@@ -187,7 +187,7 @@ function DeliveryVoucher({ id, onBack }) {
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("deliveries", "amounts") !== "hidden";
   const [d, setD] = useState(null);
-  useEffect(() => { api.get(id).then(setD).catch((e) => alert("Lỗi: " + e.message)); }, [id]);
+  useEffect(() => { api.get(id).then(setD).catch((e) => toast.error("Lỗi: " + e.message)); }, [id]);
   if (!d) return <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
   const totalQty = (d.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0);
   const dt = d.delivery_date ? new Date(d.delivery_date) : null;
@@ -317,7 +317,7 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
   const [rows, setRows] = useState([]);
 
   const load = useCallback(async () => {
-    try { setRows((await api.list({})) || []); } catch (e) { alert("Lỗi tải phiếu: " + e.message); }
+    try { setRows((await api.list({})) || []); } catch (e) { toast.error("Lỗi tải phiếu: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -326,7 +326,7 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
     if (focusOrderId) { setEditId(null); setNewOrderId(focusOrderId); setView("form"); onFocusConsumed?.(); }
   }, [focusOrderId]); // eslint-disable-line
 
-  const del = async (id) => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const resetToList = () => { setView("list"); setEditId(null); setNewOrderId(null); };
   if (view === "form") return <DeliveryForm lookups={lookups} editId={editId} initialOrderId={newOrderId}
@@ -354,9 +354,10 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Phiếu giao hàng & thanh toán" actions={
-        can("deliveries", "create") && <button onClick={() => { setEditId(null); setView("form"); }} className="btn-primary"><Plus size={16} /> Tạo phiếu</button>
-      } />
+      <ListHeader title="Phiếu giao hàng & thanh toán" actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        {can("deliveries", "create") && <button onClick={() => { setEditId(null); setView("form"); }} className="btn-primary"><Plus size={16} /> Tạo phiếu</button>}
+      </>} />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có phiếu giao hàng" />
     </div>
   );

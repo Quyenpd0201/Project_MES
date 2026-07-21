@@ -1,13 +1,12 @@
 {
   "name": "mes-backend",
   "version": "1.0.0",
-  "private": true,
-  "type": "commonjs",
+  "description": "MES Backend API Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "migrate": "node migrate.js"
+    "migrate": "node scripts/migrate.js"
   },
   "dependencies": {
     "chromedriver": "^151.0.0",

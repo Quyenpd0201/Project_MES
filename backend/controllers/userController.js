@@ -42,7 +42,8 @@ exports.create = async (req, res) => {
     res.status(201).json({ id: rows[0].id });
   } catch (e) {
     if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
-    res.status(500).json({ message: e.detail || 'Lỗi tạo tài khoản' });
+    console.error('[userController.create]', e);
+    res.status(500).json({ message: 'Lỗi tạo tài khoản' });
   }
 };
 
@@ -74,7 +75,8 @@ exports.update = async (req, res) => {
     res.json({ message: 'Đã cập nhật tài khoản' });
   } catch (e) {
     if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
-    res.status(500).json({ message: e.detail || 'Lỗi cập nhật' });
+    console.error('[userController.update]', e);
+    res.status(500).json({ message: 'Lỗi cập nhật tài khoản' });
   }
 };
 

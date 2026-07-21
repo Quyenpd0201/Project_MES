@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Pencil, Trash2, Save } from "lucide-react";
+import { RotateCcw, Plus, Pencil, Trash2, Save } from "lucide-react";
 import { ListHeader, DataTable, PageHeader, Section } from "../components.jsx";
 import { users, roles } from "../mesApi.js";
-import { inputCls, statusClass } from "../ui.js";
+import {  inputCls, statusClass , toast } from "../ui.js";
 
 const F = ({ label, required, children }) => (
   <div><label className="block text-sm font-medium text-slate-600 mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>{children}</div>
@@ -13,10 +13,10 @@ function UserForm({ record, roleList, teams, onBack, onSaved }) {
   const [f, setF] = useState({ username: record?.username || "", password: "", full_name: record?.full_name || "", role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "" });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const save = async () => {
-    if (!f.username) return alert("Nhập tài khoản");
-    if (!isEdit && !f.password) return alert("Nhập mật khẩu");
-    try { if (isEdit) await users.update(record.id, f); else await users.create(f); onSaved(); }
-    catch (e) { alert("Lỗi: " + e.message); }
+    if (!f.username) return toast.error("Nhập tài khoản");
+    if (!isEdit && !f.password) return toast.error("Nhập mật khẩu");
+    try { if (isEdit) await users.update(record.id, f); else await users.create(f); toast.success("Đã lưu thành công"); onSaved(); }
+    catch (e) { toast.error("Lỗi: " + e.message); }
   };
   return (
     <div className="space-y-5">
@@ -55,9 +55,9 @@ export default function UsersModule({ lookups }) {
   const [roleList, setRoleList] = useState([]);
   const [editing, setEditing] = useState(null);
   const teams = [...new Set(((lookups && lookups.employees) || []).map((e) => e.factory).filter(Boolean))];
-  const load = useCallback(async () => { try { setRows(await users.list()); } catch (e) { alert("Lỗi tải tài khoản: " + e.message); } }, []);
+  const load = useCallback(async () => { try { setRows(await users.list()); } catch (e) { toast.error("Lỗi tải tài khoản: " + e.message); } }, []);
   useEffect(() => { load(); roles.list().then(setRoleList).catch(() => {}); }, [load]);
-  const del = async (id) => { if (!confirm("Xóa tài khoản này?")) return; try { await users.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { if (!confirm("Xóa tài khoản này?")) return; try { await users.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const columns = [
     { key: "username", label: "Tài khoản", filter: "text", render: (u) => <button onClick={() => setEditing(u)} className="font-medium text-blue-600 hover:underline">{u.username}</button> },
@@ -76,9 +76,10 @@ export default function UsersModule({ lookups }) {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Tài khoản" actions={
+      <ListHeader title="Tài khoản" actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         <button onClick={() => setEditing({})} className="btn-primary"><Plus size={16} /> Thêm tài khoản</button>
-      } />
+      </>} />
       <DataTable columns={columns} rows={rows} rowKey={(u) => u.id} emptyText="Chưa có tài khoản" />
     </div>
   );

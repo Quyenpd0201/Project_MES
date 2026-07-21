@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const productsRouter = require('./routes/products');
 const apiRouter = require('./routes/index');
+const requireAuth = require('./middleware/requireAuth');
 const { ensureSeedAdmin } = require('./controllers/authController');
 
 const app = express();
@@ -52,7 +53,7 @@ app.use(express.json({ limit: '2mb' }));
 app.use('/api/products/:id/attachments', express.json({ limit: '10mb' }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/products', productsRouter);
+app.use('/api/products', requireAuth, productsRouter);
 app.use('/api', apiRouter);
 app.get('/health', (_, res) => res.json({ ok: true }));
 

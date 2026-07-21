@@ -30,7 +30,8 @@ exports.getById = async (req, res) => {
       WHERE pr.id = $1 AND pr.is_deleted = FALSE`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy quy trình' });
     const steps = await db.query(`
-      SELECT s.*, pout.product_name AS output_name, m.name AS machine_name
+      SELECT s.*, pout.product_name AS output_name, m.name AS machine_name,
+             (SELECT jsonb_agg(jsonb_build_object('id', m2.id, 'name', m2.name, 'factory', m2.factory, 'machine_type', m2.machine_type)) FROM machines m2 WHERE m2.id::text IN (SELECT jsonb_array_elements_text(COALESCE(s.machine_ids, '[]'::jsonb)))) AS machines_details
       FROM process_steps s
       LEFT JOIN products pout ON pout.id = s.output_product_id
       LEFT JOIN machines m ON m.id = s.machine_id
@@ -50,10 +51,10 @@ async function saveSteps(client, processId, steps) {
     const ids = inputs.map((x) => x.material_id);
     await client.query(`
       INSERT INTO process_steps
-        (process_id, seq, name, workshop, machine_id, duration_minutes, inputs, input_product_ids, input_product_id,
+        (process_id, seq, name, workshop, machine_id, machine_ids, duration_minutes, inputs, input_product_ids, input_product_id,
          output_product_id, output_quantity, output_unit, yield_percent, scrap_percent, note)
-      VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13,$14,$15)`,
-      [processId, n++, s.name, s.workshop || null, s.machine_id || null,
+      VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15,$16)`,
+      [processId, n++, s.name, s.workshop || null, s.machine_id || null, JSON.stringify(s.machine_ids || (s.machine_id ? [s.machine_id] : [])),
        numOrNull(s.duration_minutes), JSON.stringify(inputs), JSON.stringify(ids), ids[0] || null,
        s.output_product_id || null, numOrNull(s.output_quantity), upUnit(s.output_unit),
        numOrNull(s.yield_percent), numOrNull(s.scrap_percent), s.note || null]);

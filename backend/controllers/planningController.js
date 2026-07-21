@@ -23,6 +23,10 @@ exports.groups = async (req, res) => {
              po.attr_color, po.attr_size, po.attr_thickness, po.group_key,
              po.machine_id, po.planned_date, po.shift,
              p.product_name, p.product_code, c.name AS customer_name, m.name AS machine_name,
+             (SELECT COUNT(*)::int FROM production_tasks t WHERE t.production_order_id = po.id) AS task_count,
+             COALESCE((SELECT MIN(t3.planned_date) FROM production_tasks t3 WHERE t3.production_order_id = po.id AND t3.planned_date IS NOT NULL), po.planned_date) AS planned_date_display,
+             COALESCE(NULLIF((SELECT STRING_AGG(DISTINCT t4.shift, ', ') FROM production_tasks t4 WHERE t4.production_order_id = po.id AND t4.shift IS NOT NULL AND t4.shift != ''), ''), po.shift) AS shift_display,
+             COALESCE((SELECT STRING_AGG(DISTINCT m2.name, ', ') FROM production_tasks t2 JOIN machines m2 ON m2.id = t2.machine_id WHERE t2.production_order_id = po.id AND t2.machine_id IS NOT NULL), m.name) AS machine_name_display,
              COALESCE((SELECT SUM(COALESCE(t.actual_qty, t.quantity)) FROM production_tasks t
                        WHERE t.production_order_id = po.id AND t.status = 'Hoàn thành'
                          AND t.stage = (CASE WHEN EXISTS (SELECT 1 FROM production_tasks tf WHERE tf.production_order_id = po.id AND tf.stage = 'Cắt') THEN 'Cắt' ELSE 'Thổi' END)), 0) AS produced_qty

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { auth, setToken } from "./mesApi.js";
-import { inputCls } from "./ui.js";
+import { inputCls, toast } from "./ui.js";
 import { Logo } from "./components.jsx";
 
 export default function Login({ onLogin }) {
@@ -15,6 +15,7 @@ export default function Login({ onLogin }) {
     try {
       const r = await auth.login({ username: u, password: p });
       setToken(r.token);
+      toast.success("Đăng nhập thành công");
       onLogin(r.user);
     } catch (e) { setErr(e.message || "Đăng nhập thất bại"); }
     finally { setLoading(false); }

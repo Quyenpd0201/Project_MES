@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy } from "lucide-react";
+import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy } from "lucide-react";
 import { resource } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
-import { inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone } from "../ui.js";
+import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../ui.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo } from "../components.jsx";
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../specs.js";
 
@@ -143,7 +143,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
       setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "" });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [] })));
       setSeq((d.items?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải đơn: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
   }, [editId]); // eslint-disable-line
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -154,7 +154,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
       setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "" });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "" })));
       setSeq((d.items?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải đơn nguồn để sao chép: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
   const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]); setSeq((s) => s + 1); };
@@ -174,18 +174,18 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   }));
 
   const save = async () => {
-    if (!f.customer_id) return alert("Chọn khách hàng");
+    if (!f.customer_id) return toast.error("Chọn khách hàng");
     const valid = items.filter((it) => it.product_id && it.quantity);
-    if (!valid.length) return alert("Cần ít nhất 1 dòng hàng");
+    if (!valid.length) return toast.error("Cần ít nhất 1 dòng hàng");
     try {
       if (editId) await ordersApi.update(editId, { ...f, items: valid }); else await ordersApi.create({ ...f, items: valid });
-      onSaved();
-    } catch (e) { alert("Lỗi lưu đơn hàng: " + e.message); }
+      toast.success("Đã lưu thành công"); onSaved();
+    } catch (e) { toast.error("Lỗi lưu đơn hàng: " + e.message); }
   };
 
   const del = async () => {
     if (!confirm("Xóa đơn hàng này?")) return;
-    try { await ordersApi.remove(editId); onSaved(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await ordersApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   return (
@@ -240,7 +240,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   </div>
                   <div className="md:col-span-2">
                     <span className="block text-xs font-medium text-slate-500 mb-1">ĐVT</span>
-                    <input className={inputCls} disabled={fdis("items")} value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} />
+                    <input className={inputCls} list="units" disabled={fdis("items")} value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} />
                   </div>
                 </div>
                 {!fdis("items") && <button onClick={() => rmItem(it._k)} className="mt-6 text-slate-400 hover:text-rose-600 p-1 shrink-0"><Trash2 size={16} /></button>}
@@ -308,7 +308,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
 /* ---- Phiếu đặt hàng (in được) ---- */
 function OrderVoucher({ id, onBack }) {
   const [o, setO] = useState(null);
-  useEffect(() => { ordersApi.get(id).then(setO).catch((e) => alert("Lỗi: " + e.message)); }, [id]);
+  useEffect(() => { ordersApi.get(id).then(setO).catch((e) => toast.error("Lỗi: " + e.message)); }, [id]);
   if (!o) return <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
   const totalQty = (o.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0);
 
@@ -402,7 +402,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
   const load = useCallback(async () => {
-    try { setRows(await ordersApi.list({})); } catch (e) { alert("Lỗi tải đơn hàng: " + e.message); }
+    try { setRows(await ordersApi.list({})); } catch (e) { toast.error("Lỗi tải đơn hàng: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -411,7 +411,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
     if (focusId) { setEditId(focusId); setView("form"); onFocusConsumed?.(); }
   }, [focusId]);
 
-  const del = async (id) => { if (!confirm("Xóa đơn hàng này?")) return; try { await ordersApi.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { if (!confirm("Xóa đơn hàng này?")) return; try { await ordersApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   if (view === "form") return <OrderForm lookups={lookups} editId={editId} copyId={copyId}
     onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
@@ -441,9 +441,10 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Đơn hàng" actions={
-        can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>
-      } />
+      <ListHeader title="Đơn hàng" actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        {can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>}
+      </>} />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
     </div>
   );

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, GitBranch } from "lucide-react";
+import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, GitBranch } from "lucide-react";
 import { resource } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
-import { inputCls, fmt, statusClass } from "../ui.js";
+import {  inputCls, fmt, statusClass , toast } from "../ui.js";
 import { PageHeader, Section, ListHeader, DataTable } from "../components.jsx";
 
 const bomApi = resource("boms");
@@ -50,7 +50,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
         _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || unitOf(l.material_id),
         ratio_percent: l.ratio_percent ?? "", note: l.note || "" })));
       setSeq((d.lines?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải định mức: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải định mức: " + e.message));
   }, [editId]);
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -62,7 +62,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
         output_quantity: d.output_quantity, output_unit: d.output_unit || unitOf(d.product_id), status: d.status, note: d.note || "", process_id: "" });
       setLines((d.lines || []).map((l, i) => ({ _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || unitOf(l.material_id), ratio_percent: l.ratio_percent ?? "", note: l.note || "" })));
       setSeq((d.lines?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải định mức nguồn: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải định mức nguồn: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
   const addLine = () => { setLines((a) => [...a, { _k: seq, material_id: "", quantity: "", unit: "", ratio_percent: "", note: "" }]); setSeq((s) => s + 1); };
@@ -79,18 +79,18 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   const ratioSum = lines.reduce((s, l) => s + (Number(l.ratio_percent) || 0), 0);
 
   const save = async () => {
-    if (!f.product_id) return alert("Chọn sản phẩm đầu ra");
-    if (!f.name) return alert("Nhập tên định mức");
+    if (!f.product_id) return toast.error("Chọn sản phẩm đầu ra");
+    if (!f.name) return toast.error("Nhập tên định mức");
     const payload = { ...f, lines: lines.filter((l) => l.material_id) };
     try {
       if (editId) await bomApi.update(editId, payload); else await bomApi.create(payload);
-      onSaved();
-    } catch (e) { alert("Lỗi lưu định mức: " + e.message); }
+      toast.success("Đã lưu thành công"); onSaved();
+    } catch (e) { toast.error("Lỗi lưu định mức: " + e.message); }
   };
 
   const del = async () => {
     if (!confirm("Xóa định mức này?")) return;
-    try { await bomApi.remove(editId); onSaved(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await bomApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   return (
@@ -132,7 +132,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
           </Field>}
           <div className="grid grid-cols-2 gap-3">
             {!fhid("output_quantity") && <Field label="Định mức cho SL"><input type="number" min="0" className={inputCls} disabled={fdis("output_quantity")} value={f.output_quantity} onChange={(e) => set("output_quantity", e.target.value)} /></Field>}
-            <Field label="Đơn vị"><input className={inputCls} value={f.output_unit} onChange={(e) => set("output_unit", e.target.value)} placeholder="kg, cái..." /></Field>
+            <Field label="Đơn vị"><input className={inputCls} list="units" value={f.output_unit} onChange={(e) => set("output_unit", e.target.value)} placeholder="kg, cái..." /></Field>
           </div>
           <Field label="Trạng thái">
             <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
@@ -175,7 +175,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
                   </select>
                 </td>
                 <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={l.quantity} onChange={(e) => upLine(l._k, "quantity", e.target.value)} /></td>
-                <td className="py-1.5 pr-2"><input className={inputCls} value={l.unit} onChange={(e) => upLine(l._k, "unit", e.target.value)} /></td>
+                <td className="py-1.5 pr-2"><input className={inputCls} list="units" value={l.unit} onChange={(e) => upLine(l._k, "unit", e.target.value)} /></td>
                 {isColor && <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={l.ratio_percent} onChange={(e) => upLine(l._k, "ratio_percent", e.target.value)} /></td>}
                 <td className="py-1.5 text-center">
                   <button onClick={() => rmLine(l._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
@@ -207,13 +207,13 @@ export default function BomModule({ lookups }) {
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
   const load = useCallback(async () => {
-    try { setRows(await bomApi.list({})); } catch (e) { alert("Lỗi tải định mức: " + e.message); }
+    try { setRows(await bomApi.list({})); } catch (e) { toast.error("Lỗi tải định mức: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
     if (!confirm("Xóa định mức này?")) return;
-    try { await bomApi.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await bomApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   if (view === "form")
@@ -241,9 +241,10 @@ export default function BomModule({ lookups }) {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Định mức / Công thức (BOM)" actions={
-        can("bom", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo định mức</button>
-      } />
+      <ListHeader title="Định mức / Công thức (BOM)" actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        {can("bom", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo định mức</button>}
+      </>} />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có định mức" />
     </div>
   );

@@ -3,7 +3,7 @@ import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle,
 import { production } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
 import { ListHeader } from "../components.jsx";
-import { inputCls, fmt, fmtDate, statusClass } from "../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast } from "../ui.js";
 
 /* ---- Modal: NVL thực tế sử dụng (gợi ý từ BOM) → trừ tồn kho ---- */
 function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
@@ -13,7 +13,7 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
   useEffect(() => {
     production.materials(task.production_order_id)
       .then((d) => { setData(d); setLines((d.lines || []).map((l) => ({ ...l, used_qty: l.used_qty ?? l.suggested_qty }))); })
-      .catch((e) => alert("Lỗi tải NVL: " + e.message));
+      .catch((e) => toast.error("Lỗi tải NVL: " + e.message));
   }, [task.production_order_id]);
   const setQty = (mid, v) => setLines((a) => a.map((l) => (l.material_id === mid ? { ...l, used_qty: v } : l)));
   const save = async () => {
@@ -21,7 +21,7 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
     try {
       await production.saveMaterials(task.production_order_id, lines.map((l) => ({ material_id: l.material_id, qty: l.used_qty, unit: l.unit })));
       onClose(true);
-    } catch (e) { alert("Lỗi ghi nhận NVL: " + e.message); }
+    } catch (e) { toast.error("Lỗi ghi nhận NVL: " + e.message); }
     finally { setSaving(false); }
   };
 
@@ -111,7 +111,7 @@ function TaskCard({ t, canEdit, onSaved }) {
   const doUpdate = async (patch) => {
     setSaving(true);
     try { await production.updateTask(t.id, patch); onSaved(); }
-    catch (e) { alert("Lỗi cập nhật: " + e.message); }
+    catch (e) { toast.error("Lỗi cập nhật: " + e.message); }
     finally { setSaving(false); }
   };
   const start = () => doUpdate({ status: "Đang sản xuất" });                                   // Bắt đầu / Tiếp tục
@@ -119,7 +119,7 @@ function TaskCard({ t, canEdit, onSaved }) {
   const pause = () => doUpdate({ status: "Dừng sản xuất", actual_qty: actual, scrap_qty: scrap }); // Tạm dừng
   const complete = () => {
     const need = Number(t.quantity) || 0, act = Number(actual) || 0;
-    if (act < need) return alert(`Chưa thể Hoàn thành: SL thực tế (${fmt(act)}) phải ≥ SL đơn hàng (${fmt(need)}).`);
+    if (act < need) return toast.error(`Chưa thể Hoàn thành: SL thực tế (${fmt(act)}) phải ≥ SL đơn hàng (${fmt(need)}).`);
     setMatMode("complete"); setShowMat(true); // bắt cập nhật NVL trước khi hoàn thành
   };
   const finishComplete = () => doUpdate({ status: "Hoàn thành", actual_qty: actual, scrap_qty: scrap });
@@ -215,7 +215,7 @@ export default function ExecutionModule({ lookups }) {
 
   const load = useCallback(async () => {
     try { setRows(await production.execution(filters)); }
-    catch (e) { alert("Lỗi tải công việc: " + e.message); }
+    catch (e) { toast.error("Lỗi tải công việc: " + e.message); }
   }, [filters]);
   useEffect(() => { load(); }, [load]);
 

@@ -47,7 +47,26 @@ const SELECT_JOIN = `
                    WHERE t.production_order_id = po.id AND t.status = 'Hoàn thành'
                      AND t.stage = ${FINAL_STAGE}), 0) AS produced_qty,
          COALESCE((SELECT SUM(t.scrap_qty) FROM production_tasks t WHERE t.production_order_id = po.id), 0) AS scrap_qty,
-         COALESCE((SELECT MIN(t.planned_date) FROM production_tasks t WHERE t.production_order_id = po.id AND t.planned_date IS NOT NULL), po.planned_date) AS start_date
+         COALESCE((SELECT MIN(t.planned_date) FROM production_tasks t WHERE t.production_order_id = po.id AND t.planned_date IS NOT NULL), po.planned_date) AS start_date,
+         -- Máy hiển thị: danh sách các máy từ tasks, fallback về machine_id của lệnh
+         COALESCE(
+           (SELECT STRING_AGG(DISTINCT m2.name, ', ') FROM production_tasks t2
+            JOIN machines m2 ON m2.id = t2.machine_id
+            WHERE t2.production_order_id = po.id AND t2.machine_id IS NOT NULL),
+           m.name
+         ) AS machine_name_display,
+         -- Ngày SX hiển thị: ưu tiên ngày nhỏ nhất từ tasks, fallback về planned_date của lệnh
+         COALESCE(
+           (SELECT MIN(t3.planned_date) FROM production_tasks t3
+            WHERE t3.production_order_id = po.id AND t3.planned_date IS NOT NULL),
+           po.planned_date
+         ) AS planned_date_display,
+         -- Ca hiển thị: gộp danh sách các ca từ tasks, fallback về shift của lệnh
+         COALESCE(
+           NULLIF((SELECT STRING_AGG(DISTINCT t4.shift, ', ') FROM production_tasks t4
+            WHERE t4.production_order_id = po.id AND t4.shift IS NOT NULL AND t4.shift != ''), ''),
+           po.shift
+         ) AS shift_display
   FROM production_orders po
   JOIN products p   ON p.id = po.product_id
   LEFT JOIN customers c ON c.id = po.customer_id
@@ -228,7 +247,7 @@ exports.update = async (req, res) => {
       const finishing = Array.isArray(b.finishing) ? b.finishing.filter(f => f && f.name).map(f => ({ name: f.name, checked: !!f.checked })) : [];
       cols.push(`finishing = $${i++}::jsonb`); vals.push(JSON.stringify(finishing));
     }
-    if (b.specs !== undefined) {
+    if (b.specs !== undefined || b.attr_size !== undefined || b.attr_thickness !== undefined || b.attr_color !== undefined) {
       const specs = specsFromBody(b);
       const a = legacyAttrs(specs);
       cols.push(`specs = $${i++}::jsonb`); vals.push(JSON.stringify(specs));

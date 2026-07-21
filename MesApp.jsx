@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "./src/ui.js";
 import { Routes, Route, useNavigate, Navigate, useLocation, NavLink, useParams } from "react-router-dom";
 import * as XLSX from "xlsx";
 import {
@@ -6,7 +7,7 @@ import {
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
   Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
-import { getLookups, getDashboard, auth, setToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
+import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
@@ -41,8 +42,12 @@ const AREAS = ["Xưởng thổi", "Xưởng cắt"];
 const API_BASE = import.meta.env?.VITE_API_BASE || "http://localhost:4000";
 
 async function http(path, opts) {
+  const token = getToken();
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...opts,
   });
   if (!res.ok) {
@@ -127,8 +132,8 @@ function Sidebar({ user, onLogout, collapsed, onToggle }) {
     { key: "production", label: "Sản xuất", icon: Factory, path: "/production" },
     { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "planning", path: "/orderstatus" },
     { key: "execution", label: "Thực thi SX", icon: Hammer, path: "/execution" },
-    { key: "qrlabels", label: "Tem QR", icon: QrCode, path: "/qrlabels" },
-    { key: "qrscan", label: "Quét QR", icon: ScanLine, path: "/qrscan" },
+    { key: "qrlabels", label: "In tem xuất xứ", icon: FileText, path: "/qrlabels" },
+    { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
     { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays, path: "/workschedule" },
     { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
     { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
@@ -262,14 +267,14 @@ function ProductList({ onOpen, onCreate, onCopy }) {
 
   const load = useCallback(async () => {
     try { setRows(await api.list({})); }
-    catch (e) { console.error(e); alert("Lỗi tải danh sách: " + e.message); }
+    catch (e) { console.error(e); toast.error("Lỗi tải danh sách: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
     if (!confirm("Xóa sản phẩm này?")) return;
-    try { await api.remove(id); load(); }
-    catch (e) { alert("Lỗi xóa sản phẩm: " + e.message); }
+    try { await api.remove(id); toast.success("Đã xóa thành công"); load(); }
+    catch (e) { toast.error("Lỗi xóa sản phẩm: " + e.message); }
   };
 
   // Tải file mẫu (chỉ tiêu đề)
@@ -303,12 +308,12 @@ function ProductList({ onOpen, onCreate, onCopy }) {
         PRODUCT_XLSX_COLS.forEach((c) => { const v = row[c.label]; if (v !== undefined && v !== "") p[c.key] = typeof v === "string" ? v.trim() : v; });
         return p;
       }).filter((p) => p.product_name);
-      if (!payloads.length) return alert("Không đọc được dòng hợp lệ. Kiểm tra cột tiêu đề khớp file mẫu (cần cột 'Tên sản phẩm').");
+      if (!payloads.length) return toast.error("Không đọc được dòng hợp lệ. Kiểm tra cột tiêu đề khớp file mẫu (cần cột 'Tên sản phẩm').");
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} sản phẩm.`;
       if (res.failed) msg += `\nBỏ qua ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
-      alert(msg); load();
-    } catch (e) { alert("Lỗi đọc file: " + e.message); }
+      toast.error(msg); load();
+    } catch (e) { toast.error("Lỗi đọc file: " + e.message); }
   };
 
   const columns = [
@@ -335,7 +340,7 @@ function ProductList({ onOpen, onCreate, onCopy }) {
           </label>
         )}
         <button onClick={exportExcel} className="btn-ghost"><Download size={16} /> Xuất Excel</button>
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Tải lại</button>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         {can("products", "create") && <button onClick={onCreate} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
       <DataTable columns={columns} rows={rows} rowKey={(p) => p.id} emptyText="Không có dữ liệu" />
@@ -482,7 +487,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
       setKeySeq((attrs.length || 1) + 1);
-    }).catch((e) => alert("Lỗi tải SP nguồn: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải SP nguồn: " + e.message));
   }, [copyId, productId]);
 
   // Nạp dữ liệu khi sửa
@@ -499,7 +504,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
       setKeySeq((attrs.length || 1) + 1);
-    }).catch((e) => alert("Lỗi tải sản phẩm: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải sản phẩm: " + e.message));
   }, [productId]);
 
   const addAttr = () => {
@@ -511,16 +516,16 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
     setAttributes((a) => a.map((x) => (x._key === key ? { ...x, [field]: val } : x)));
 
   const save = async () => {
-    if (!form.product_name) return alert("Vui lòng nhập Tên sản phẩm");
+    if (!form.product_name) return toast.error("Vui lòng nhập Tên sản phẩm");
     const cleanAttrs = attributes
       .filter((a) => a.name && a.value)
       .map(({ name, value }) => ({ name, value }));
     try {
       if (productId) await api.update(productId, { ...form, attributes: cleanAttrs });
       else await api.create({ ...form, attributes: cleanAttrs });
-      onSaved();
+      toast.success("Đã lưu thành công"); onSaved();
     } catch (e) {
-      alert("Lỗi lưu sản phẩm: " + e.message);
+      toast.error("Lỗi lưu sản phẩm: " + e.message);
     }
   };
 
@@ -565,7 +570,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
     const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
     setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
     setKeySeq((attrs.length || 1) + 1);
-  }).catch((e) => alert("Lỗi tải chi tiết: " + e.message));
+  }).catch((e) => toast.error("Lỗi tải chi tiết: " + e.message));
   useEffect(() => { load(); }, [id]); // eslint-disable-line
   useEffect(() => { productRelated(id).then(setRelated).catch(() => {}); }, [id]);
 
@@ -583,25 +588,26 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
         const dataUrl = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
         await productFiles.add(id, { name: f.name, content_type: f.type, data: dataUrl });
       }
+      toast.success("Đã tải lên tài liệu thành công");
       loadFiles();
-    } catch (e) { alert("Lỗi tải lên: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải lên: " + e.message); }
     finally { setUploading(false); }
   };
   const viewFile = async (att) => {
     try { const f = await productFiles.file(id, att.id); const w = window.open("", "_blank"); if (w) w.document.write(`<title>${f.name}</title><iframe src="${f.data}" style="border:0;position:fixed;inset:0;width:100%;height:100%"></iframe>`); }
-    catch (e) { alert("Lỗi xem tài liệu: " + e.message); }
+    catch (e) { toast.error("Lỗi xem tài liệu: " + e.message); }
   };
-  const delFile = async (att) => { if (!confirm("Xóa tài liệu này?")) return; try { await productFiles.remove(id, att.id); loadFiles(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const delFile = async (att) => { if (!confirm("Xóa tài liệu này?")) return; try { await productFiles.remove(id, att.id); toast.success("Đã xóa tài liệu"); loadFiles(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const del = async () => {
     if (!confirm("Xóa sản phẩm này?")) return;
-    try { await api.remove(id); onDeleted?.(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await api.remove(id); toast.success("Đã xóa sản phẩm"); onDeleted?.(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
   const save = async () => {
-    if (!form.product_name) return alert("Vui lòng nhập Tên sản phẩm");
+    if (!form.product_name) return toast.error("Vui lòng nhập Tên sản phẩm");
     const cleanAttrs = attributes.filter((a) => a.name && a.value).map(({ name, value }) => ({ name, value }));
-    try { await api.update(id, { ...form, attributes: cleanAttrs }); await load(); setEditing(false); }
-    catch (e) { alert("Lỗi lưu sản phẩm: " + e.message); }
+    try { await api.update(id, { ...form, attributes: cleanAttrs }); toast.success("Lưu sản phẩm thành công"); await load(); setEditing(false); }
+    catch (e) { toast.error("Lỗi lưu sản phẩm: " + e.message); }
   };
   const cancel = () => { load(); setEditing(false); };
 
@@ -1119,6 +1125,7 @@ export default function MesApp() {
     <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
       <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} />
       <main className="nav-scroll flex-1 p-8 overflow-y-auto relative">
+        {lookups && <datalist id="units">{(lookups.units || []).map((u) => <option key={u} value={u} />)}</datalist>}
         <Routes>
           <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
           <Route path="/products" element={<ProductList 

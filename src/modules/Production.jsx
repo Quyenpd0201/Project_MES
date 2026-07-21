@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch, Copy } from "lucide-react";
 import { production, processes } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
-import { inputCls, fmt, fmtDate, statusClass } from "../ui.js";
+import { inputCls, fmt, fmtDate, statusClass, toast } from "../ui.js";
 import { PageHeader, Section, ListHeader, DataTable } from "../components.jsx";
 import Qr from "../Qr.jsx";
 import ProductionGantt from "./ProductionGantt.jsx";
@@ -56,25 +56,47 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       const mapStage = (s) => /c[ắa]t/i.test(`${s.name || ""} ${s.workshop || ""} ${s.machine_name || ""} ${s.machine_type || ""}`) ? "Cắt" : "Thổi";
       // Gợi ý máy: ưu tiên máy đang rảnh (Hoạt động + tải thấp nhất) và DÙNG 1 MÁY xuyên suốt cho cùng công đoạn
       const chosen = {}; // xưởng/công đoạn -> machine_id đã chọn
-      const pickMachine = (s, stage) => {
-        if (s.machine_id) { chosen[s.workshop || stage] = s.machine_id; return s.machine_id; } // quy trình đã chỉ định máy
-        const wantWs = s.workshop || (stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi");
-        if (chosen[wantWs]) return chosen[wantWs];                       // tái dùng máy đã chọn cho công đoạn này
-        let pool = avail.filter((m) => m.status === "Hoạt động" && m.factory === wantWs);
-        if (!pool.length) pool = avail.filter((m) => m.status === "Hoạt động" &&
-          (stage === "Cắt" ? /c[ắa]t/i.test(`${m.factory} ${m.machine_type}`) : /th[ổô]i/i.test(`${m.factory} ${m.machine_type}`)));
-        if (!pool.length) return "";
-        pool = [...pool].sort((a, b) => (a.load || 0) - (b.load || 0) || String(a.name).localeCompare(String(b.name), "vi"));
-        chosen[wantWs] = pool[0].id;
-        return pool[0].id;
-      };
-      const base = Date.now();
-      const newTasks = proc.steps.map((s, idx) => {
+      
+      const newTasks = [];
+      let seq = 1;
+      const baseQty = Number(quantity) || 0;
+      
+      for (const s of proc.steps) {
         const stage = mapStage(s);
-        return { _k: base + idx, stage, quantity: quantity || "", actual_qty: "", scrap_qty: "",
-          machine_id: pickMachine(s, stage), shift: "", planned_date: "", planned_end_date: "", assigned_team: "", assigned_worker: "", status: "Chờ" };
-      });
-      setTasks(newTasks); setTaskSeq(base + newTasks.length + 1);
+        const mids = (s.machine_ids && s.machine_ids.length > 0) ? s.machine_ids : (s.machine_id ? [s.machine_id] : [null]);
+        
+        // Chia số lượng nếu 1 công đoạn làm trên nhiều máy
+        const qtyPerTask = baseQty > 0 ? Math.round(baseQty / mids.length) : "";
+
+        mids.forEach((mId, i) => {
+          let chosenMId = mId;
+          if (!chosenMId) {
+             const wantWs = s.workshop || (stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi");
+             if (chosen[wantWs]) chosenMId = chosen[wantWs];
+             else {
+               let pool = avail.filter((m) => m.status === "Hoạt động" && m.factory === wantWs);
+               if (!pool.length) pool = avail.filter((m) => m.status === "Hoạt động" && (stage === "Cắt" ? /c[ắa]t/i.test(`${m.factory} ${m.machine_type}`) : /th[ổô]i/i.test(`${m.factory} ${m.machine_type}`)));
+               if (pool.length) { 
+                 pool = [...pool].sort((a, b) => (a.load || 0) - (b.load || 0));
+                 chosenMId = pool[0].id; chosen[wantWs] = chosenMId; 
+               }
+             }
+          } else {
+             chosen[s.workshop || stage] = chosenMId;
+          }
+
+          // Máy cuối cùng sẽ ôm phần dư do làm tròn
+          const taskQty = (i === mids.length - 1 && baseQty > 0) ? (baseQty - qtyPerTask * (mids.length - 1)) : qtyPerTask;
+
+          newTasks.push({
+            _k: Date.now() + seq, stage, quantity: taskQty, actual_qty: "", scrap_qty: "",
+            machine_id: chosenMId || "", shift: "", planned_date: "", planned_end_date: "", 
+            assigned_team: "", assigned_worker: "", status: "Chờ", note: s.name || ""
+          });
+          seq++;
+        });
+      }
+      setTasks(newTasks); setTaskSeq(Date.now() + seq + 1);
       if (!silent) {
         const nMc = newTasks.filter((t) => t.machine_id).length;
         alert(`Đã tạo ${newTasks.length} phân công theo quy trình "${proc.name}". Gợi ý máy rảnh cho ${nMc}/${newTasks.length} công đoạn (ưu tiên 1 máy/công đoạn). Hãy kiểm tra ca/ngày rồi Lưu.`);
@@ -151,8 +173,10 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       if (editId) {
         await production.update(editId, { ...f, finishing });
         await production.saveTasks(editId, tasks.filter((t) => t.stage));
+        toast.success("Lưu lệnh sản xuất thành công");
       } else {
         await production.create({ ...f, finishing });
+        toast.success("Tạo lệnh sản xuất mới thành công");
       }
       onSaved();
     } catch (e) { alert("Lỗi lưu lệnh sản xuất: " + e.message); }
@@ -194,7 +218,6 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           </Field>}
           <Field label="Đơn vị">
             <input className={inputCls} list="units" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="cái, cuộn, kg..." />
-            <datalist id="units">{(lookups.units || []).map((u) => <option key={u} value={u} />)}</datalist>
           </Field>
           <Field label="Ngày giao (deadline)">
             <input type="date" className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
@@ -289,17 +312,17 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             <table className="w-full text-sm whitespace-nowrap">
               <thead className="text-slate-400 text-xs uppercase">
                 <tr>
-                  <th className="text-left py-2 font-medium w-28">Công đoạn</th>
-                  <th className="text-left py-2 font-medium w-24">Sản lượng</th>
-                  <th className="text-left py-2 font-medium">Máy</th>
-                  <th className="text-left py-2 font-medium w-24">Ca</th>
-                  <th className="text-left py-2 font-medium w-36">Từ ngày</th>
-                  <th className="text-left py-2 font-medium w-36">Đến ngày</th>
-                  <th className="text-left py-2 font-medium w-36">Đội</th>
-                  <th className="text-left py-2 font-medium w-40">Công nhân</th>
-                  <th className="text-left py-2 font-medium w-24">Thực tế</th>
-                  <th className="text-left py-2 font-medium w-24">Phế phẩm</th>
-                  <th className="text-left py-2 font-medium w-32">Trạng thái</th>
+                  <th className="text-left py-2 font-medium min-w-[110px]">Công đoạn</th>
+                  <th className="text-left py-2 font-medium min-w-[110px]">Sản lượng</th>
+                  <th className="text-left py-2 font-medium min-w-[180px]">Máy</th>
+                  <th className="text-left py-2 font-medium min-w-[100px]">Ca</th>
+                  <th className="text-left py-2 font-medium min-w-[140px]">Từ ngày</th>
+                  <th className="text-left py-2 font-medium min-w-[140px]">Đến ngày</th>
+                  <th className="text-left py-2 font-medium min-w-[130px]">Đội</th>
+                  <th className="text-left py-2 font-medium min-w-[160px]">Công nhân</th>
+                  <th className="text-left py-2 font-medium min-w-[100px]">Thực tế</th>
+                  <th className="text-left py-2 font-medium min-w-[100px]">Phế phẩm</th>
+                  <th className="text-left py-2 font-medium min-w-[130px]">Trạng thái</th>
                   <th className="w-10" />
                 </tr>
               </thead>
@@ -353,22 +376,12 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       </fieldset>
 
       {editId && (
-        <Section title="Tem QR các lô"
-          action={tasks.some((t) => t.task_code) && <button onClick={() => window.print()} className="btn-ghost"><Printer size={16} /> In tem</button>}>
+        <Section title="Mã truy xuất các lô"
+          action={tasks.some((t) => t.task_code) && <button onClick={() => window.print()} className="btn-ghost"><Printer size={16} /> In danh sách</button>}>
           <div className="po-qr-area flex flex-wrap gap-3">
             {tasks.filter((t) => t.task_code).map((t) => (
-              <div key={t._k} className="qr-label flex gap-3 border border-slate-300 rounded-lg p-3 bg-white" style={{ width: 290 }}>
-                <Qr size={104} text={[
-                  t.task_code,
-                  `Lệnh: ${meta?.order_code || ""}`,
-                  meta?.sales_order_code ? `Đơn: ${meta.sales_order_code}` : "",
-                  `SP: ${meta?.product_name || ""}`,
-                  `Công đoạn: ${t.stage} (${t.stage === "Cắt" ? "TP" : "BTP"})`,
-                  [meta?.attr_color, meta?.attr_size, meta?.attr_thickness].filter(Boolean).length ? `Màu/KT/Dày: ${[meta.attr_color, meta.attr_size, meta.attr_thickness].filter(Boolean).join("/")}` : "",
-                  `SL: ${fmt(t.quantity)} ${meta?.unit || ""}`.trim(),
-                  t.planned_date ? `Ngày: ${fmtDate(t.planned_date)}` : "",
-                ].filter(Boolean).join("\n")} />
-                <div className="text-[11px] leading-snug text-slate-700 min-w-0">
+              <div key={t._k} className="label-card flex flex-col gap-2 border border-slate-300 rounded-lg p-3 bg-white" style={{ width: 220 }}>
+                <div className="text-[12px] leading-snug text-slate-700 min-w-0">
                   <div className="font-semibold text-slate-800">{t.task_code}</div>
                   <div className="text-slate-400">{meta?.order_code} · {t.stage} ({t.stage === "Cắt" ? "TP" : "BTP"})</div>
                   <div className="truncate">{meta?.product_name}</div>
@@ -380,7 +393,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             ))}
             {!tasks.some((t) => t.task_code) && <p className="text-sm text-slate-400">Chưa có lô. Thêm phân công và Lưu để sinh tem QR cho từng lô.</p>}
           </div>
-          <style>{`@media print { body * { visibility:hidden!important; } .po-qr-area, .po-qr-area * { visibility:visible!important; } .po-qr-area { position:absolute; left:0; top:0; } .qr-label { break-inside:avoid; } }`}</style>
+          <style>{`@media print { body * { visibility:hidden!important; } .po-qr-area, .po-qr-area * { visibility:visible!important; } .po-qr-area { position:absolute; left:0; top:0; } .label-card { break-inside:avoid; } }`}</style>
         </Section>
       )}
     </div>
@@ -396,73 +409,104 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-/* ---- Modal lập lịch ---- */
+/* ---- Module chính ---- */
+/* ---- Modal lập lịch (popup) ---- */
 export function ScheduleModal({ lookups, order, onClose, onSaved }) {
-  const [s, setS] = useState({
-    machine_id: order.machine_id || "", planned_date: order.planned_date?.slice(0, 10) || "",
-    shift: order.shift || "", assigned_team: order.assigned_team || "", assigned_worker: order.assigned_worker || "",
-  });
-  const emps = lookups.employees || [];
-  const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
-  const workers = emps.filter((e) => !s.assigned_team || e.factory === s.assigned_team);
-  const setTeam = (v) => setS((p) => ({ ...p, assigned_team: v, assigned_worker: emps.find((e) => e.name === p.assigned_worker && (!v || e.factory === v)) ? p.assigned_worker : "" }));
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    production.getTasks(order.id).then((d) => {
+      setTasks(d);
+      setLoading(false);
+    }).catch(e => { toast.error("Lỗi tải phân công: " + e.message); onClose(); });
+  }, [order.id, onClose]);
+
   const save = async () => {
-    try { await production.schedule(order.id, s); onSaved(); }
-    catch (e) { alert("Lỗi lập lịch: " + e.message); }
+    try {
+      await production.saveTasks(order.id, tasks.filter(t => t.stage));
+      toast.success("Lưu lịch phân công thành công");
+      onSaved();
+    } catch (e) {
+      toast.error("Lỗi lưu lập lịch: " + e.message);
+    }
   };
+
+  const setTask = (id, k, v) => setTasks(ts => ts.map(t => t.id === id ? { ...t, [k]: v } : t));
+
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-slate-800">Lập lịch · {order.order_code}</h3>
-        <p className="text-sm text-slate-500">{order.product_name} · {order.attr_color || "—"} · {order.attr_size || "—"} · SL {fmt(order.quantity)}</p>
-        <Field label="Máy">
-          <select className={inputCls} value={s.machine_id} onChange={(e) => setS({ ...s, machine_id: e.target.value })}>
-            <option value="">-- Chọn máy --</option>
-            {lookups.machines.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.factory})</option>)}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Ngày sản xuất">
-            <input type="date" className={inputCls} value={s.planned_date} onChange={(e) => setS({ ...s, planned_date: e.target.value })} />
-          </Field>
-          <Field label="Ca">
-            <select className={inputCls} value={s.shift} onChange={(e) => setS({ ...s, shift: e.target.value })}>
-              <option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}
-            </select>
-          </Field>
+    <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[60]">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100">
+          <h2 className="text-lg font-semibold text-slate-800">Phân công - {order.order_code}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">&times;</button>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Đội">
-            <select className={inputCls} value={s.assigned_team} onChange={(e) => setTeam(e.target.value)}>
-              <option value="">-- Chọn đội --</option>
-              {teams.map((t) => <option key={t}>{t}</option>)}
-            </select>
-          </Field>
-          <Field label="Công nhân">
-            <select className={inputCls} value={s.assigned_worker} onChange={(e) => setS({ ...s, assigned_worker: e.target.value })}>
-              <option value="">-- Chọn công nhân --</option>
-              {workers.map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ""}</option>)}
-            </select>
-          </Field>
+        <div className="p-4 overflow-y-auto">
+          {loading ? <p className="text-slate-500">Đang tải...</p> : (
+            <div className="overflow-x-auto border border-slate-200 rounded-lg">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="px-3 py-2 text-left">Công đoạn</th>
+                    <th className="px-3 py-2 text-left">Máy</th>
+                    <th className="px-3 py-2 text-left">Ngày</th>
+                    <th className="px-3 py-2 text-left">Ca</th>
+                    <th className="px-3 py-2 text-left">Nhân công</th>
+                    <th className="px-3 py-2 text-left">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {tasks.length === 0 && <tr><td colSpan="6" className="p-4 text-center text-slate-500">Lệnh chưa được chia công đoạn. Vui lòng vào Chi tiết lệnh để Phân công.</td></tr>}
+                  {tasks.map(t => {
+                    const dis = t.status === "Hoàn thành" || t.status === "Đã hủy" || t.status === "Đang sản xuất";
+                    return (
+                      <tr key={t.id}>
+                        <td className="px-3 py-2 font-medium text-slate-700">{t.stage}</td>
+                        <td className="px-3 py-2">
+                          <select disabled={dis} className={inputCls} value={t.machine_id || ""} onChange={e => setTask(t.id, "machine_id", e.target.value)}>
+                            <option value="">- Chọn máy -</option>
+                            {(lookups.machines || []).filter(m => !t.stage || m.machine_type?.toLowerCase().includes(t.stage.toLowerCase())).map(m => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-3 py-2">
+                          <input disabled={dis} type="date" className={inputCls} value={t.planned_date?.slice(0, 10) || ""} onChange={e => setTask(t.id, "planned_date", e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input disabled={dis} className={inputCls} placeholder="VD: Ca 1" value={t.shift || ""} onChange={e => setTask(t.id, "shift", e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input disabled={dis} className={inputCls} placeholder="Nhân công..." value={t.assigned_worker || ""} onChange={e => setTask(t.id, "assigned_worker", e.target.value)} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(t.status)}`}>{t.status}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-        <div className="flex justify-end gap-2 pt-2">
-          <button onClick={onClose} className="btn-ghost">Hủy</button>
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu lịch</button>
+        <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-lg">
+          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
+          <button onClick={save} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"><Save size={16}/> Lưu thay đổi</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ---- Module chính ---- */
 export default function ProductionModule({ lookups, focusId, onFocusConsumed, onExit }) {
   const { can } = usePerm();
   const [view, setView] = useState("list");
   const [mode, setMode] = useState("table"); // table | gantt
   const [editId, setEditId] = useState(null);
   const [copyId, setCopyId] = useState(null);
-  const [rows, setRows] = useState([]);
   const [scheduling, setScheduling] = useState(null);
+  const [rows, setRows] = useState([]);
   const [cameFromFocus, setCameFromFocus] = useState(false); // mở từ module khác → back về đúng chỗ
 
   const load = useCallback(async () => {
@@ -500,8 +544,13 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
     { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
     { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },
     { key: "attr_size", label: "Kích thước", filter: "select", render: (r) => r.attr_size || "—" },
-    { key: "machine_name", label: "Máy", filter: "select", render: (r) => r.machine_name || <span className="text-slate-400">Chưa xếp</span> },
-    { key: "planned_date", label: "Ngày SX", filter: "date", render: (r) => `${fmtDate(r.planned_date)}${r.shift ? " · " + r.shift : ""}` },
+    { key: "machine_name", label: "Máy", filter: "select", render: (r) => r.machine_name_display || r.machine_name || <span className="text-slate-400">Chưa xếp</span> },
+    { key: "planned_date", label: "Ngày SX", filter: "date", render: (r) => {
+        const d = r.planned_date_display || r.planned_date;
+        const s = r.shift_display || r.shift;
+        if (!d && !s) return "—";
+        return `${d ? fmtDate(d) : ""}${s ? " · " + s : ""}`.replace(/^ · | · $/, '');
+      } },
     { key: "due_date", label: "Ngày giao", filter: "date", render: (r) => fmtDate(r.due_date) },
     { key: "_progress", label: "Tiến độ", render: (r) => r.task_count > 0 ? (
         <div className="w-28">
@@ -518,7 +567,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
       ) : <span className="text-slate-400 text-xs">Chưa phân công</span> },
     { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "_act", label: "", align: "right", render: (r) => (<>
-        <button onClick={() => setScheduling(r)} title="Lập lịch" className="text-slate-400 hover:text-blue-600 p-1"><CalendarClock size={16} /></button>
+        <button onClick={() => setScheduling(r)} disabled={!can("production", "update")} className="text-slate-400 hover:text-blue-600 p-1" title="Lập lịch / xếp máy"><CalendarClock size={16} /></button>
         {can("production", "create") && <button onClick={() => openForm({ copy: r.id })} title="Sao chép" className="text-slate-400 hover:text-blue-600 p-1"><Copy size={16} /></button>}
         <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
       </>) },
@@ -537,12 +586,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
       {mode === "gantt" && <ProductionGantt onOpenOrder={(id) => openForm({ edit: id })} />}
 
       {mode === "table" && <DataTable dense columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có lệnh sản xuất" />}
-
-      {scheduling && (
-        <ScheduleModal lookups={lookups} order={scheduling}
-          onClose={() => setScheduling(null)}
-          onSaved={() => { setScheduling(null); load(); }} />
-      )}
+      {scheduling && <ScheduleModal lookups={lookups} order={scheduling} onClose={() => setScheduling(null)} onSaved={() => { setScheduling(null); load(); }} />}
     </div>
   );
 }

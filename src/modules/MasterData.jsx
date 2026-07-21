@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, Save, Upload, Download, FileDown } from "lucide-react";
+import { RotateCcw, Plus, Trash2, Pencil, Save, Upload, Download, FileDown } from "lucide-react";
 import * as XLSX from "xlsx";
 import { resource, customerOrders, machineOrders, nextCode } from "../mesApi.js";
 import { usePerm } from "../perm.jsx";
 import { ListHeader, DataTable, PageHeader, Section } from "../components.jsx";
-import { inputCls, statusClass, fmt, fmtDate } from "../ui.js";
+import {  inputCls, statusClass, fmt, fmtDate , toast } from "../ui.js";
 
 const isObjOptions = (f) => f.type === "select" && f.options && typeof f.options[0] === "object";
 
@@ -49,11 +49,11 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
 
   const save = async () => {
     for (const fl of cfg.fields)
-      if (fl.required && !f[fl.key]) return alert(`Vui lòng nhập ${fl.label}`);
+      if (fl.required && !f[fl.key]) return toast.error(`Vui lòng nhập ${fl.label}`);
     try {
       if (isEdit) await api.update(record.id, f); else await api.create(f);
-      onSaved();
-    } catch (e) { alert("Lỗi lưu: " + e.message); }
+      toast.success("Đã lưu thành công"); onSaved();
+    } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
 
   return (
@@ -169,14 +169,14 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   const api = resource(cfg.resource);
 
   const load = useCallback(async () => {
-    try { setRows(await api.list()); } catch (e) { alert("Lỗi tải: " + e.message); }
+    try { setRows(await api.list()); } catch (e) { toast.error("Lỗi tải: " + e.message); }
   }, [cfg.resource]); // eslint-disable-line
 
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
     if (!confirm("Xóa bản ghi này?")) return;
-    try { await api.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   // ---- Export Excel ----
@@ -224,13 +224,13 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
         });
         return p;
       }).filter((p) => Object.keys(p).filter((k) => k !== (codeCol && codeCol.key)).length);
-      if (!payloads.length) return alert("Không đọc được dòng dữ liệu hợp lệ. Kiểm tra tiêu đề cột khớp file mẫu.");
+      if (!payloads.length) return toast.error("Không đọc được dòng dữ liệu hợp lệ. Kiểm tra tiêu đề cột khớp file mẫu.");
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} dòng.`;
       if (res.failed) msg += `\nLỗi ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
-      alert(msg);
+      toast.error(msg);
       load();
-    } catch (e) { alert("Lỗi đọc file: " + e.message); }
+    } catch (e) { toast.error("Lỗi đọc file: " + e.message); }
   };
 
   const dtCols = [
@@ -260,6 +260,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   return (
     <div className="space-y-4">
       <ListHeader title={cfg.title} actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         <button onClick={downloadTemplate} className="btn-ghost"><FileDown size={16} /> Tải mẫu</button>
         {can("masterdata", "create") && (
           <label className="btn-ghost cursor-pointer">
