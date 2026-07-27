@@ -119,7 +119,7 @@ const inputCls =
 
 /* ============================== SIDEBAR ============================== */
 
-function Sidebar({ user, onLogout, collapsed, onToggle }) {
+function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseMobile }) {
   const location = useLocation();
   const allItems = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/" },
@@ -180,10 +180,17 @@ function Sidebar({ user, onLogout, collapsed, onToggle }) {
       isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
 
   return (
-    <aside className={`${collapsed ? "w-16" : "w-60"} shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col transition-all duration-300 relative`}>
+    <>
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 z-40 md:hidden" onClick={onCloseMobile} />
+      )}
+      <aside className={`fixed inset-y-0 left-0 z-50 transform ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 ${collapsed ? "md:w-16 w-60" : "w-60"} shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col transition-all duration-300`}>
       <div className={`px-4 py-4 border-b border-slate-100 shrink-0 flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all`}>
-        <button onClick={onToggle} className="p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Thu gọn/Mở rộng menu">
+        <button onClick={onToggle} className="hidden md:block p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Thu gọn/Mở rộng menu">
           <Menu size={20} />
+        </button>
+        <button onClick={onCloseMobile} className="md:hidden p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Đóng menu">
+          <ArrowLeft size={20} />
         </button>
         {!collapsed && (
           <div className="flex-1 flex flex-col items-center pr-6">
@@ -221,7 +228,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle }) {
                 {open && !collapsed && (
                   <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {it.children.map((c) => (
-                      <NavLink key={c.key} to={c.path}
+                      <NavLink key={c.key} to={c.path} onClick={() => onCloseMobile?.()}
                         className={({ isActive }) => `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
                           isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
                         <c.icon size={15} className="shrink-0" /> <span className="truncate">{c.label}</span>
@@ -233,7 +240,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle }) {
             );
           }
           return (
-            <NavLink key={it.key} to={it.path} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
+            <NavLink key={it.key} to={it.path} onClick={() => onCloseMobile?.()} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
               <Icon size={18} className="shrink-0" /> 
               {!collapsed && <span className="truncate">{it.label}</span>}
             </NavLink>
@@ -256,7 +263,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle }) {
           <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
         </button>
       </div>
-    </aside>
+    </>
   );
 }
 
@@ -1047,6 +1054,7 @@ export default function MesApp() {
   const navigate = useNavigate();
   const [authLoading, setAuthLoading] = useState(true);
   const [sidebarHidden, setSidebarHidden] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Focus ID cho các danh sách (nếu có, để highlight)
   const [detailId, setDetailId] = useState(null);
@@ -1122,9 +1130,24 @@ export default function MesApp() {
 
   return (
     <PermProvider user={user}>
-    <div className="flex h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
-      <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} />
-      <main className="nav-scroll flex-1 p-8 overflow-y-auto relative">
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
+      <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} mobileMenuOpen={mobileMenuOpen} onCloseMobile={() => setMobileMenuOpen(false)} />
+      
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Mobile Header */}
+        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0 z-30 shadow-sm">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMobileMenuOpen(true)} className="p-1 text-slate-500 hover:bg-slate-100 rounded">
+              <Menu size={20} />
+            </button>
+            <Logo className="h-6" />
+          </div>
+          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+            {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
+          </div>
+        </div>
+
+        <div className="nav-scroll flex-1 overflow-y-auto p-4 md:p-8 relative">
         {lookups && <datalist id="units">{(lookups.units || []).map((u) => <option key={u} value={u} />)}</datalist>}
         <Routes>
           <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
@@ -1159,6 +1182,7 @@ export default function MesApp() {
           <Route path="/deliveries" element={lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </div>
       </main>
 
     </div>
