@@ -255,9 +255,7 @@ export default function InventoryModule({ lookups }) {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Kho" actions={
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
-      } />
+      <ListHeader title="Kho" />
       <div className="flex gap-1 border-b border-slate-200">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
