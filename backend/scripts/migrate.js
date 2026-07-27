@@ -6,13 +6,17 @@ const fs = require('fs');
 const { Pool } = require('pg');
 
 async function main() {
-  const pool = new Pool({
-    host: process.env.PGHOST || 'localhost',
-    port: process.env.PGPORT || 5432,
-    user: process.env.PGUSER || 'postgres',
-    password: process.env.PGPASSWORD || 'postgres',
-    database: process.env.PGDATABASE || 'mes',
-  });
+  const poolConfig = process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+    : {
+        host: process.env.PGHOST || 'localhost',
+        port: process.env.PGPORT || 5432,
+        user: process.env.PGUSER || 'postgres',
+        password: process.env.PGPASSWORD || 'postgres',
+        database: process.env.PGDATABASE || 'mes',
+      };
+
+  const pool = new Pool(poolConfig);
 
   // Nạp tuần tự mọi file schema*.sql từ migrations/ (schema.sql trước, rồi schema_v2.sql, ...)
   const migrationsDir = path.join(ROOT, 'migrations');

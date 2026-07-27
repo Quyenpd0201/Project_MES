@@ -5,12 +5,18 @@ const { Pool, types } = require('pg');
 // Trả cột DATE (OID 1082) nguyên chuỗi 'YYYY-MM-DD', tránh lệch ngày do timezone
 types.setTypeParser(1082, (v) => v);
 
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
+  : {
+      host: process.env.PGHOST || 'localhost',
+      port: process.env.PGPORT || 5432,
+      user: process.env.PGUSER || 'postgres',
+      password: process.env.PGPASSWORD || 'postgres',
+      database: process.env.PGDATABASE || 'mes',
+    };
+
 const pool = new Pool({
-  host: process.env.PGHOST || 'localhost',
-  port: process.env.PGPORT || 5432,
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'postgres',
-  database: process.env.PGDATABASE || 'mes',
+  ...poolConfig,
   max: 10,
 });
 
