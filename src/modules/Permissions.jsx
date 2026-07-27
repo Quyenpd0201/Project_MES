@@ -68,9 +68,7 @@ export default function PermissionsModule() {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Phân quyền theo vai trò" actions={
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
-      } />
+      <ListHeader title="Phân quyền theo vai trò" />
 
       <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[220px]">
