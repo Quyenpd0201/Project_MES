@@ -22,6 +22,7 @@ router.use('/', require('./modules/engineering/bom.route'));
 router.use('/', require('./modules/production/planning.route'));
 router.use('/', require('./modules/inventory/inventory.route'));
 router.use('/', require('./modules/production/dashboard.route'));
+router.use('/', require('./modules/production/report.route'));
 router.use('/', require('./modules/masterData/lookup.route'));
 
 module.exports = router;

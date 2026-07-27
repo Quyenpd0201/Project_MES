@@ -120,3 +120,15 @@ export const inventory = {
   addStock: (data) => http(`/inventory/stock`, body("POST", data)),
   deleteStock: (id) => http(`/inventory/stock/${id}`, { method: "DELETE" }),
 };
+
+export const reports = {
+  kpi: () => http(`/reports/kpi`).then(r => r.kpi),
+  detailed: (fromDate, toDate) => {
+    let url = `/reports/detailed`;
+    if (fromDate && toDate) {
+      url += `?fromDate=${fromDate}&toDate=${toDate}`;
+    }
+    return http(url).then(r => r.data);
+  },
+  machines: () => http(`/reports/machines`),
+};

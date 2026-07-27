@@ -93,15 +93,12 @@ exports.login = async (req, res) => {
 
 exports.me = async (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const entry = tokens.get(token);
-  if (!entry || entry.expiresAt < Date.now()) {
-    tokens.delete(token);
+  const userId = exports.verifyToken(token);
+  if (!userId) {
     return res.status(401).json({ message: 'Phiên đăng nhập hết hạn' });
   }
-  const user = await userPayload(entry.userId);
+  const user = await userPayload(userId);
   if (!user) return res.status(401).json({ message: 'Tài khoản không tồn tại' });
-  // Làm mới expiry mỗi lần dùng (sliding window)
-  entry.expiresAt = Date.now() + TOKEN_TTL_MS;
   res.json({ user });
 };
 

@@ -25,6 +25,7 @@ import BomModule from "./src/modules/engineering/Bom.jsx";
 import ProcessModule from "./src/modules/engineering/Process.jsx";
 import OrdersModule from "./src/modules/sales/Orders.jsx";
 import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
+import ReportsModule from "./src/modules/reports/Reports.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo } from "./src/components.jsx";
 
 /* =====================================================================
@@ -136,6 +137,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
     { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays, path: "/workschedule" },
     { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
+    { key: "reports", label: "Báo cáo", icon: Activity, path: "/reports" },
     { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
     { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true, path: "/users" },
     {
@@ -1175,6 +1177,7 @@ export default function MesApp() {
           <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
           <Route path="/qrlabels" element={<QrLabelsModule />} />
           <Route path="/qrscan" element={<QrScanModule />} />
+          <Route path="/reports" element={needLookups(ReportsModule)} />
           <Route path="/permissions" element={<PermissionsModule />} />
           <Route path="/users" element={needLookups(UsersModule)} />
           <Route path="/bom" element={needLookups(BomModule)} />
