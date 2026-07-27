@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requirePerm } = require('../../core/requireAuth');
 const { makeCrud } = require('../../core/genericCrud');
 const production = require('../production/productionController');
 

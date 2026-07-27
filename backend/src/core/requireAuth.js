@@ -1,5 +1,5 @@
 // backend/middleware/requireAuth.js — xác thực Bearer token cho mọi request
-const { getUserIdFromToken } = require('../modules/auth/authController');
+const { verifyToken } = require('../modules/auth/authController');
 const db = require('./db');
 
 /**
@@ -11,7 +11,7 @@ module.exports = async function requireAuth(req, res, next) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ message: 'Cần đăng nhập để thực hiện thao tác này' });
 
-  const userId = getUserIdFromToken(token);
+  const userId = verifyToken(token);
   if (!userId) return res.status(401).json({ message: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại' });
 
   try {
@@ -33,4 +33,18 @@ module.exports = async function requireAuth(req, res, next) {
     console.error('[requireAuth]', err);
     res.status(500).json({ message: 'Lỗi xác thực, vui lòng thử lại' });
   }
+};
+
+/**
+ * Middleware phân quyền (RBAC).
+ * Cần đặt sau requireAuth.
+ * Kiểm tra xem user có phải admin, hoặc có quyền được cấu hình không.
+ */
+module.exports.requirePerm = (perm) => {
+  return (req, res, next) => {
+    if (!req.user) return res.status(401).json({ message: 'Chưa xác thực' });
+    if (req.user.is_admin) return next();
+    if (req.user.permissions && req.user.permissions[perm]) return next();
+    res.status(403).json({ message: 'Bạn không có quyền thực hiện thao tác này' });
+  };
 };

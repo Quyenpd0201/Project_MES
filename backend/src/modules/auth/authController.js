@@ -2,17 +2,8 @@
 const crypto = require('crypto');
 const db = require('../../core/db');
 
-// ── Token store: token → { userId, expiresAt } ──────────────────────────────
-const TOKEN_TTL_MS = 8 * 60 * 60 * 1000; // 8 giờ
-const tokens = new Map(); // token → { userId, expiresAt }
-
-// Dọn token hết hạn mỗi 30 phút để tránh leak memory
-setInterval(() => {
-  const now = Date.now();
-  for (const [tk, val] of tokens) {
-    if (val.expiresAt < now) tokens.delete(tk);
-  }
-}, 30 * 60 * 1000);
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'mes_fallback_secret_key';
 
 // ── Brute-force protection ────────────────────────────────────────────────────
 const FAIL_MAX = 5;         // số lần sai tối đa
@@ -95,8 +86,7 @@ exports.login = async (req, res) => {
     }
 
     clearFailedLogin(ip);
-    const token = crypto.randomUUID();
-    tokens.set(token, { userId: u.id, expiresAt: Date.now() + TOKEN_TTL_MS });
+    const token = jwt.sign({ userId: u.id }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token, user: await userPayload(u.id) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi đăng nhập' }); }
 };
@@ -117,18 +107,19 @@ exports.me = async (req, res) => {
 
 exports.logout = (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  tokens.delete(token);
   res.json({ message: 'Đã đăng xuất' });
 };
 
 exports.hashPassword = hashPassword;
 
-// Hàm lấy userId từ token (dùng bởi middleware requireAuth)
-exports.getUserIdFromToken = (token) => {
-  const entry = tokens.get(token);
-  if (!entry || entry.expiresAt < Date.now()) { tokens.delete(token); return null; }
-  entry.expiresAt = Date.now() + TOKEN_TTL_MS; // sliding window
-  return entry.userId;
+// Verify token helper for middleware
+exports.verifyToken = (token) => {
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    return payload.userId;
+  } catch (err) {
+    return null;
+  }
 };
 
 // Tạo tài khoản admin mặc định nếu DB chưa có user nào (kể cả chưa bị xóa)

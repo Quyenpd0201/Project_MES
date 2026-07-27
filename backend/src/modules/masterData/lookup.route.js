@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requirePerm } = require('../../core/requireAuth');
 const lookups = require('./lookupController');
 
 router.get('/lookups', lookups.all);

@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requirePerm } = require('../../core/requireAuth');
 const role = require('./roleController');
 const { makeCrud } = require('../../core/genericCrud');
 
@@ -18,6 +19,6 @@ mountCrud('/roles', makeCrud({
   searchCols: ['name', 'role_code'], exactCols: ['status'], codeCol: 'role_code',
   blockDeleteStatuses: ['Hoạt động'],
 }));
-router.put('/roles/:id/permissions', role.savePermissions);
+router.put('/roles/:id/permissions', requirePerm('sys:roles:manage'), role.savePermissions);
 
 module.exports = router;
