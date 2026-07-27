@@ -3,10 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const productsRouter = require('./routes/products');
-const apiRouter = require('./routes/index');
-const requireAuth = require('./middleware/requireAuth');
-const { ensureSeedAdmin } = require('./controllers/authController');
+const productsRouter = require('./src/modules/engineering/product.route');
+const apiRouter = require('./src/routes');
+const requireAuth = require('./src/core/requireAuth');
+const { ensureSeedAdmin } = require('./src/modules/auth/authController');
 
 const app = express();
 
