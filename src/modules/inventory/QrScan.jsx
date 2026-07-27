@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ScanLine, Save, Camera, X, CheckCircle2 } from "lucide-react";
+import { Search, Save, CheckCircle2 } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { production } from "../../mesApi.js";
-import { inputCls, fmt, fmtDate, statusClass } from "../../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 
 const TASK_RE = /(LSX\d+-\d+)/i;
 const STATUSES = ["Chờ", "Đang sản xuất", "Hoàn thành", "Đã hủy"];
@@ -12,13 +12,9 @@ export default function QrScanModule() {
   const [task, setTask] = useState(null);
   const [form, setForm] = useState({ status: "", actual_qty: "", scrap_qty: "" });
   const [log, setLog] = useState([]);
-  const [cam, setCam] = useState(false);
   const inputRef = useRef(null);
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-  useEffect(() => () => stopCam(), []); // eslint-disable-line
 
   const lookup = async (raw) => {
     const code = (raw.match(TASK_RE)?.[1] || raw.trim()).toUpperCase();
@@ -28,7 +24,7 @@ export default function QrScanModule() {
       const t = await production.taskByCode(code);
       setTask(t);
       setForm({ status: t.status || "Đang sản xuất", actual_qty: t.actual_qty ?? "", scrap_qty: t.scrap_qty ?? "" });
-    } catch (e) { setTask(null); alert(e.message); inputRef.current?.focus(); }
+    } catch (e) { setTask(null); toast.error(e.message); inputRef.current?.focus(); }
   };
 
   const save = async () => {
@@ -38,51 +34,24 @@ export default function QrScanModule() {
       setLog((l) => [{ code: task.task_code, status: form.status, prod: r.produced, time: new Date().toLocaleTimeString("vi-VN") }, ...l].slice(0, 12));
       setTask(null); setForm({ status: "", actual_qty: "", scrap_qty: "" });
       inputRef.current?.focus();
-    } catch (e) { alert("Lỗi cập nhật: " + e.message); }
-  };
-
-  function stopCam() {
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null; setCam(false);
-  }
-  const startCam = async () => {
-    if (!("BarcodeDetector" in window)) return alert("Trình duyệt không hỗ trợ quét bằng camera. Hãy dùng máy quét QR USB hoặc nhập mã tay.");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-      streamRef.current = stream; setCam(true);
-      setTimeout(async () => {
-        if (!videoRef.current) return;
-        videoRef.current.srcObject = stream; await videoRef.current.play().catch(() => {});
-        const det = new window.BarcodeDetector({ formats: ["qr_code"] });
-        const tick = async () => {
-          if (!streamRef.current || !videoRef.current) return;
-          try { const codes = await det.detect(videoRef.current); if (codes.length) { stopCam(); lookup(codes[0].rawValue); return; } } catch { /* ignore */ }
-          requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }, 50);
-    } catch (e) { alert("Không mở được camera: " + e.message); }
+    } catch (e) { toast.error("Lỗi cập nhật: " + e.message); }
   };
 
   const F = ({ label, children }) => (<div><label className="block text-sm font-medium text-slate-600 mb-1.5">{label}</label>{children}</div>);
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Quét QR cập nhật sản xuất" />
+      <ListHeader title="Tra cứu mã truy xuất (Cập nhật sản xuất)" />
 
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3">
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <ScanLine size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input ref={inputRef} className={inputCls + " pl-10"} value={input} placeholder="Quét tem QR (máy quét USB) hoặc nhập mã lô — vd LSX00004-1 — rồi Enter"
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input ref={inputRef} className={inputCls + " pl-10"} value={input} placeholder="Nhập mã truy xuất — ví dụ: LSX00004-1 — rồi ấn Enter"
               onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup(input); } }} />
           </div>
-          <button onClick={() => lookup(input)} className="btn-primary">Tra lô</button>
-          {!cam ? <button onClick={startCam} className="btn-ghost"><Camera size={16} /> Camera</button>
-            : <button onClick={stopCam} className="btn-ghost" style={{ color: "#e11d48" }}><X size={16} /> Tắt</button>}
+          <button onClick={() => lookup(input)} className="btn-primary">Tra cứu</button>
         </div>
-        {cam && <video ref={videoRef} className="w-full max-w-sm mx-auto rounded-lg border border-slate-200" muted playsInline />}
-        <p className="text-xs text-slate-400">Mẹo: máy quét QR USB hoạt động như bàn phím — chỉ cần đặt con trỏ vào ô trên rồi quét, hệ thống tự tra lô.</p>
       </div>
 
       {task && (
@@ -119,7 +88,7 @@ export default function QrScanModule() {
 
       {log.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 text-sm font-semibold text-slate-700">Lần quét gần đây</div>
+          <div className="px-5 py-3 border-b border-slate-100 bg-slate-50/50 text-sm font-semibold text-slate-700">Lần tra cứu gần đây</div>
           <div className="divide-y divide-slate-100">
             {log.map((l, i) => (
               <div key={i} className="px-5 py-2.5 text-sm flex items-center gap-3">

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { toast } from "../../ui.js";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { production } from "../../mesApi.js";
 import { fmt, fmtDate } from "../../ui.js";
@@ -36,7 +37,7 @@ export default function ProductionGantt({ onOpenOrder }) {
         const earliest = rows.map((r) => r.start_date).sort()[0];
         setAnchor((a) => a || earliest);
       } else setAnchor((a) => a || toYMD(new Date()));
-    } catch (e) { alert("Lỗi tải Gantt: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải Gantt: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 

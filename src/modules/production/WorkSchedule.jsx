@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { workSchedules } from "../../mesApi.js";
-import { inputCls } from "../../ui.js";
+import {  inputCls , toast } from "../../ui.js";
 
 const d = (ymd) => new Date(ymd + "T00:00:00");
 const toYMD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -33,14 +33,14 @@ export default function WorkScheduleModule({ lookups }) {
         }; 
       });
       setMap(m);
-    } catch (e) { alert("Lỗi tải lịch: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải lịch: " + e.message); }
   }, [days]);
   useEffect(() => { load(); }, [load]);
 
   const setCell = async (employee_id, work_date, shift_id, has_attendance) => {
     setMap((m) => ({ ...m, [`${employee_id}|${work_date}`]: { shift_id: shift_id || undefined, has_attendance } }));
     try { await workSchedules.upsert({ employee_id, work_date, shift_id: shift_id || null }); }
-    catch (e) { alert("Lỗi lưu: " + e.message); load(); }
+    catch (e) { toast.error("Lỗi lưu: " + e.message); load(); }
   };
 
   // gom nhân viên theo đơn vị
@@ -53,22 +53,35 @@ export default function WorkScheduleModule({ lookups }) {
   return (
     <div className="space-y-5">
       <ListHeader title="Lịch làm việc" actions={<>
-        <div className="flex bg-slate-100 p-1 rounded-lg">
-          <button 
-            onClick={() => setAnchor(addDays(mondayOf(new Date()), -7))} 
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${anchor === addDays(mondayOf(new Date()), -7) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-            Tuần trước
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white shadow-sm">
+            <button 
+              onClick={() => setAnchor(addDays(anchor, -7))} 
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition"
+              title="Tuần trước"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <span className="px-2 py-1.5 text-sm font-medium text-slate-700 min-w-[120px] text-center">
+              Tuần {d(days[0]).getDate()}/{d(days[0]).getMonth() + 1} – {d(days[6]).getDate()}/{d(days[6]).getMonth() + 1}
+            </span>
+            <button 
+              onClick={() => setAnchor(addDays(anchor, 7))} 
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition"
+              title="Tuần sau"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
           <button 
             onClick={() => setAnchor(mondayOf(new Date()))} 
-            className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${anchor === mondayOf(new Date()) ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+            className={`px-4 py-1.5 text-sm font-medium rounded-lg border transition ${anchor === mondayOf(new Date()) ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+          >
             Tuần này
           </button>
         </div>
-        <span className="text-sm font-medium text-slate-500 border-l border-slate-200 pl-4 py-1">
-          {d(days[0]).getDate()}/{d(days[0]).getMonth() + 1} – {d(days[6]).getDate()}/{d(days[6]).getMonth() + 1}
-        </span>
-        <button onClick={load} className="btn-ghost ml-2"><RotateCcw size={16} /> Làm mới</button>
+        <div className="w-px h-6 bg-slate-200 mx-2"></div>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
       </>} />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">

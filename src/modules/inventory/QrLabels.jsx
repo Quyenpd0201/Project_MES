@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Printer, Tag } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { production } from "../../mesApi.js";
-import { inputCls, fmt, fmtDate } from "../../ui.js";
+import {  inputCls, fmt, fmtDate , toast } from "../../ui.js";
 
 // Các thông tin có thể in lên tem (khách không có máy quét QR → in chữ to, rõ)
 const PROD_FIELDS = [
@@ -50,7 +50,7 @@ export default function QrLabelsModule() {
     try {
       const [o, t] = await Promise.all([production.get(id), production.getTasks(id)]);
       setOrder(o); setTasks(t);
-    } catch (e) { alert("Lỗi tải lệnh: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải lệnh: " + e.message); }
   }, []);
 
   const dataOf = (t) => ({
@@ -87,7 +87,7 @@ export default function QrLabelsModule() {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Tem dán sản xuất" />
+      <ListHeader title="In tem truy xuất" />
 
       {/* Cấu hình */}
       <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 no-print">

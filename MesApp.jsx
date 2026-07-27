@@ -9,22 +9,22 @@ import {
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
-import UsersModule from "./src/modules/Users.jsx";
+import UsersModule from "./src/modules/auth/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
 import { fmt, fmtDate, statusClass, dueTone } from "./src/ui.js";
-import ProductionModule from "./src/modules/Production.jsx";
-import ExecutionModule from "./src/modules/Execution.jsx";
-import PlanningModule, { OrderStatusModule } from "./src/modules/Planning.jsx";
-import InventoryModule from "./src/modules/Inventory.jsx";
-import MasterDataScreen from "./src/modules/MasterData.jsx";
-import BomModule from "./src/modules/Bom.jsx";
-import OrdersModule from "./src/modules/Orders.jsx";
-import DeliveriesModule from "./src/modules/Deliveries.jsx";
-import WorkScheduleModule from "./src/modules/WorkSchedule.jsx";
-import QrLabelsModule from "./src/modules/QrLabels.jsx";
-import QrScanModule from "./src/modules/QrScan.jsx";
-import ProcessModule from "./src/modules/Process.jsx";
-import PermissionsModule from "./src/modules/Permissions.jsx";
+import PermissionsModule from "./src/modules/auth/Permissions.jsx";
+import ProductionModule from "./src/modules/production/Production.jsx";
+import ExecutionModule from "./src/modules/production/Execution.jsx";
+import PlanningModule, { OrderStatusModule } from "./src/modules/production/Planning.jsx";
+import WorkScheduleModule from "./src/modules/production/WorkSchedule.jsx";
+import InventoryModule from "./src/modules/inventory/Inventory.jsx";
+import QrLabelsModule from "./src/modules/inventory/QrLabels.jsx";
+import QrScanModule from "./src/modules/inventory/QrScan.jsx";
+import MasterDataScreen from "./src/modules/masterData/MasterData.jsx";
+import BomModule from "./src/modules/engineering/Bom.jsx";
+import ProcessModule from "./src/modules/engineering/Process.jsx";
+import OrdersModule from "./src/modules/sales/Orders.jsx";
+import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo } from "./src/components.jsx";
 
 /* =====================================================================
@@ -263,6 +263,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
           <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
         </button>
       </div>
+    </aside>
     </>
   );
 }

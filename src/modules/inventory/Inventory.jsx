@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
+import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
 import { ListHeader, DataTable, PageHeader, Section } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { inputCls, fmt, fmtDate, statusClass } from "../../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { PRODUCT_SPECS, splitNU, specShort } from "../../specs.js";
 
 const Field = ({ label, required, children }) => (
@@ -66,10 +66,10 @@ function AdjustModal({ lookups, onClose, onSaved }) {
     setF((s) => ({ ...s, product_id: id, unit: p?.unit || s.unit }));
   };
   const save = async () => {
-    if (!f.product_id) return alert("Chọn sản phẩm");
-    if (!f.quantity || Number(f.quantity) <= 0) return alert("Nhập số lượng hợp lệ");
+    if (!f.product_id) return toast.error("Chọn sản phẩm");
+    if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Nhập số lượng hợp lệ");
     try { await inventory.adjust({ ...f, specs }); onSaved(); }
-    catch (e) { alert("Lỗi: " + e.message); }
+    catch (e) { toast.error("Lỗi: " + e.message); }
   };
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -91,7 +91,7 @@ function AdjustModal({ lookups, onClose, onSaved }) {
             <input type="number" min="0" className={inputCls} value={f.quantity} onChange={(e) => set("quantity", e.target.value)} />
           </Field>
           <Field label="Đơn vị">
-            <input className={inputCls} value={f.unit} onChange={(e) => set("unit", e.target.value)} />
+            <input className={inputCls} list="units" value={f.unit} onChange={(e) => set("unit", e.target.value)} />
           </Field>
           <Field label="Vị trí lưu trữ">
             <select className={inputCls} value={f.location_id} onChange={(e) => set("location_id", e.target.value)}>
@@ -129,7 +129,7 @@ function TreeTab({ lookups }) {
   const [adjusting, setAdjusting] = useState(false);
 
   const load = useCallback(async () => {
-    try { setData(await inventory.tree({})); } catch (e) { alert("Lỗi tải tồn kho: " + e.message); }
+    try { setData(await inventory.tree({})); } catch (e) { toast.error("Lỗi tải tồn kho: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -223,7 +223,7 @@ const TRX_COLOR = { "Nhập": "bg-emerald-50 text-emerald-700", "Xuất": "bg-ro
 function TransactionsTab() {
   const [rows, setRows] = useState([]);
   const load = useCallback(async () => {
-    try { setRows(await inventory.transactions({})); } catch (e) { alert("Lỗi tải lịch sử: " + e.message); }
+    try { setRows(await inventory.transactions({})); } catch (e) { toast.error("Lỗi tải lịch sử: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronDown, Save, ShieldCheck, Eraser } from "lucide-react";
+import { RotateCcw, ChevronDown, Save, ShieldCheck, Eraser } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
-import { inputCls } from "../../ui.js";
+import {  inputCls , toast } from "../../ui.js";
 
 /* Đăng ký ứng dụng + trường để phân quyền */
 const APPS = [
@@ -48,7 +48,7 @@ export default function PermissionsModule() {
     setRoleId(id);
     if (!id) { setPerms({}); return; }
     try { const r = await roles.get(id); setPerms(r.permissions || {}); }
-    catch (e) { alert("Lỗi tải vai trò: " + e.message); }
+    catch (e) { toast.error("Lỗi tải vai trò: " + e.message); }
   }, []);
 
   const ap = (k) => perms[k] || {};
@@ -62,8 +62,8 @@ export default function PermissionsModule() {
     setPerms(all);
   };
   const save = async () => {
-    try { await roles.savePermissions(roleId, perms); alert("Đã lưu phân quyền cho vai trò."); }
-    catch (e) { alert("Lỗi lưu: " + e.message); }
+    try { await roles.savePermissions(roleId, perms); toast.error("Đã lưu phân quyền cho vai trò."); }
+    catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
 
   return (

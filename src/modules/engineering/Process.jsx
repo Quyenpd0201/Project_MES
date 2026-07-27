@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, Save, GitBranch, ArrowRight, ArrowDown, X, Copy } from "lucide-react";
+import { RotateCcw, Plus, Trash2, Pencil, Save, GitBranch, ArrowRight, ArrowDown, X, Copy } from "lucide-react";
 import { processes, resource } from "../../mesApi.js";
 
 const bomApi = resource("boms");
-import { inputCls, fmt, statusClass } from "../../ui.js";
+import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
 import { PageHeader, Section, ListHeader, DataTable } from "../../components.jsx";
 import { usePerm } from "../../perm.jsx";
 
@@ -86,7 +86,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
       setF({ name: d.name, product_id: d.product_id || "", status: d.status, note: d.note || "", linked_bom_id: d.linked_bom_id || "" });
       setSteps((d.steps || []).map(mapStep));
       setSeq((d.steps?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải quy trình: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải quy trình: " + e.message));
   }, [editId]);
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -97,7 +97,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
       setF({ name: (d.name || "") + " (copy)", product_id: d.product_id || "", status: d.status, note: d.note || "", linked_bom_id: "" });
       setSteps((d.steps || []).map(mapStep));
       setSeq((d.steps?.length || 0) + 1);
-    }).catch((e) => alert("Lỗi tải quy trình nguồn: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải quy trình nguồn: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
   const addStep = () => { setSteps((a) => [...a, { ...emptyStep(), _k: seq }]); setSeq((s) => s + 1); };
@@ -131,7 +131,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   }));
 
   const save = async () => {
-    if (!f.name) return alert("Nhập tên quy trình");
+    if (!f.name) return toast.error("Nhập tên quy trình");
     try {
       const payload = {
         ...f,
@@ -143,10 +143,10 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
         })),
       };
       if (editId) { await procApi.update(editId, payload); loadData(); setEditing(false); }
-      else { await procApi.create(payload); onSaved(); }
-    } catch (e) { alert("Lỗi lưu: " + e.message); }
+      else { await procApi.create(payload); toast.success("Đã lưu thành công"); onSaved(); }
+    } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
-  const del = async () => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(editId); onSaved(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async () => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   return (
     <div className="space-y-5">
@@ -192,26 +192,55 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                   <button onClick={() => rmStep(s._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
                 </div>
                 <div className="p-4 space-y-3">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Field label="Công đoạn"><input className={inputCls} value={s.name} onChange={(e) => upStep(s._k, "name", e.target.value)} placeholder="Thổi màng…" /></Field>
-                    <Field label="Xưởng">
-                      <select className={inputCls} value={s.workshop} onChange={(e) => changeWorkshop(s._k, e.target.value)}>
-                        <option value="">-- Chọn xưởng --</option>
-                        {workshops.map((w) => <option key={w} value={w}>{w}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Máy">
-                      <select className={inputCls} value={s.machine_id} onChange={(e) => upStep(s._k, "machine_id", e.target.value)}>
-                        <option value="">-- Chọn máy --</option>
-                        {machinesOf(s.workshop).map((m) => <option key={m.id} value={m.id}>{m.name}{m.machine_type ? ` · ${m.machine_type}` : ""}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Thời gian SX (phút)">
-                      <input type="number" min="0" className={inputCls} value={s.duration_minutes} placeholder="0" onChange={(e) => upStep(s._k, "duration_minutes", e.target.value)} />
-                    </Field>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
+                    <div className="md:col-span-4">
+                      <Field label="Công đoạn">
+                        <input className={inputCls} value={s.name} placeholder="VD: Thổi màng..." onChange={(e) => upStep(s._k, "name", e.target.value)} />
+                      </Field>
+                    </div>
+                    <div className="md:col-span-3">
+                      <Field label="Thời gian SX (phút)">
+                        <input type="number" min="0" className={inputCls} value={s.duration_minutes} placeholder="0" onChange={(e) => upStep(s._k, "duration_minutes", e.target.value)} />
+                      </Field>
+                    </div>
+                    <div className="md:col-span-5">
+                      <Field label="Máy thực hiện (có thể chọn nhiều)">
+                        <div className="flex flex-col gap-2">
+                          <select className={inputCls} value="" onChange={(e) => {
+                            if (!e.target.value) return;
+                            const v = e.target.value;
+                            let curr = s.machine_ids || [];
+                            if (!curr.includes(v)) {
+                              upStep(s._k, "machine_ids", [...curr, v]);
+                            }
+                          }}>
+                            <option value="">+ Chọn máy...</option>
+                            {machines.filter((m) => !(s.machine_ids || []).includes(m.id)).map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.factory ? `[${m.factory}] ` : ""}{m.name}{m.machine_type ? ` · ${m.machine_type}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex flex-wrap gap-1.5">
+                            {!(s.machine_ids && s.machine_ids.length > 0) ? (
+                              <span className="text-slate-400 text-[13px] py-1">Chưa chọn máy nào</span>
+                            ) : (
+                              (s.machine_ids || []).map((mid, idx) => {
+                                const m = machines.find((x) => x.id == mid) || { name: `ID: ${mid}` };
+                                return (
+                                  <div key={idx} className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium border border-blue-100">
+                                    <span>{m.factory ? `[${m.factory}] ` : ""}{m.name}</span>
+                                    <button onClick={() => upStep(s._k, "machine_ids", (s.machine_ids || []).filter((x) => x != mid))} className="text-blue-400 hover:text-red-500 ml-0.5">&times;</button>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      </Field>
+                    </div>
                   </div>
 
-                  {/* NVL đầu vào — bảng SL/ĐV */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <span className="text-sm font-medium text-slate-600">NVL / BTP đầu vào</span>
@@ -232,7 +261,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                                 </select>
                               </td>
                               <td className="px-3 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upInput(s._k, idx, "quantity", e.target.value)} /></td>
-                              <td className="px-3 py-1.5"><input className={inputCls} value={it.unit} onChange={(e) => upInput(s._k, idx, "unit", e.target.value)} /></td>
+                              <td className="px-3 py-1.5"><input className={inputCls} list="units" value={it.unit} onChange={(e) => upInput(s._k, idx, "unit", e.target.value)} /></td>
                               <td className="px-3 py-1.5 text-center"><button onClick={() => rmInputRow(s._k, idx)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button></td>
                             </tr>
                           ))}
@@ -253,7 +282,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                         </select>
                       </Field></div>
                       <Field label="SL đầu ra ước tính"><input type="number" min="0" className={inputCls} value={s.output_quantity} placeholder="0" onChange={(e) => upStep(s._k, "output_quantity", e.target.value)} /></Field>
-                      <Field label="Đơn vị"><input className={inputCls} value={s.output_unit} onChange={(e) => upStep(s._k, "output_unit", e.target.value)} /></Field>
+                      <Field label="Đơn vị"><input className={inputCls} list="units" value={s.output_unit} onChange={(e) => upStep(s._k, "output_unit", e.target.value)} /></Field>
                       <div className="grid grid-cols-2 gap-2">
                         <Field label="% TP"><input type="number" min="0" className={inputCls} value={s.yield_percent} placeholder="0" onChange={(e) => upStep(s._k, "yield_percent", e.target.value)} /></Field>
                         <Field label="% Phế"><input type="number" min="0" className={inputCls} value={s.scrap_percent} placeholder="0" onChange={(e) => upStep(s._k, "scrap_percent", e.target.value)} /></Field>
@@ -290,9 +319,9 @@ export default function ProcessModule({ lookups }) {
   const [copyId, setCopyId] = useState(null);
   const [rows, setRows] = useState([]);
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
-  const load = useCallback(async () => { try { setRows(await procApi.list({})); } catch (e) { alert("Lỗi tải quy trình: " + e.message); } }, []);
+  const load = useCallback(async () => { try { setRows(await procApi.list({})); } catch (e) { toast.error("Lỗi tải quy trình: " + e.message); } }, []);
   useEffect(() => { load(); }, [load]);
-  const del = async (id) => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   if (view === "form") return <ProcessForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
 
@@ -310,9 +339,10 @@ export default function ProcessModule({ lookups }) {
 
   return (
     <div className="space-y-5">
-      <ListHeader title="Quy trình công nghệ" actions={
-        can("process", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo quy trình</button>
-      } />
+      <ListHeader title="Quy trình công nghệ" actions={<>
+        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        {can("process", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo quy trình</button>}
+      </>} />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có quy trình" />
     </div>
   );

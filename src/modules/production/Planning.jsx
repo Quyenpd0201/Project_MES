@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
 import { ListHeader, usePager, DataTable } from "../../components.jsx";
 import { planning, production } from "../../mesApi.js";
-import { inputCls, fmt, fmtDate, statusClass } from "../../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { ScheduleModal } from "./Production.jsx";
 
 const Field = ({ label, children }) => (
@@ -40,12 +40,12 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
   const planItems = batch.items.map((i) => ({ item_id: i.item_id, qty: qty[i.item_id] })).filter((x) => Number(x.qty) > 0);
 
   const save = async () => {
-    if (!planItems.length) return alert("Nhập số lượng sản xuất cho ít nhất 1 dòng.");
+    if (!planItems.length) return toast.error("Nhập số lượng sản xuất cho ít nhất 1 dòng.");
     try {
       const r = await planning.generate({ items: planItems, ...a });
-      alert(`Đã tạo ${r.created.length} lệnh sản xuất: ${r.created.join(", ")}`);
+      toast.error(`Đã tạo ${r.created.length} lệnh sản xuất: ${r.created.join(", ")}`);
       onDone();
-    } catch (e) { alert("Lỗi tạo lệnh: " + e.message); }
+    } catch (e) { toast.error("Lỗi tạo lệnh: " + e.message); }
   };
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -159,7 +159,7 @@ function OrderPlanningTab({ lookups }) {
 
   const load = useCallback(async () => {
     try { const r = await planning.fromOrders(); setBatches(r.batches); setDemandLines(r.demand_lines); }
-    catch (e) { alert("Lỗi tải kế hoạch: " + e.message); }
+    catch (e) { toast.error("Lỗi tải kế hoạch: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -237,7 +237,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
       const sc = GROUP_SCOPES.find((s) => s.key === scope);
       const r = await planning.groups(sc.statuses);
       setGroups(r.groups); setTotalOrders(r.total_orders);
-    } catch (e) { alert("Lỗi tải kế hoạch: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải kế hoạch: " + e.message); }
   }, [scope]);
   useEffect(() => { load(); }, [load]);
 
@@ -294,8 +294,21 @@ function GroupingTab({ lookups, onOpenOrder }) {
                     <td className="px-4 py-2 text-slate-600">{o.customer_name || "—"}</td>
                     <td className="px-4 py-2 text-right">{fmt(o.quantity)} {o.unit}</td>
                     <td className="px-4 py-2">{o.produced_qty > 0 ? <ProgressMini done={o.produced_qty} target={o.quantity} /> : <span className="text-slate-300 text-xs">—</span>}</td>
-                    <td className="px-4 py-2">{o.machine_name || <span className="text-slate-400">Chưa xếp</span>}</td>
-                    <td className="px-4 py-2">{fmtDate(o.planned_date)}{o.shift ? ` · ${o.shift}` : ""}</td>
+                    <td className="px-4 py-2">
+                      {o.machine_name_display ? (
+                        o.machine_name_display.split(", ").length <= 2 
+                          ? <span title={o.machine_name_display}>{o.machine_name_display}</span>
+                          : <span title={o.machine_name_display}>{o.machine_name_display.split(", ").slice(0, 2).join(", ")} ... (+{o.machine_name_display.split(", ").length - 2})</span>
+                      ) : <span className="text-slate-400">Chưa xếp</span>}
+                    </td>
+                    <td className="px-4 py-2">
+                      {(() => {
+                        const d = o.planned_date_display || o.planned_date;
+                        const s = o.shift_display || o.shift;
+                        if (!d && !s) return "—";
+                        return `${d ? fmtDate(d) : ""}${s ? " · " + s : ""}`.replace(/^ · | · $/, '');
+                      })()}
+                    </td>
                     <td className="px-4 py-2">{fmtDate(o.due_date)}</td>
                     <td className="px-4 py-2"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(o.status)}`}>{o.status}</span></td>
                     <td className="px-4 py-2 text-right"><button onClick={() => setScheduling(o)} className="text-slate-400 hover:text-blue-600 p-1" title="Lập lịch / xếp máy"><CalendarClock size={16} /></button></td>
@@ -316,7 +329,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
 function MaterialTab({ onOpenProduct }) {
   const [data, setData] = useState({ requirements: [], missing_bom: [], order_count: 0 });
   const load = useCallback(async () => {
-    try { setData(await planning.materialRequirements()); } catch (e) { alert("Lỗi tính NVL: " + e.message); }
+    try { setData(await planning.materialRequirements()); } catch (e) { toast.error("Lỗi tính NVL: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -364,7 +377,7 @@ function ScheduleBoard({ onOpenOrder }) {
     try {
       const rows = await production.list({});
       setOrders((rows || []).filter((o) => !["Hoàn thành", "Đã hủy"].includes(o.status)));
-    } catch (e) { alert("Lỗi tải lịch: " + e.message); }
+    } catch (e) { toast.error("Lỗi tải lịch: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -383,7 +396,7 @@ function ScheduleBoard({ onOpenOrder }) {
     const nd = date ? toYMD(date) : "";
     if ((dkey(o) || "") === nd) return;
     try { await production.reschedule(o.id, nd); load(); }
-    catch (e) { alert("Lỗi xếp lịch: " + e.message); }
+    catch (e) { toast.error("Lỗi xếp lịch: " + e.message); }
   };
 
   const Card = ({ o }) => (
