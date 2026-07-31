@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Co
 import { resource } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect } from "../../components.jsx";
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 
 const ordersApi = resource("sales-orders");
@@ -240,7 +240,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   </div>
                   <div className="md:col-span-2">
                     <span className="block text-xs font-medium text-slate-500 mb-1">ĐVT</span>
-                    <input className={inputCls} list="units" disabled={fdis("items")} value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} />
+                    <UnitSelect value={it.unit} disabled={fdis("items")} onChange={(v) => upItem(it._k, "unit", v)} />
                   </div>
                 </div>
                 {!fdis("items") && <button onClick={() => rmItem(it._k)} className="mt-6 text-slate-400 hover:text-rose-600 p-1 shrink-0"><Trash2 size={16} /></button>}

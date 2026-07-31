@@ -4,7 +4,7 @@ import { processes, resource } from "../../mesApi.js";
 
 const bomApi = resource("boms");
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
 import { usePerm } from "../../perm.jsx";
 
 const procApi = processes;
@@ -261,7 +261,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                                 </select>
                               </td>
                               <td className="px-3 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upInput(s._k, idx, "quantity", e.target.value)} /></td>
-                              <td className="px-3 py-1.5"><input className={inputCls} list="units" value={it.unit} onChange={(e) => upInput(s._k, idx, "unit", e.target.value)} /></td>
+                              <td className="px-3 py-1.5"><UnitSelect value={it.unit} onChange={(v) => upInput(s._k, idx, "unit", v)} /></td>
                               <td className="px-3 py-1.5 text-center"><button onClick={() => rmInputRow(s._k, idx)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button></td>
                             </tr>
                           ))}
@@ -282,7 +282,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                         </select>
                       </Field></div>
                       <Field label="SL đầu ra ước tính"><input type="number" min="0" className={inputCls} value={s.output_quantity} placeholder="0" onChange={(e) => upStep(s._k, "output_quantity", e.target.value)} /></Field>
-                      <Field label="Đơn vị"><input className={inputCls} list="units" value={s.output_unit} onChange={(e) => upStep(s._k, "output_unit", e.target.value)} /></Field>
+                      <Field label="Đơn vị"><UnitSelect value={s.output_unit} onChange={(v) => upStep(s._k, "output_unit", v)} /></Field>
                       <div className="grid grid-cols-2 gap-2">
                         <Field label="% TP"><input type="number" min="0" className={inputCls} value={s.yield_percent} placeholder="0" onChange={(e) => upStep(s._k, "yield_percent", e.target.value)} /></Field>
                         <Field label="% Phế"><input type="number" min="0" className={inputCls} value={s.scrap_percent} placeholder="0" onChange={(e) => upStep(s._k, "scrap_percent", e.target.value)} /></Field>

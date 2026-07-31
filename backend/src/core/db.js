@@ -1,5 +1,5 @@
 // backend/db.js — kết nối PostgreSQL bằng connection pool
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 const { Pool, types } = require('pg');
 
 // Trả cột DATE (OID 1082) nguyên chuỗi 'YYYY-MM-DD', tránh lệch ngày do timezone

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, UnitSelect } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -91,7 +91,7 @@ function AdjustModal({ lookups, onClose, onSaved }) {
             <input type="number" min="0" className={inputCls} value={f.quantity} onChange={(e) => set("quantity", e.target.value)} />
           </Field>
           <Field label="Đơn vị">
-            <input className={inputCls} list="units" value={f.unit} onChange={(e) => set("unit", e.target.value)} />
+            <UnitSelect value={f.unit} onChange={(v) => set("unit", v)} />
           </Field>
           <Field label="Vị trí lưu trữ">
             <select className={inputCls} value={f.location_id} onChange={(e) => set("location_id", e.target.value)}>

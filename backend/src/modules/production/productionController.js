@@ -79,57 +79,84 @@ const SELECT_JOIN = `
  *  - Nhập kho Thành phẩm/BTP đúng sản phẩm + thuộc tính (SL = sản lượng thực)
  *  - Trừ NVL theo định mức BOM còn hiệu lực (theo tỉ lệ sản lượng)
  */
-async function postInventoryForOrder(client, poId, produced) {
+// Đồng bộ kho theo TỪNG công đoạn (WIP): mỗi công đoạn xong nhập kho đầu ra của nó
+// (công đoạn giữa → BTP, công đoạn cuối → TP); công đoạn sau TIÊU HAO (trừ) BTP mà công đoạn trước tạo ra.
+// Nhập/điều chỉnh theo CHÊNH LỆCH so với đã nhập trước đó (posted_qty theo từng công đoạn) → sửa SL là kho tự khớp.
+async function syncOrderInventory(client, poId) {
   const o = (await client.query(`
-    SELECT po.id, po.product_id, po.quantity, po.specs, po.spec_key,
+    SELECT po.id, po.product_id, po.specs, po.spec_key,
            po.attr_size, po.attr_thickness, po.attr_color, po.order_code, p.product_type, p.unit
     FROM production_orders po JOIN products p ON p.id = po.product_id WHERE po.id = $1`, [poId])).rows[0];
   if (!o) return;
+  const tasks = (await client.query(
+    `SELECT id, stage, quantity, actual_qty, status, posted_qty FROM production_tasks WHERE production_order_id = $1 ORDER BY seq`, [poId])).rows;
+  if (!tasks.length) return;
 
   const locOf = async (whType) => (await client.query(
     `SELECT l.id FROM locations l JOIN warehouses w ON w.id = l.warehouse_id
      WHERE w.warehouse_type = $1 AND l.is_deleted = FALSE ORDER BY l.created_at LIMIT 1`, [whType])).rows[0]?.id || null;
-
-  // sp.kho theo LÔ: mỗi lệnh SX = 1 lô (lot_code = mã LSX), gom theo spec_key
-  const upsertStock = async (productId, locId, specs, specKey, lotCode, prodId, attrs, delta, unit) => {
+  // Kho theo LÔ: mỗi lệnh SX = 1 lô (lot_code = mã LSX), gom theo spec_key; BTP và TP khác vị trí kho
+  const upsertStock = async (locId, qty) => {
     await client.query(`
       INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, prod_order_id, attr_size, attr_thickness, attr_color, quantity, unit)
       VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10,$11)
       ON CONFLICT (product_id, location_id, spec_key, lot_code)
       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, updated_at = now()`,
-      [productId, locId, JSON.stringify(specs || {}), specKey || '', lotCode || '', prodId || null,
-       attrs.size || '', attrs.thickness || '', attrs.color || '', delta, unit || null]);
+      [o.product_id, locId, JSON.stringify(o.specs || {}), o.spec_key || '', o.order_code, o.id,
+       o.attr_size || '', o.attr_thickness || '', o.attr_color || '', qty, o.unit || null]);
   };
-  const logTrx = async (productId, locId, type, qty, specs, specKey, lotCode, attrs) => {
+  const logTrx = async (locId, type, qty, note) => {
     await client.query(`
       INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color, ref_code, note)
       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12)`,
-      [productId, locId, type, qty, JSON.stringify(specs || {}), specKey || '', lotCode || '',
-       attrs.size || '', attrs.thickness || '', attrs.color || '', o.order_code, 'Tự động từ lệnh SX']);
+      [o.product_id, locId, type, qty, JSON.stringify(o.specs || {}), o.spec_key || '', o.order_code,
+       o.attr_size || '', o.attr_thickness || '', o.attr_color || '', o.order_code, note]);
   };
 
-  // 1) Nhập kho thành phẩm / bán thành phẩm — thành 1 lô riêng (mã LSX)
-  const whType = o.product_type === 'Thành phẩm' ? 'TP' : o.product_type === 'Bán thành phẩm' ? 'BTP' : null;
-  if (whType) {
-    const loc = await locOf(whType);
-    const attrs = { size: o.attr_size, thickness: o.attr_thickness, color: o.attr_color };
-    await upsertStock(o.product_id, loc, o.specs, o.spec_key, o.order_code, o.id, attrs, produced, o.unit);
-    await logTrx(o.product_id, loc, 'Nhập', produced, o.specs, o.spec_key, o.order_code, attrs);
+  const btpLoc = await locOf('BTP');
+  const tpLoc = await locOf('TP');
+  const finalStage = tasks.some(t => t.stage === 'Cắt') ? 'Cắt' : 'Thổi';
+  const firstStage = tasks[0].stage;                                  // công đoạn đầu (theo seq)
+  const finalLoc = o.product_type === 'Bán thành phẩm' ? btpLoc : tpLoc; // đầu ra công đoạn cuối theo loại SP
+
+  let totalFinal = 0;
+  for (const t of tasks) {
+    const producedT = t.status === 'Hoàn thành' ? (Number(t.actual_qty == null ? t.quantity : t.actual_qty) || 0) : 0;
+    const delta = producedT - Number(t.posted_qty || 0);
+    if (delta !== 0) {
+      // (a) Nhập kho ĐẦU RA của công đoạn này
+      const outLoc = t.stage === finalStage ? finalLoc : btpLoc;
+      if (outLoc) {
+        await upsertStock(outLoc, delta);
+        await logTrx(outLoc, delta > 0 ? 'Nhập' : 'Xuất', Math.abs(delta), `Nhập kho ${t.stage} (tự động)`);
+      }
+      // (b) TIÊU HAO BTP của công đoạn trước (mọi công đoạn trừ công đoạn đầu)
+      if (t.stage !== firstStage && btpLoc) {
+        await upsertStock(btpLoc, -delta);
+        await logTrx(btpLoc, delta > 0 ? 'Xuất' : 'Nhập', Math.abs(delta), `Tiêu hao BTP cho ${t.stage} (tự động)`);
+      }
+      await client.query(`UPDATE production_tasks SET posted_qty = $2 WHERE id = $1`, [t.id, producedT]);
+    }
+    if (t.stage === finalStage) totalFinal += producedT;
   }
-
-  // (2) Trừ NVL: KHÔNG còn tự động backflush theo BOM.
-  // NVL được trừ kho theo SỐ LƯỢNG THỰC TẾ công nhân nhập ở màn Thực thi SX
-  // (xem getMaterials / saveMaterials) để khớp tiêu hao thực tế.
-
-  await client.query(`UPDATE production_orders SET inventory_posted = TRUE WHERE id = $1`, [poId]);
+  // Giữ tổng thành phẩm ở cấp lệnh cho hiển thị/tương thích
+  await client.query(`UPDATE production_orders SET posted_qty = $2::numeric, inventory_posted = ($2::numeric > 0) WHERE id = $1`, [poId, totalFinal]);
 }
+
+// One-off backfill: đồng bộ lại kho theo công đoạn cho 1 lệnh (tự mở transaction).
+exports.resyncInventory = async (poId) => {
+  const client = await db.pool.connect();
+  try { await client.query('BEGIN'); await syncOrderInventory(client, poId); await client.query('COMMIT'); }
+  catch (e) { await client.query('ROLLBACK'); throw e; }
+  finally { client.release(); }
+};
 
 /**
  * Tính lại trạng thái lệnh từ các phân công trong DB, đồng bộ đơn hàng,
  * và backflush kho khi hoàn thành lần đầu. Dùng cho cả saveTasks lẫn quét QR.
  */
 async function recomputeOrder(client, poId) {
-  const ord = (await client.query(`SELECT quantity, sales_order_id, sales_order_item_id, inventory_posted FROM production_orders WHERE id = $1`, [poId])).rows[0];
+  const ord = (await client.query(`SELECT quantity, sales_order_id, sales_order_item_id, inventory_posted, posted_qty FROM production_orders WHERE id = $1`, [poId])).rows[0];
   if (!ord) return;
   const tks = (await client.query(`SELECT stage, status, quantity, actual_qty FROM production_tasks WHERE production_order_id = $1`, [poId])).rows;
   const finalStage = tks.some(t => t.stage === 'Cắt') ? 'Cắt' : 'Thổi';
@@ -138,7 +165,8 @@ async function recomputeOrder(client, poId) {
 
   const poStatus = tks.length ? (produced >= Number(ord.quantity) ? 'Hoàn thành' : 'Đang sản xuất') : null;
   if (poStatus) await client.query(`UPDATE production_orders SET status = $1 WHERE id = $2`, [poStatus, poId]);
-  if (poStatus === 'Hoàn thành' && !ord.inventory_posted && produced > 0) await postInventoryForOrder(client, poId, produced);
+  // Đồng bộ kho theo từng công đoạn (WIP): xong công đoạn nào nhập kho đầu ra công đoạn đó, công đoạn sau tiêu hao BTP.
+  await syncOrderInventory(client, poId);
 
   // Ghi ngày thực tế lên dòng đơn hàng gắn với lệnh SX này
   if (ord.sales_order_item_id) {

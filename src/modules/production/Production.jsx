@@ -3,7 +3,7 @@ import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChart
 import { production, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
 import Qr from "../../Qr.jsx";
 import ProductionGantt from "./ProductionGantt.jsx";
 
@@ -44,7 +44,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   }));
 
   // Sinh phân công theo Quy trình công nghệ của sản phẩm (silent = tự động, không báo)
-  const genFromProcess = async (productId, quantity, { silent = false } = {}) => {
+  const genFromProcess = async (productId, quantity, { silent = false, defaults = {} } = {}) => {
     if (!productId) { if (!silent) alert("Hãy chọn Sản phẩm trước."); return; }
     try {
       const list = await processes.list({ product_id: productId });
@@ -88,10 +88,15 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           // Máy cuối cùng sẽ ôm phần dư do làm tròn
           const taskQty = (i === mids.length - 1 && baseQty > 0) ? (baseQty - qtyPerTask * (mids.length - 1)) : qtyPerTask;
 
+          // Kế thừa đội/công nhân CHỈ khi cùng nhà máy với công đoạn (1 công nhân chỉ thuộc 1 nhà máy)
+          const stageTeam = stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi";
+          const teamMatch = defaults.assigned_team && defaults.assigned_team === stageTeam;
           newTasks.push({
             _k: Date.now() + seq, stage, quantity: taskQty, actual_qty: "", scrap_qty: "",
-            machine_id: chosenMId || "", shift: "", planned_date: "", planned_end_date: "", 
-            assigned_team: "", assigned_worker: "", status: "Chờ", note: s.name || ""
+            machine_id: chosenMId || "", shift: defaults.shift || "",
+            planned_date: defaults.planned_date || "", planned_end_date: "",
+            assigned_team: teamMatch ? defaults.assigned_team : "", assigned_worker: teamMatch ? defaults.assigned_worker : "",
+            status: "Chờ", note: s.name || ""
           });
           seq++;
         });
@@ -103,7 +108,9 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       }
     } catch (e) { if (!silent) alert("Lỗi: " + e.message); }
   };
-  const applyProcess = () => genFromProcess(f.product_id, f.quantity);
+  const applyProcess = () => genFromProcess(f.product_id, f.quantity, meta ? {
+    defaults: { shift: meta.shift, assigned_team: meta.assigned_team, assigned_worker: meta.assigned_worker, machine_id: meta.machine_id, planned_date: meta.planned_date?.slice(0, 10) },
+  } : {});
 
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [meta, setMeta] = useState(null); // dữ liệu lệnh đã nạp (mã lệnh, SP, đơn...) cho tem QR
@@ -132,7 +139,11 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           setTaskSeq(rows.length + 1);
         } else {
           // Mặc định: chưa có phân công → tự dựng theo quy trình công nghệ, SL = SL lệnh
-          genFromProcess(d.product_id, d.quantity, { silent: true });
+          // Kế thừa ca/đội/công nhân/máy đã phân bổ ở màn Kế hoạch (lưu ở cấp lệnh)
+          genFromProcess(d.product_id, d.quantity, {
+            silent: true,
+            defaults: { shift: d.shift, assigned_team: d.assigned_team, assigned_worker: d.assigned_worker, machine_id: d.machine_id, planned_date: d.planned_date?.slice(0, 10) },
+          });
         }
       }).catch(() => {});
     }).catch((e) => alert("Lỗi tải lệnh sản xuất: " + e.message));
@@ -217,7 +228,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             <input type="number" min="0" className={inputCls} disabled={fdis("quantity")} value={f.quantity} onChange={(e) => onQuantity(e.target.value)} />
           </Field>}
           <Field label="Đơn vị">
-            <input className={inputCls} list="units" value={f.unit} onChange={(e) => set("unit", e.target.value)} placeholder="cái, cuộn, kg..." />
+            <UnitSelect value={f.unit} onChange={(v) => set("unit", v)} />
           </Field>
           <Field label="Ngày giao (deadline)">
             <input type="date" className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />

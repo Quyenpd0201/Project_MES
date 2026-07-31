@@ -6,7 +6,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect } from "../../components.jsx";
 
 const STATUSES = ["Đã xuất hóa đơn", "Chờ thanh toán", "Đã thanh toán 1 phần", "Đã thanh toán", "Đã hủy"];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -158,7 +158,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                     </td>
                     <td className="px-4 py-1.5 text-slate-500">{specShort(it.specs) || "—"}</td>
                     <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upItem(it._k, "quantity", e.target.value)} /></td>
-                    <td className="px-4 py-1.5"><input className={inputCls} list="units" value={it.unit} onChange={(e) => upItem(it._k, "unit", e.target.value)} /></td>
+                    <td className="px-4 py-1.5"><UnitSelect value={it.unit} onChange={(v) => upItem(it._k, "unit", v)} /></td>
                     {showMoney && <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} disabled={!moneyEdit} value={it.unit_price} onChange={(e) => upItem(it._k, "unit_price", e.target.value)} /></td>}
                     {showMoney && <td className="px-4 py-1.5 text-right font-semibold text-slate-800">{fmt(amount)}</td>}
                     <td className="px-4 py-1.5 text-center">{editing && <button onClick={() => rmItem(it._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>}</td>

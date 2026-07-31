@@ -26,7 +26,7 @@ import ProcessModule from "./src/modules/engineering/Process.jsx";
 import OrdersModule from "./src/modules/sales/Orders.jsx";
 import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
 import ReportsModule from "./src/modules/reports/Reports.jsx";
-import { PageHeader, Section, ListHeader, usePager, DataTable, Logo } from "./src/components.jsx";
+import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
 /* =====================================================================
    MES — Quản lý Sản phẩm & Dashboard (single-file demo)
@@ -131,7 +131,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     { key: "deliveries", label: "Phiếu giao hàng", icon: FileText, path: "/deliveries" },
     { key: "planning", label: "Kế hoạch", icon: ClipboardList, path: "/planning" },
     { key: "production", label: "Sản xuất", icon: Factory, path: "/production" },
-    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "planning", path: "/orderstatus" },
+    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
     { key: "execution", label: "Thực thi SX", icon: Hammer, path: "/execution" },
     { key: "qrlabels", label: "In tem xuất xứ", icon: FileText, path: "/qrlabels" },
     { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
@@ -426,7 +426,7 @@ function ProductFields({ form, set, disabled, code }) {
             </select>
           </Field>}
           {!hid("unit") && <Field label="Đơn vị tính">
-            <input className={cls("unit")} disabled={dis("unit")} value={form.unit || ""} onChange={(e) => set("unit", e.target.value)} placeholder="kg, cái, cuộn..." />
+            <UnitSelect value={form.unit || ""} disabled={dis("unit")} onChange={(v) => set("unit", v)} />
           </Field>}
 
           {/* Hàng 3: phân nhóm */}
@@ -1070,7 +1070,7 @@ export default function MesApp() {
   const [deliveryOrderId, setDeliveryOrderId] = useState(null);
 
   // Tab state
-  const [planningTab, setPlanningTab] = useState("calendar");
+  const [planningTab, setPlanningTab] = useState("orders");
 
   const [lookups, setLookups] = useState(null);
   const [user, setUser] = useState(null);
@@ -1151,7 +1151,6 @@ export default function MesApp() {
         </div>
 
         <div className="nav-scroll flex-1 overflow-y-auto p-4 md:p-8 relative">
-        {lookups && <datalist id="units">{(lookups.units || []).map((u) => <option key={u} value={u} />)}</datalist>}
         <Routes>
           <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
           <Route path="/products" element={<ProductList 

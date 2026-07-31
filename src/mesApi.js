@@ -102,16 +102,16 @@ export const planning = {
 export const inventory = {
   list: (params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));
-    return http(`/inventory?${q.toString()}`).then((r) => r.data?.data || []);
+    return http(`/inventory?${q.toString()}`).then((r) => r.data || []);
   },
   tree: (params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));
-    return http(`/inventory/tree?${q.toString()}`).then((r) => r.data?.data || []);
+    return http(`/inventory/tree?${q.toString()}`).then((r) => r.data || []);
   },
   adjust: (data) => http(`/inventory/adjust`, body("POST", data)),
   transactions: (params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));
-    return http(`/inventory/transactions?${q.toString()}`).then((r) => r.data?.data || []);
+    return http(`/inventory/transactions?${q.toString()}`).then((r) => r.data || []);
   },
   detail: (params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));

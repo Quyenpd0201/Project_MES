@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
 import { ListHeader, usePager, DataTable } from "../../components.jsx";
-import { planning, production } from "../../mesApi.js";
+import { planning, production, processes } from "../../mesApi.js";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { ScheduleModal } from "./Production.jsx";
 
@@ -28,28 +28,71 @@ const ProgressMini = ({ done, target, unit }) => {
 };
 
 /* ====== Modal phân bổ nguồn lực & tạo lệnh từ 1 lô ====== */
+const stageFactory = (stage) => (stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi");
+const mapStageName = (s) => (/c[ắa]t/i.test(`${s.name || ""} ${s.workshop || ""} ${s.machine_name || ""}`) ? "Cắt" : "Thổi");
+
 function AllocateModal({ lookups, batch, onClose, onDone }) {
-  const [a, setA] = useState({ machine_id: "", planned_date: "", shift: "", assigned_team: "", assigned_worker: "" });
+  const [planned_date, setPlannedDate] = useState("");
   const rem = (it) => Number(it.remaining ?? it.quantity) || 0;
   const [qty, setQty] = useState(() => Object.fromEntries(batch.items.map((i) => [i.item_id, String(rem(i))])));
-  const set = (k, v) => setA((s) => ({ ...s, [k]: v }));
   const emps = lookups.employees || [];
   const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
-  const workers = emps.filter((e) => !a.assigned_team || e.factory === a.assigned_team);
-  const setTeam = (v) => setA((s) => ({ ...s, assigned_team: v, assigned_worker: emps.find((e) => e.name === s.assigned_worker && (!v || e.factory === v)) ? s.assigned_worker : "" }));
   const planItems = batch.items.map((i) => ({ item_id: i.item_id, qty: qty[i.item_id] })).filter((x) => Number(x.qty) > 0);
+
+  // Nạp các công đoạn từ quy trình công nghệ của sản phẩm → phân bổ RIÊNG từng công đoạn
+  const [stages, setStages] = useState([]);
+  const [loadingProc, setLoadingProc] = useState(true);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoadingProc(true);
+      try {
+        const list = await processes.list({ product_id: batch.product_id });
+        if (!list.length) { if (!cancel) setStages([]); return; }
+        const proc = await processes.get(list[0].id);
+        const rows = (proc.steps || []).map((s, i) => {
+          const stage = mapStageName(s);
+          return {
+            _k: i, name: s.name || stage, stage,
+            machine_id: (s.machine_ids && s.machine_ids[0]) || s.machine_id || "",
+            shift: "", assigned_team: s.workshop || stageFactory(stage), assigned_worker: "",
+          };
+        });
+        if (!cancel) setStages(rows);
+      } catch { if (!cancel) setStages([]); }
+      finally { if (!cancel) setLoadingProc(false); }
+    })();
+    return () => { cancel = true; };
+  }, [batch.product_id]);
+
+  const setStage = (k, field, v) => setStages((arr) => arr.map((s) => {
+    if (s._k !== k) return s;
+    const nx = { ...s, [field]: v };
+    if (field === "assigned_team") { // đổi đội → bỏ công nhân không thuộc đội mới
+      const keep = emps.find((e) => e.name === s.assigned_worker && (!v || e.factory === v));
+      nx.assigned_worker = keep ? s.assigned_worker : "";
+    }
+    return nx;
+  }));
+  const workersOf = (team) => emps.filter((e) => !team || e.factory === team);
+  // Máy gợi ý theo nhà máy của công đoạn
+  const machinesOf = (team) => (lookups.machines || []).filter((m) => !team || m.factory === team);
 
   const save = async () => {
     if (!planItems.length) return toast.error("Nhập số lượng sản xuất cho ít nhất 1 dòng.");
     try {
-      const r = await planning.generate({ items: planItems, ...a });
-      toast.error(`Đã tạo ${r.created.length} lệnh sản xuất: ${r.created.join(", ")}`);
+      const r = await planning.generate({
+        items: planItems, planned_date,
+        stages: stages.map((s) => ({ stage: s.stage, name: s.name, machine_id: s.machine_id, shift: s.shift, assigned_team: s.assigned_team, assigned_worker: s.assigned_worker })),
+      });
+      toast.success(`Đã tạo ${r.created.length} lệnh sản xuất: ${r.created.join(", ")}`);
       onDone();
     } catch (e) { toast.error("Lỗi tạo lệnh: " + e.message); }
   };
+
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-lg font-bold text-slate-800">Phân bổ & tạo lệnh sản xuất</h3>
         <p className="text-sm text-slate-500">
           Lô: <b>{batch.product_name}</b> · {batch.attr_color || "—"} · {batch.attr_size || "—"} · {batch.attr_thickness || "—"}<br />
@@ -82,30 +125,65 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
           <p className="text-[11px] text-slate-400 mt-1">Nhập nhỏ hơn số còn lại nếu chỉ sản xuất trước một phần — phần còn lại vẫn nằm chờ trong kế hoạch.</p>
         </div>
 
-        <Field label="Máy">
-          <select className={inputCls} value={a.machine_id} onChange={(e) => set("machine_id", e.target.value)}>
-            <option value="">-- Chưa xếp (để 'Chờ duyệt') --</option>
-            {lookups.machines.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.factory})</option>)}
-          </select>
-        </Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Ngày sản xuất"><input type="date" className={inputCls} value={a.planned_date} onChange={(e) => set("planned_date", e.target.value)} /></Field>
-          <Field label="Ca"><select className={inputCls} value={a.shift} onChange={(e) => set("shift", e.target.value)}><option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}</select></Field>
+          <Field label="Ngày bắt đầu sản xuất"><input type="date" className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Đội">
-            <select className={inputCls} value={a.assigned_team} onChange={(e) => setTeam(e.target.value)}>
-              <option value="">-- Chọn đội --</option>
-              {teams.map((t) => <option key={t}>{t}</option>)}
-            </select>
-          </Field>
-          <Field label="Công nhân">
-            <select className={inputCls} value={a.assigned_worker} onChange={(e) => set("assigned_worker", e.target.value)}>
-              <option value="">-- Chọn công nhân --</option>
-              {workers.map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ""}</option>)}
-            </select>
-          </Field>
+
+        {/* Phân bổ theo TỪNG công đoạn — mỗi công đoạn có máy/ca/đội/người riêng */}
+        <div>
+          <div className="text-sm font-medium text-slate-600 mb-1.5">Phân bổ theo công đoạn <span className="text-slate-400 font-normal">(công đoạn nối tiếp: xong công đoạn trước mới sang công đoạn sau)</span></div>
+          {loadingProc ? (
+            <div className="text-sm text-slate-400 py-4 text-center">Đang nạp quy trình…</div>
+          ) : !stages.length ? (
+            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">Sản phẩm chưa có quy trình công nghệ — lệnh sẽ tạo không kèm công đoạn. Hãy tạo quy trình ở mục "Quy trình CN" để phân bổ theo công đoạn.</div>
+          ) : (
+            <div className="border border-slate-200 rounded-lg overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                  <tr>
+                    <th className="text-left px-3 py-2 w-10">#</th>
+                    <th className="text-left px-3 py-2">Công đoạn</th>
+                    <th className="text-left px-3 py-2">Máy</th>
+                    <th className="text-left px-3 py-2 w-24">Ca</th>
+                    <th className="text-left px-3 py-2">Đội</th>
+                    <th className="text-left px-3 py-2">Công nhân</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {stages.map((s, idx) => (
+                    <tr key={s._k}>
+                      <td className="px-3 py-2 text-slate-400 font-semibold">{idx + 1}</td>
+                      <td className="px-3 py-2"><span className="font-medium text-slate-700">{s.name}</span><span className="text-slate-400"> · {s.stage}</span></td>
+                      <td className="px-2 py-2">
+                        <select className={inputCls + " py-1"} value={s.machine_id} onChange={(e) => setStage(s._k, "machine_id", e.target.value)}>
+                          <option value="">-- Chọn máy --</option>
+                          {machinesOf(s.assigned_team).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select className={inputCls + " py-1"} value={s.shift} onChange={(e) => setStage(s._k, "shift", e.target.value)}>
+                          <option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select className={inputCls + " py-1"} value={s.assigned_team} onChange={(e) => setStage(s._k, "assigned_team", e.target.value)}>
+                          <option value="">-- Đội --</option>{teams.map((t) => <option key={t}>{t}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <select className={inputCls + " py-1"} value={s.assigned_worker} onChange={(e) => setStage(s._k, "assigned_worker", e.target.value)}>
+                          <option value="">-- Công nhân --</option>
+                          {workersOf(s.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ""}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
+
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="btn-ghost">Hủy</button>
           <button onClick={save} className="btn-primary"><Save size={16} /> Tạo {planItems.length} lệnh</button>
@@ -150,11 +228,29 @@ function computePriority(batches) {
 }
 
 /* ====== Tab: Lập kế hoạch từ đơn hàng ====== */
-function OrderPlanningTab({ lookups }) {
+// Đầu ngày hôm nay (bỏ giờ) để so hạn giao
+const startOfToday = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const dueDateOf = (b) => (b.earliest_due ? new Date(String(b.earliest_due).slice(0, 10) + "T00:00:00") : null);
+
+function OrderPlanningTab({ lookups, mode = "ontime" }) {
+  const overdueMode = mode === "overdue";
   const [batches, setBatches] = useState([]);
   const [demandLines, setDemandLines] = useState(0);
   const [allocating, setAllocating] = useState(null);
-  const priority = useMemo(() => computePriority(batches), [batches]);
+  const today = useMemo(() => startOfToday(), []);
+
+  // Tách lô theo hạn giao: quá hạn (đưa sang màn riêng) vs chưa quá hạn
+  const { list, priority } = useMemo(() => {
+    const isOverdue = (b) => { const d = dueDateOf(b); return d && d < today; };
+    if (overdueMode) {
+      const overdue = batches.filter(isOverdue);
+      const ordered = [...overdue].sort((a, b) => (dueDateOf(a) || 0) - (dueDateOf(b) || 0)); // trễ nhiều nhất lên đầu
+      return { list: overdue, priority: { rankMap: {}, ordered } };
+    }
+    const ontime = batches.filter((b) => !isOverdue(b));
+    return { list: ontime, priority: computePriority(ontime) };
+  }, [batches, overdueMode, today]);
+
   const { slice, Pager } = usePager(priority.ordered);
 
   const load = useCallback(async () => {
@@ -166,24 +262,32 @@ function OrderPlanningTab({ lookups }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Gom dòng đơn hàng còn mở thành <b>lô trùng</b> (sản phẩm + màu + kích thước + độ dày). Hệ thống tự <b className="text-amber-600">highlight 5 lô ưu tiên</b>: neo theo ngày giao sớm nhất, các lô sau gom theo <b>chiều ngang</b> gần nhất để giảm đổi khổ (cùng chiều ngang nên chạy 1 lần).</p>
+        {overdueMode ? (
+          <p className="text-sm text-slate-500">Các lô đã <b className="text-rose-600">QUÁ HẠN giao hàng</b> — cần xử lý gấp (ưu tiên sản xuất ngay hoặc thương lượng lại ngày giao với khách). Sắp xếp theo mức trễ nhiều nhất.</p>
+        ) : (
+          <p className="text-sm text-slate-500">Gom dòng đơn hàng còn mở thành <b>lô trùng</b> (sản phẩm + màu + kích thước + độ dày). Hệ thống tự <b className="text-amber-600">highlight 5 lô ưu tiên</b>: neo theo ngày giao sớm nhất, các lô sau gom theo <b>chiều ngang</b> gần nhất để giảm đổi khổ (cùng chiều ngang nên chạy 1 lần). <span className="text-slate-400">(Lô đã quá hạn nằm ở tab "Đơn hàng quá hạn".)</span></p>
+        )}
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
       </div>
       <div className="flex gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className="text-2xl font-bold text-slate-800">{batches.length}</div><div className="text-xs text-slate-500">Lô cần sản xuất</div></div>
-        <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className="text-2xl font-bold text-slate-800">{demandLines}</div><div className="text-xs text-slate-500">Dòng đơn hàng chờ</div></div>
+        <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className={`text-2xl font-bold ${overdueMode ? "text-rose-600" : "text-slate-800"}`}>{list.length}</div><div className="text-xs text-slate-500">{overdueMode ? "Lô quá hạn" : "Lô cần sản xuất"}</div></div>
+        {!overdueMode && <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className="text-2xl font-bold text-slate-800">{demandLines}</div><div className="text-xs text-slate-500">Dòng đơn hàng chờ</div></div>}
       </div>
-      {!batches.length && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">Không có đơn hàng nào cần lên kế hoạch. Tạo đơn hàng ở mục Đơn hàng trước.</div>}
+      {!list.length && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">{overdueMode ? "Không có lô nào quá hạn giao. 🎉" : "Không có đơn hàng nào cần lên kế hoạch. Tạo đơn hàng ở mục Đơn hàng trước."}</div>}
       <div className="space-y-4">
         {slice.map((b, idx) => {
           const rank = priority.rankMap[b.batch_key];
+          const due = dueDateOf(b);
+          const daysLate = overdueMode && due ? Math.round((today - due) / 86400000) : 0;
           return (
-          <div key={b.batch_key} className={`bg-white rounded-xl border overflow-hidden ${rank ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}>
-            <div className={`flex items-center justify-between px-5 py-3 border-b border-slate-100 ${rank ? "bg-amber-50/70" : "bg-slate-50"}`}>
+          <div key={b.batch_key} className={`bg-white rounded-xl border overflow-hidden ${overdueMode ? "border-rose-300 ring-2 ring-rose-100" : rank ? "border-amber-400 ring-2 ring-amber-200" : "border-slate-200"}`}>
+            <div className={`flex items-center justify-between px-5 py-3 border-b border-slate-100 ${overdueMode ? "bg-rose-50/70" : rank ? "bg-amber-50/70" : "bg-slate-50"}`}>
               <div className="flex items-center gap-3">
-                <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">{idx + 1}</span>
+                <span className={`w-6 h-6 rounded-full text-white text-xs font-bold flex items-center justify-center ${overdueMode ? "bg-rose-600" : "bg-blue-600"}`}>{idx + 1}</span>
                 <span className="font-semibold text-slate-800">{b.product_name} · {b.attr_color || "—"} · {b.attr_size || "—"} · {b.attr_thickness || "—"}</span>
-                {rank && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold"><Star size={12} className="fill-amber-500 text-amber-500" /> Ưu tiên #{rank}</span>}
+                {overdueMode
+                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold"><AlertTriangle size={12} /> Trễ {daysLate} ngày</span>
+                  : rank && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold"><Star size={12} className="fill-amber-500 text-amber-500" /> Ưu tiên #{rank}</span>}
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-slate-500">{b.items.length} dòng</span>
@@ -486,6 +590,7 @@ export default function PlanningModule({ lookups, onOpenOrder, onOpenProduct, in
   const setTab = (k) => { setTabState(k); onTabChange?.(k); };
   const tabs = [
     { key: "orders", label: "Đơn hàng cần SX", icon: ClipboardList },
+    { key: "overdue", label: "Đơn hàng quá hạn", icon: AlertTriangle },
     { key: "board", label: "Lịch sản xuất", icon: CalendarRange },
     { key: "material", label: "Nhu cầu NVL", icon: ShoppingCart },
   ];
@@ -501,7 +606,8 @@ export default function PlanningModule({ lookups, onOpenOrder, onOpenProduct, in
           </button>
         ))}
       </div>
-      {tab === "orders" && <OrderPlanningTab lookups={lookups} />}
+      {tab === "orders" && <OrderPlanningTab lookups={lookups} mode="ontime" />}
+      {tab === "overdue" && <OrderPlanningTab lookups={lookups} mode="overdue" />}
       {tab === "board" && <ScheduleBoard onOpenOrder={onOpenOrder} />}
       {tab === "material" && <MaterialTab onOpenProduct={onOpenProduct} />}
     </div>

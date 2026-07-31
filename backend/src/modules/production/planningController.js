@@ -121,6 +121,8 @@ exports.generate = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const { items: planItems, item_ids, machine_id, planned_date, shift, assigned_team, assigned_worker } = req.body;
+    // Phân bổ theo từng công đoạn: [{stage, name, machine_id, shift, assigned_team, assigned_worker}]
+    const stages = Array.isArray(req.body.stages) ? req.body.stages.filter((s) => s && s.stage) : [];
     // Hỗ trợ cả 2 dạng: items[{item_id, qty}] (lập một phần) hoặc item_ids[] (lập hết phần còn lại)
     const list = Array.isArray(planItems) && planItems.length
       ? planItems
@@ -135,7 +137,9 @@ exports.generate = async (req, res) => {
       FROM sales_order_items it JOIN sales_orders so ON so.id = it.sales_order_id
       WHERE it.id = ANY($1::uuid[])`, [ids])).rows;
 
-    const status = machine_id ? 'Đã lên kế hoạch' : 'Chờ duyệt';
+    // Máy/trạng thái cấp lệnh: nếu phân bổ theo công đoạn thì lấy máy của công đoạn đầu để hiển thị
+    const headMachine = machine_id || (stages[0] && stages[0].machine_id) || null;
+    const status = (headMachine || stages.length) ? 'Đã lên kế hoạch' : 'Chờ duyệt';
     const created = [];
     for (const it of items) {
       const remaining = Number(it.quantity) - Number(it.planned_qty || 0);
@@ -148,12 +152,25 @@ exports.generate = async (req, res) => {
         INSERT INTO production_orders
           (sales_order_id, sales_order_item_id, customer_id, product_id, quantity, unit,
            specs, spec_key, attr_size, attr_thickness, attr_color, machine_id, planned_date, shift, assigned_team, group_key, due_date, status, assigned_worker)
-        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING order_code`,
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id, order_code`,
         [it.so_id, it.id, it.customer_id, it.product_id, q, it.unit,
          JSON.stringify(it.specs || {}), it.spec_key || '',
-         it.attr_size, it.attr_thickness, it.attr_color, machine_id || null, planned_date || null,
+         it.attr_size, it.attr_thickness, it.attr_color, headMachine, planned_date || null,
          shift || null, assigned_team || null, gk, it.due_date, status, assigned_worker || null]);
-      created.push(r.rows[0].order_code);
+      const po = r.rows[0];
+      created.push(po.order_code);
+      // Tạo sẵn công đoạn (production_tasks) theo phân bổ từng công đoạn — mỗi công đoạn làm đủ SL (nối tiếp)
+      let n = 1;
+      for (const s of stages) {
+        await client.query(`
+          INSERT INTO production_tasks
+            (production_order_id, task_code, stage, quantity, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [po.id, `${po.order_code}-${n}`, s.stage, q, s.machine_id || null, s.shift || null,
+           planned_date || null, planned_date || null, s.assigned_team || null, s.assigned_worker || null,
+           'Chờ', n, s.name || null]);
+        n++;
+      }
       const newPlanned = Number(it.planned_qty || 0) + q;
       await client.query(
         `UPDATE sales_order_items SET planned_qty = $1, is_planned = ($1 >= quantity) WHERE id = $2`,

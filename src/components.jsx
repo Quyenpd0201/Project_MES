@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { inputCls, UNITS } from "./ui.js";
+
+/**
+ * Dropdown chọn Đơn vị tính (thay ô nhập tự do). Luôn giữ giá trị cũ ngoài danh mục
+ * (vd dữ liệu cũ) để không mất dữ liệu.
+ */
+export function UnitSelect({ value, onChange, disabled = false, className }) {
+  const v = value || "";
+  const opts = v && !UNITS.includes(v) ? [v, ...UNITS] : UNITS;
+  return (
+    <select className={className || inputCls} disabled={disabled} value={v} onChange={(e) => onChange(e.target.value)}>
+      <option value="">-- Đơn vị --</option>
+      {opts.map((u) => <option key={u} value={u}>{u}</option>)}
+    </select>
+  );
+}
 
 /**
  * Logo Ngọc An Thư (SVG) — dùng chung cho sidebar, đăng nhập, và mọi biểu mẫu in.

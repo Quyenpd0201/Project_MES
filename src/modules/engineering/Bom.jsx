@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, G
 import { resource } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
 
 const bomApi = resource("boms");
 const procApi = resource("processes");
@@ -132,7 +132,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
           </Field>}
           <div className="grid grid-cols-2 gap-3">
             {!fhid("output_quantity") && <Field label="Định mức cho SL"><input type="number" min="0" className={inputCls} disabled={fdis("output_quantity")} value={f.output_quantity} onChange={(e) => set("output_quantity", e.target.value)} /></Field>}
-            <Field label="Đơn vị"><input className={inputCls} list="units" value={f.output_unit} onChange={(e) => set("output_unit", e.target.value)} placeholder="kg, cái..." /></Field>
+            <Field label="Đơn vị"><UnitSelect value={f.output_unit} onChange={(v) => set("output_unit", v)} /></Field>
           </div>
           <Field label="Trạng thái">
             <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
@@ -175,7 +175,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
                   </select>
                 </td>
                 <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={l.quantity} onChange={(e) => upLine(l._k, "quantity", e.target.value)} /></td>
-                <td className="py-1.5 pr-2"><input className={inputCls} list="units" value={l.unit} onChange={(e) => upLine(l._k, "unit", e.target.value)} /></td>
+                <td className="py-1.5 pr-2"><UnitSelect value={l.unit} onChange={(v) => upLine(l._k, "unit", v)} /></td>
                 {isColor && <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={l.ratio_percent} onChange={(e) => upLine(l._k, "ratio_percent", e.target.value)} /></td>}
                 <td className="py-1.5 text-center">
                   <button onClick={() => rmLine(l._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button>
