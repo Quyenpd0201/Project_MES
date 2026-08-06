@@ -1,6 +1,76 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { inputCls, UNITS } from "./ui.js";
+
+// Bỏ dấu tiếng Việt để tìm không phân biệt dấu/hoa-thường
+const stripVN = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+
+/**
+ * Dropdown có Ô TÌM KIẾM (combobox): gõ vài ký tự → lọc gợi ý (không phân biệt dấu).
+ * options: [{ value, label }]. onChange(value).
+ */
+export function SearchSelect({ value, onChange, options = [], placeholder = "-- Chọn --", disabled = false, className }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [pos, setPos] = useState(null);           // toạ độ để đặt menu (portal, fixed)
+  const triggerRef = useRef(null);
+  const menuRef = useRef(null);
+  const selected = options.find((o) => o.value === value);
+  const filtered = q ? options.filter((o) => stripVN(o.label).includes(stripVN(q))) : options;
+
+  const place = () => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r) setPos({ left: r.left, top: r.bottom + 4, width: r.width });
+  };
+  const openMenu = () => { if (disabled) return; place(); setOpen(true); };
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (triggerRef.current?.contains(e.target) || menuRef.current?.contains(e.target)) return;
+      setOpen(false); setQ("");
+    };
+    document.addEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [open]);
+
+  const pick = (v) => { onChange(v); setOpen(false); setQ(""); };
+  return (
+    <>
+      <button type="button" ref={triggerRef} disabled={disabled} onClick={() => (open ? setOpen(false) : openMenu())}
+        className={(className || inputCls) + " text-left flex items-center justify-between gap-2" + (disabled ? " bg-slate-50 text-slate-400" : "")}>
+        <span className={"truncate " + (selected ? "" : "text-slate-400")}>{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={16} className="text-slate-400 shrink-0" />
+      </button>
+      {open && !disabled && pos && createPortal(
+        <div ref={menuRef} style={{ position: "fixed", left: pos.left, top: pos.top, width: pos.width, zIndex: 1000 }}
+          className="bg-white border border-slate-200 rounded-lg shadow-lg max-h-72 overflow-auto">
+          <div className="p-2 sticky top-0 bg-white border-b border-slate-100">
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Gõ để tìm…"
+              className="w-full px-2 py-1.5 rounded border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" />
+          </div>
+          <div className="py-1">
+            {!filtered.length && <div className="px-3 py-2 text-sm text-slate-400">Không tìm thấy</div>}
+            {filtered.map((o) => (
+              <button type="button" key={o.value} onClick={() => pick(o.value)}
+                className={"w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 " + (o.value === value ? "bg-blue-50 text-blue-700 font-medium" : "text-slate-700")}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
 
 /**
  * Dropdown chọn Đơn vị tính (thay ô nhập tự do). Luôn giữ giá trị cũ ngoài danh mục

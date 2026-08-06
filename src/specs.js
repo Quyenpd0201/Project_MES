@@ -1,9 +1,9 @@
 // src/specs.js — bộ thông số kỹ thuật chuẩn cho Đơn hàng & Kho (đồng bộ backend/lib/specs.js)
-// kind: "select" (chọn) | "num" (số + đơn vị cố định) | "numunit" (số + chọn đơn vị)
+// kind: "text" (nhập tự do) | "select" (chọn) | "num" (số + đơn vị cố định) | "numunit" (số + chọn đơn vị)
 export const PRODUCT_SPECS = [
-  { name: "Số lớp", kind: "select", options: ["1 lớp", "2 lớp"] },
-  { name: "Chiều dài", kind: "num", unit: "mm" },
+  { name: "Số lớp", kind: "text", placeholder: "vd: 2 lớp" },
   { name: "Chiều ngang", kind: "num", unit: "mm" },
+  { name: "Chiều dài", kind: "num", unit: "mm" },
   { name: "Độ dày", kind: "numunit", units: ["dem", "cem", "zem"] },
   { name: "Màu sắc", kind: "select", options: ["Trắng", "Đỏ", "Cam", "Vàng", "Lục", "Lam", "Chàm", "Tím"] },
 ];

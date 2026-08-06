@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Co
 import { resource } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 
 const ordersApi = resource("sales-orders");
@@ -35,6 +35,12 @@ function SpecFields({ specs, onChange, disabled }) {
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       {PRODUCT_SPECS.map((spec) => {
         const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.name}</span>;
+        if (spec.kind === "text") return (
+          <label key={spec.name}>{lbl}
+            <input className={cls} disabled={disabled} value={get(spec.name)} placeholder={spec.placeholder || ""}
+              onChange={(e) => setV(spec.name, e.target.value)} />
+          </label>
+        );
         if (spec.kind === "select") return (
           <label key={spec.name}>{lbl}
             <select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
@@ -205,10 +211,9 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
       <Section title="Thông tin đơn hàng">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
         {!fhid("customer_id") && <Field label="Khách hàng" required>
-          <select className={inputCls} disabled={fdis("customer_id")} value={f.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
-            <option value="">-- Chọn khách hàng --</option>
-            {lookups.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <SearchSelect value={f.customer_id} disabled={fdis("customer_id")} placeholder="-- Chọn khách hàng --"
+            options={lookups.customers.map((c) => ({ value: c.id, label: c.name }))}
+            onChange={(v) => set("customer_id", v)} />
         </Field>}
         {!fhid("status") && <Field label="Trạng thái">
           <select className={inputCls} disabled={fdis("status")} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
@@ -229,10 +234,9 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3">
                   <div className="md:col-span-7">
                     <span className="block text-xs font-medium text-slate-500 mb-1">Sản phẩm</span>
-                    <select className={inputCls} disabled={fdis("items")} value={it.product_id} onChange={(e) => upItem(it._k, "product_id", e.target.value)}>
-                      <option value="">-- Chọn --</option>
-                      {lookups.products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-                    </select>
+                    <SearchSelect value={it.product_id} disabled={fdis("items")} placeholder="-- Chọn sản phẩm --"
+                      options={lookups.products.map((p) => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
+                      onChange={(v) => upItem(it._k, "product_id", v)} />
                   </div>
                   <div className="md:col-span-3">
                     <span className="block text-xs font-medium text-slate-500 mb-1">Số lượng</span>
