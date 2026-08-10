@@ -3,7 +3,8 @@ import { Routes, Route, NavLink, Navigate, useLocation, useNavigate } from "reac
 import { Settings, ClipboardCheck, CheckSquare, AlertTriangle, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import { toast, statusClass } from "../../ui.js";
 import { PageHeader } from "../../components.jsx";
-import { http, auth } from "../../mesApi.js";
+import { http } from "../../mesApi.js";
+import { usePerm } from "../../perm.jsx";
 
 function QualityConfig({ lookups }) {
   const [activeTab, setActiveTab] = useState('items'); // 'items' | 'criteria'
@@ -475,7 +476,7 @@ function InspectionExecution({ lookups }) {
 export function CreateInspectionForm({ orders, criteria, initialOrder, onCancel, onSaved }) {
   const [form, setForm] = useState({ production_order_id: initialOrder || '', criteria_id: '', inspector_name: '', note: '' });
   const [formDetails, setFormDetails] = useState([]);
-  const { user } = auth();
+  const { user } = usePerm();
 
   // If initialOrder is provided, try to auto-select criteria
   useEffect(() => {
