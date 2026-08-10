@@ -275,7 +275,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
             );
           }
           return (
-            <NavLink key={it.key} to={it.path} onClick={() => onCloseMobile?.()} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
+            <NavLink key={it.key} to={it.path} end={it.key !== 'products'} onClick={() => onCloseMobile?.()} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
               <Icon size={18} className="shrink-0" /> 
               {!collapsed && <span className="truncate">{it.label}</span>}
             </NavLink>
