@@ -621,7 +621,9 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
   const removeAttr = (key) => setAttributes((a) => a.filter((x) => x._key !== key));
   const updateAttr = (key, fld, val) => setAttributes((a) => a.map((x) => (x._key === key ? { ...x, [fld]: val } : x)));
 
-  const load = () => api.get(id).then((d) => {
+  const load = () => {
+    if (!id) { onBack(); return Promise.resolve(); }
+    return api.get(id).then((d) => {
     setP(d);
     setForm({
       product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
@@ -635,14 +637,18 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
     setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
     setKeySeq((attrs.length || 1) + 1);
   }).catch((e) => toast.error("Lỗi tải chi tiết: " + e.message));
+  };
   useEffect(() => { load(); }, [id]); // eslint-disable-line
-  useEffect(() => { productRelated(id).then(setRelated).catch(() => {}); }, [id]);
+  useEffect(() => { if (id) productRelated(id).then(setRelated).catch(() => {}); }, [id]);
 
   // Tài liệu / hình ảnh đính kèm
   const [files, setFiles] = useState([]);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const loadFiles = () => productFiles.list(id).then((r) => { setFiles(r.data || []); setPreview(r.preview || null); }).catch(() => {});
+  const loadFiles = () => {
+    if (!id) return;
+    productFiles.list(id).then((r) => { setFiles(r.data || []); setPreview(r.preview || null); }).catch(() => {});
+  };
   useEffect(() => { loadFiles(); }, [id]); // eslint-disable-line
   const onUpload = async (fileList) => {
     const arr = [...(fileList || [])]; if (!arr.length) return;
