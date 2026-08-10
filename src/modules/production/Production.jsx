@@ -45,12 +45,12 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
 
   // Sinh phân công theo Quy trình công nghệ của sản phẩm (silent = tự động, không báo)
   const genFromProcess = async (productId, quantity, { silent = false, defaults = {} } = {}) => {
-    if (!productId) { if (!silent) alert("Hãy chọn Sản phẩm trước."); return; }
+    if (!productId) { if (!silent) toast.error("Hãy chọn Sản phẩm trước."); return; }
     try {
       const list = await processes.list({ product_id: productId });
-      if (!list.length) { if (!silent) alert("Sản phẩm này chưa có quy trình công nghệ. Tạo ở mục Quy trình CN."); return; }
+      if (!list.length) { if (!silent) toast.error("Sản phẩm này chưa có quy trình công nghệ. Tạo ở mục Quy trình CN."); return; }
       const proc = await processes.get(list[0].id);
-      if (!proc.steps?.length) { if (!silent) alert("Quy trình chưa có bước nào."); return; }
+      if (!proc.steps?.length) { if (!silent) toast.error("Quy trình chưa có bước nào."); return; }
       let avail = [];
       try { avail = await production.machineAvailability(); } catch { /* không chặn nếu lỗi */ }
       const mapStage = (s) => /c[ắa]t/i.test(`${s.name || ""} ${s.workshop || ""} ${s.machine_name || ""} ${s.machine_type || ""}`) ? "Cắt" : "Thổi";
@@ -104,9 +104,9 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       setTasks(newTasks); setTaskSeq(Date.now() + seq + 1);
       if (!silent) {
         const nMc = newTasks.filter((t) => t.machine_id).length;
-        alert(`Đã tạo ${newTasks.length} phân công theo quy trình "${proc.name}". Gợi ý máy rảnh cho ${nMc}/${newTasks.length} công đoạn (ưu tiên 1 máy/công đoạn). Hãy kiểm tra ca/ngày rồi Lưu.`);
+        toast.success(`Đã tạo ${newTasks.length} phân công theo quy trình "${proc.name}". Gợi ý máy rảnh cho ${nMc}/${newTasks.length} công đoạn (ưu tiên 1 máy/công đoạn). Hãy kiểm tra ca/ngày rồi Lưu.`);
       }
-    } catch (e) { if (!silent) alert("Lỗi: " + e.message); }
+    } catch (e) { if (!silent) toast.error("Lỗi: " + e.message); }
   };
   const applyProcess = () => genFromProcess(f.product_id, f.quantity, meta ? {
     defaults: { shift: meta.shift, assigned_team: meta.assigned_team, assigned_worker: meta.assigned_worker, machine_id: meta.machine_id, planned_date: meta.planned_date?.slice(0, 10) },
@@ -146,7 +146,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           });
         }
       }).catch(() => {});
-    }).catch((e) => alert("Lỗi tải lệnh sản xuất: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải lệnh sản xuất: " + e.message));
   }, [editId]); // eslint-disable-line
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -162,7 +162,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
       setFinishing(names.map((name) => ({ name, checked: saved.get(name) || false })));
-    }).catch((e) => alert("Lỗi tải lệnh nguồn: " + e.message));
+    }).catch((e) => toast.error("Lỗi tải lệnh nguồn: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
   // auto đổ đơn vị theo sản phẩm + tự dựng phân công theo quy trình (khi tạo mới)
@@ -178,8 +178,8 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   };
 
   const save = async () => {
-    if (!f.product_id) return alert("Vui lòng chọn Sản phẩm");
-    if (!f.quantity || Number(f.quantity) <= 0) return alert("Vui lòng nhập Số lượng hợp lệ");
+    if (!f.product_id) return toast.error("Vui lòng chọn Sản phẩm");
+    if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Vui lòng nhập Số lượng hợp lệ");
     try {
       if (editId) {
         await production.update(editId, { ...f, finishing });
@@ -190,12 +190,12 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         toast.success("Tạo lệnh sản xuất mới thành công");
       }
       onSaved();
-    } catch (e) { alert("Lỗi lưu lệnh sản xuất: " + e.message); }
+    } catch (e) { toast.error("Lỗi lưu lệnh sản xuất: " + e.message); }
   };
 
   const del = async () => {
     if (!confirm("Xóa lệnh sản xuất này?")) return;
-    try { await production.remove(editId); onSaved(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await production.remove(editId); toast.success("Đã xóa lệnh sản xuất thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   return (
@@ -522,7 +522,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
 
   const load = useCallback(async () => {
     try { setRows(await production.list({})); }
-    catch (e) { alert("Lỗi tải lệnh sản xuất: " + e.message); }
+    catch (e) { toast.error("Lỗi tải lệnh sản xuất: " + e.message); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -540,7 +540,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
 
   const del = async (id) => {
     if (!confirm("Xóa lệnh sản xuất này?")) return;
-    try { await production.remove(id); load(); } catch (e) { alert("Lỗi xóa: " + e.message); }
+    try { await production.remove(id); toast.success("Đã xóa lệnh sản xuất thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
   if (view === "form")

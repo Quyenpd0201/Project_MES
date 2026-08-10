@@ -142,7 +142,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
           yield_percent: s.yield_percent, scrap_percent: s.scrap_percent,
         })),
       };
-      if (editId) { await procApi.update(editId, payload); loadData(); setEditing(false); }
+      if (editId) { await procApi.update(editId, payload); toast.success("Đã cập nhật thành công"); loadData(); setEditing(false); }
       else { await procApi.create(payload); toast.success("Đã lưu thành công"); onSaved(); }
     } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
