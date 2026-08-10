@@ -1,9 +1,47 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
-import { production } from "../../mesApi.js";
+import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle, Play, Pause, CheckCircle2, ClipboardCheck, X } from "lucide-react";
+import { production, http } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { ListHeader } from "../../components.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
+import { CreateInspectionForm } from "../quality/QualityModule.jsx";
+
+/* ---- Modal: Ghi nhận QC ---- */
+function QCModal({ task, onClose }) {
+  const [orders, setOrders] = useState([]);
+  const [criteria, setCriteria] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      http('/api/production/orders').then(r => r.data),
+      http('/api/quality/criteria').then(r => r.data)
+    ]).then(([o, c]) => {
+      setOrders(o);
+      setCriteria(c.filter(x => x.status === 'Hoạt động'));
+      setLoading(false);
+    }).catch(e => {
+      toast.error(e.message);
+      onClose(false);
+    });
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => onClose(false)}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {loading ? <div className="p-10 text-center">Đang tải biểu mẫu QC...</div> : (
+          <CreateInspectionForm 
+            orders={orders} 
+            criteria={criteria} 
+            initialOrder={task.production_order_id} 
+            onCancel={() => onClose(false)} 
+            onSaved={() => onClose(true)} 
+          />
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ---- Modal: NVL thực tế sử dụng (gợi ý từ BOM) → trừ tồn kho ---- */
 function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
@@ -92,6 +130,7 @@ function TaskCard({ t, canEdit, onSaved }) {
   const [scrap, setScrap] = useState(t.scrap_qty ?? "");
   const [saving, setSaving] = useState(false);
   const [showMat, setShowMat] = useState(false);
+  const [showQC, setShowQC] = useState(false);
   const [matMode, setMatMode] = useState(null); // "view" | "complete"
   useEffect(() => { setActual(t.actual_qty ?? ""); setScrap(t.scrap_qty ?? ""); }, [t.id]); // eslint-disable-line
 
@@ -191,12 +230,14 @@ function TaskCard({ t, canEdit, onSaved }) {
               <button onClick={complete} disabled={saving} className="btn-primary flex-1 justify-center" style={{ background: "#059669" }}><CheckCircle2 size={16} /> Hoàn thành sản xuất</button>
             </>)}
             <button onClick={() => { setMatMode("view"); setShowMat(true); }} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Boxes size={16} /> NVL thực tế</button>
+            <button onClick={() => setShowQC(true)} className="btn-ghost text-purple-600 border-purple-200 hover:bg-purple-50"><ClipboardCheck size={16} /> Ghi nhận QC</button>
           </div>
         )}
       </div>
 
       {showMat && <MaterialModal task={t} canEdit={canEdit} completeMode={matMode === "complete"}
         onClose={(saved) => { const wasComplete = matMode === "complete"; setShowMat(false); setMatMode(null); if (wasComplete && saved) finishComplete(); else if (saved) onSaved?.(); }} />}
+      {showQC && <QCModal task={t} onClose={(saved) => { setShowQC(false); if (saved) onSaved?.(); }} />}
     </div>
   );
 }

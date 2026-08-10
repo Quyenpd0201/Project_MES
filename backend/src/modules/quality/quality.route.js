@@ -24,4 +24,11 @@ router.get('/criteria/:id', ctrl.getCriteria);
 router.put('/criteria/:id', ctrl.updateCriteria);
 router.delete('/criteria/:id', ctrl.deleteCriteria);
 
+router.get('/inspections', ctrl.listInspections);
+router.post('/inspections', ctrl.createInspection);
+router.get('/inspections/:id', ctrl.getInspection);
+
+router.get('/ng', ctrl.listNG);
+router.put('/ng/:id', ctrl.updateNG);
+
 module.exports = router;
