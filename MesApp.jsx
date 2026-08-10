@@ -606,7 +606,7 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
 }
 
 /* =========================== PRODUCT DETAIL =========================== */
-function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrder }) {
+function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrder, lookups }) {
   const { can } = usePerm();
   const [tab, setTab] = useState("info");
   const [p, setP] = useState(null);
