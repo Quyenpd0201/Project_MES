@@ -31,6 +31,7 @@ import ProcessModule from "./src/modules/engineering/Process.jsx";
 import OrdersModule from "./src/modules/sales/Orders.jsx";
 import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
 import ReportsModule from "./src/modules/reports/Reports.jsx";
+import InventoryReport from "./src/modules/reports/InventoryReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
@@ -1277,6 +1278,7 @@ export default function MesApp() {
           <Route path="/qrlabels" element={<QrLabelsModule />} />
           <Route path="/qrscan" element={<QrScanModule />} />
           <Route path="/reports" element={needLookups(ReportsModule)} />
+          <Route path="/reports/inventory" element={lookups ? <InventoryReport lookups={lookups} /> : loadingEl} />
           <Route path="/permissions" element={<PermissionsModule />} />
           <Route path="/users" element={needLookups(UsersModule)} />
           <Route path="/bom" element={needLookups(BomModule)} />
