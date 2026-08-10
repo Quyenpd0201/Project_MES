@@ -18,6 +18,11 @@ import ExecutionModule from "./src/modules/production/Execution.jsx";
 import PlanningModule, { OrderStatusModule } from "./src/modules/production/Planning.jsx";
 import WorkScheduleModule from "./src/modules/production/WorkSchedule.jsx";
 import InventoryModule from "./src/modules/inventory/Inventory.jsx";
+import InboundModule from "./src/modules/inventory/InboundModule.jsx";
+import OutboundModule from "./src/modules/inventory/OutboundModule.jsx";
+import TransferModule from "./src/modules/inventory/TransferModule.jsx";
+import AdjustModule from "./src/modules/inventory/AdjustModule.jsx";
+import TraceabilityLot from "./src/modules/inventory/TraceabilityLot.jsx";
 import QrLabelsModule from "./src/modules/inventory/QrLabels.jsx";
 import QrScanModule from "./src/modules/inventory/QrScan.jsx";
 import MasterDataScreen from "./src/modules/masterData/MasterData.jsx";
@@ -26,6 +31,7 @@ import ProcessModule from "./src/modules/engineering/Process.jsx";
 import OrdersModule from "./src/modules/sales/Orders.jsx";
 import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
 import ReportsModule from "./src/modules/reports/Reports.jsx";
+import OutputReport from "./src/modules/production/OutputReport.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
 /* =====================================================================
@@ -1262,7 +1268,13 @@ export default function MesApp() {
             onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
           <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
           <Route path="/execution" element={needLookups(ExecutionModule)} />
+          <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
           <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
+          <Route path="/inventory/inbound" element={lookups ? <InboundModule lookups={lookups} /> : loadingEl} />
+          <Route path="/inventory/outbound" element={lookups ? <OutboundModule lookups={lookups} /> : loadingEl} />
+          <Route path="/inventory/transfer" element={lookups ? <TransferModule lookups={lookups} /> : loadingEl} />
+          <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
+          <Route path="/traceability/lot" element={<TraceabilityLot />} />
           <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
           <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
           <Route path="/qrlabels" element={<QrLabelsModule />} />
