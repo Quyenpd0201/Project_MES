@@ -182,6 +182,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   const items = allItems.filter(canSee);
   const [expanded, setExpanded] = useState({});
   const [search, setSearch] = useState("");
+  const isSearchActive = search.trim().length > 0;
 
   const filteredItems = items.map(it => {
     const term = search.toLowerCase();
@@ -195,8 +196,6 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     }
     return it.label.toLowerCase().includes(term) ? it : null;
   }).filter(Boolean);
-
-  const isSearchActive = search.trim().length > 0;
 
   const itemCls = (isActive) =>
     `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition ${
