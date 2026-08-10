@@ -24,6 +24,7 @@ router.use('/', require('./modules/inventory/inventory.route'));
 router.use('/', require('./modules/production/dashboard.route'));
 router.use('/', require('./modules/production/report.route'));
 router.use('/', require('./modules/masterData/lookup.route'));
+router.use('/quality', require('./modules/quality/quality.route'));
 
 module.exports = router;
 

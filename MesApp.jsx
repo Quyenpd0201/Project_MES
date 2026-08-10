@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
   Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen,
+  ClipboardCheck, CheckSquare, AlertTriangle, Settings
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
@@ -26,6 +27,7 @@ import ProcessModule from "./src/modules/engineering/Process.jsx";
 import OrdersModule from "./src/modules/sales/Orders.jsx";
 import DeliveriesModule from "./src/modules/sales/Deliveries.jsx";
 import ReportsModule from "./src/modules/reports/Reports.jsx";
+import QualityModule from "./src/modules/quality/QualityModule.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
 /* =====================================================================
@@ -138,6 +140,15 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays, path: "/workschedule" },
     { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
     { key: "reports", label: "Báo cáo", icon: Activity, path: "/reports" },
+    {
+      key: "quality", label: "Chất lượng", icon: ClipboardCheck, perm: "quality_config",
+      children: [
+        { key: "q:inspection", label: "Kiểm tra chất lượng", icon: ClipboardCheck, path: "/quality/inspection" },
+        { key: "q:results", label: "Kết quả kiểm tra", icon: CheckSquare, path: "/quality/results" },
+        { key: "q:ng", label: "Xử lý NG", icon: AlertTriangle, path: "/quality/ng" },
+        { key: "q:config", label: "Cấu hình chất lượng", icon: Settings, path: "/quality/config" },
+      ],
+    },
     { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
     { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true, path: "/users" },
     {
@@ -1239,6 +1250,7 @@ export default function MesApp() {
           <Route path="/qrlabels" element={<QrLabelsModule />} />
           <Route path="/qrscan" element={<QrScanModule />} />
           <Route path="/reports" element={needLookups(ReportsModule)} />
+          <Route path="/quality/*" element={needLookups(QualityModule)} />
           <Route path="/permissions" element={<PermissionsModule />} />
           <Route path="/users" element={needLookups(UsersModule)} />
           <Route path="/bom" element={needLookups(BomModule)} />
