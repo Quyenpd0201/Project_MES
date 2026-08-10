@@ -158,10 +158,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     
     { type: "header", label: "BÁO CÁO" },
     { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
-    { key: "rep_prod", label: "Báo cáo sản xuất", icon: Factory, path: "/reports/production" },
-    { key: "rep_qa", label: "Báo cáo chất lượng", icon: ShieldCheck, path: "/reports/quality" },
     { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
-    { key: "rep_machine", label: "Báo cáo máy móc", icon: Wrench, path: "/reports/machines" },
     
     { type: "header", label: "THÔNG TIN CHUNG" },
     { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
