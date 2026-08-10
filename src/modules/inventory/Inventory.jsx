@@ -135,6 +135,7 @@ function TreeTab({ lookups }) {
   const [openP, setOpenP] = useState(() => new Set());
   const [openG, setOpenG] = useState(() => new Set());
   const [adjusting, setAdjusting] = useState(false);
+  const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const load = useCallback(async () => {
     try { setData(await inventory.tree({})); } catch (e) { toast.error("Lỗi tải tồn kho: " + e.message); }
@@ -143,12 +144,22 @@ function TreeTab({ lookups }) {
 
   const toggle = (set, setSet, key) => { const n = new Set(set); n.has(key) ? n.delete(key) : n.add(key); setSet(n); };
   const norm = (s) => (s || "").toString().toLowerCase();
-  const rows = data.filter((p) => !q || norm(p.product_code).includes(norm(q)) || norm(p.product_name).includes(norm(q)));
+  const rows = data.filter((p) => {
+    const qMatch = !q || norm(p.product_code).includes(norm(q)) || norm(p.product_name).includes(norm(q));
+    const lowMatch = !lowStockOnly || (p.min_quantity != null && p.total < p.min_quantity);
+    return qMatch && lowMatch;
+  });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <input className={inputCls + " max-w-xs"} placeholder="Tìm mã / tên sản phẩm…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex items-center gap-4">
+          <input className={inputCls + " max-w-xs"} placeholder="Tìm mã / tên sản phẩm…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+            <input type="checkbox" checked={lowStockOnly} onChange={(e) => setLowStockOnly(e.target.checked)} className="w-4 h-4 accent-rose-600" />
+            Chỉ hiện hàng dưới định mức
+          </label>
+        </div>
         {(can("inventory", "edit") || can("inventory", "create")) &&
           <button onClick={() => setAdjusting(true)} className="btn-primary"><PackagePlus size={16} /> Nhập / Xuất kho</button>}
       </div>
@@ -176,6 +187,9 @@ function TreeTab({ lookups }) {
                   <span className="font-semibold text-blue-600 shrink-0">{p.product_code}</span>
                   <span className="text-slate-700 truncate">{p.product_name}</span>
                   <span className={`ml-1 inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClass(p.product_type)}`}>{p.product_type}</span>
+                  {p.min_quantity != null && p.total < p.min_quantity && (
+                    <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700" title={`Tồn kho tối thiểu: ${fmt(p.min_quantity)}`}>⚠ Dưới định mức</span>
+                  )}
                   <span className="text-xs text-slate-400">· {p.groups.length} nhóm</span>
                 </div>
                 <div className="col-span-3 text-slate-400 text-sm">—</div>

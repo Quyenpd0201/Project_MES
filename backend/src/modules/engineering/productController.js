@@ -92,7 +92,7 @@ exports.createProduct = async (req, res) => {
     const {
       product_name, production_area, category, product_group,
       unit, barcode_type, tracking_type, is_pqc_required, status,
-      description, attributes,
+      description, attributes, min_quantity,
     } = req.body;
 
     const { types, primary } = normalizeTypes(req.body);
@@ -108,14 +108,14 @@ exports.createProduct = async (req, res) => {
     const result = await db.query(
       `INSERT INTO products
          (product_name, production_area, category, product_type, product_types, product_group,
-          unit, barcode_type, tracking_type, is_pqc_required, status, description, attributes)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb)
+          unit, barcode_type, tracking_type, is_pqc_required, status, description, attributes, min_quantity)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)
        RETURNING *`,
       [
         product_name, production_area || null, category || null, primary, JSON.stringify(types), product_group || null,
         upUnit(unit), barcode_type || null, tracking_type || null,
         is_pqc_required ?? false, status || 'Hoạt động', description || null,
-        JSON.stringify(attrs),
+        JSON.stringify(attrs), min_quantity || null,
       ]
     );
 
@@ -134,7 +134,7 @@ exports.updateProduct = async (req, res) => {
     const {
       product_name, production_area, category, product_group,
       unit, barcode_type, tracking_type, is_pqc_required, status,
-      description, attributes,
+      description, attributes, min_quantity,
     } = req.body;
 
     const { types, primary } = normalizeTypes(req.body);
@@ -149,14 +149,14 @@ exports.updateProduct = async (req, res) => {
       `UPDATE products SET
          product_name=$1, production_area=$2, category=$3, product_type=$4, product_types=$5::jsonb, product_group=$6,
          unit=$7, barcode_type=$8, tracking_type=$9, is_pqc_required=$10, status=$11,
-         description=$12, attributes=$13::jsonb
-       WHERE id=$14 AND is_deleted=FALSE
+         description=$12, attributes=$13::jsonb, min_quantity=$14
+       WHERE id=$15 AND is_deleted=FALSE
        RETURNING *`,
       [
         product_name, production_area || null, category || null, primary, JSON.stringify(types), product_group || null,
         upUnit(unit), barcode_type || null, tracking_type || null,
         is_pqc_required ?? false, status || 'Hoạt động', description || null,
-        JSON.stringify(attrs), req.params.id,
+        JSON.stringify(attrs), min_quantity || null, req.params.id,
       ]
     );
     if (!result.rows.length) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });

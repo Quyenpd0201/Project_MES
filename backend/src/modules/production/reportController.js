@@ -19,7 +19,16 @@ exports.kpi = async (req, res) => {
       FROM production_orders po JOIN products p ON p.id = po.product_id WHERE po.is_deleted = FALSE GROUP BY p.product_name ORDER BY plan_qty DESC LIMIT 5
     `);
     const inventoryQuery = await db.query(`SELECT p.product_types->>0 AS name, SUM(s.quantity) AS value FROM inventory_stock s JOIN products p ON p.id = s.product_id GROUP BY p.product_types->>0`);
-    const invAlertQuery = await db.query(`SELECT COUNT(*)::int AS count FROM inventory_stock WHERE quantity < 100`);
+    const invAlertQuery = await db.query(`
+      SELECT COUNT(*)::int AS count
+      FROM (
+        SELECT s.product_id, SUM(s.quantity) AS total_qty
+        FROM inventory_stock s
+        GROUP BY s.product_id
+      ) agg
+      JOIN products p ON p.id = agg.product_id
+      WHERE p.min_quantity IS NOT NULL AND agg.total_qty < p.min_quantity
+    `);
     const qualityQuery = await db.query(`SELECT COALESCE(SUM(actual_qty),0) AS passed, COALESCE(SUM(scrap_qty),0) AS failed FROM production_tasks WHERE actual_qty > 0 OR scrap_qty > 0`);
 
     res.json({

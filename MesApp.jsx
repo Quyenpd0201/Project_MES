@@ -436,6 +436,9 @@ function ProductFields({ form, set, disabled, code }) {
           {!hid("product_group") && <Field label="Nhóm sản phẩm">
             <input className={cls("product_group")} disabled={dis("product_group")} value={form.product_group || ""} onChange={(e) => set("product_group", e.target.value)} />
           </Field>}
+          {!hid("min_quantity") && <Field label="Tồn kho tối thiểu">
+            <input type="number" min="0" className={cls("min_quantity")} disabled={dis("min_quantity")} value={form.min_quantity || ""} onChange={(e) => set("min_quantity", e.target.value)} placeholder="0" />
+          </Field>}
 
           {/* Hàng 4: theo dõi / mã vạch */}
           {!hid("tracking_type") && <Field label="Hình thức theo dõi">
@@ -473,7 +476,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
   const [form, setForm] = useState({
     product_name: "", production_area: "", category: "", product_types: ["Thành phẩm"],
     product_group: "", unit: "", barcode_type: "", tracking_type: "Theo lô",
-    is_pqc_required: false, status: "Hoạt động", description: "",
+    is_pqc_required: false, status: "Hoạt động", description: "", min_quantity: "",
   });
   // mỗi attr có _key ổn định để React render mượt khi thêm/xóa
   const [attributes, setAttributes] = useState([{ _key: 1, name: "", value: "" }]);
@@ -492,7 +495,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
         product_name: (d.product_name || "") + " (copy)", production_area: d.production_area || "", category: d.category || "",
         product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
         barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
       });
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
@@ -509,7 +512,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
         product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
         product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
         barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
       });
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
@@ -575,7 +578,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
       product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
       barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-      is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
+      is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
     });
     const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
     setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
