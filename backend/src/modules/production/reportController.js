@@ -9,8 +9,30 @@ exports.kpi = async (req, res) => {
         (SELECT COUNT(*)::int FROM machines WHERE is_deleted = FALSE AND status = 'Hoạt động') AS active_machines,
         (SELECT COALESCE(SUM(quantity), 0) FROM inventory_stock) AS total_inventory_items
     `);
+    const trendQuery = await db.query(`
+      SELECT to_char(planned_date, 'MM-DD') AS date, COALESCE(SUM(quantity), 0) AS plan_qty, COALESCE(SUM(actual_qty), 0) AS actual_qty
+      FROM production_tasks WHERE planned_date >= CURRENT_DATE - INTERVAL '6 days' GROUP BY planned_date ORDER BY planned_date
+    `);
+    const statusQuery = await db.query(`SELECT status AS name, COUNT(*)::int AS value FROM production_orders WHERE is_deleted = FALSE GROUP BY status`);
+    const productQuery = await db.query(`
+      SELECT p.product_name AS name, SUM(po.quantity) AS plan_qty
+      FROM production_orders po JOIN products p ON p.id = po.product_id WHERE po.is_deleted = FALSE GROUP BY p.product_name ORDER BY plan_qty DESC LIMIT 5
+    `);
+    const inventoryQuery = await db.query(`SELECT p.product_types->>0 AS name, SUM(s.quantity) AS value FROM inventory_stock s JOIN products p ON p.id = s.product_id GROUP BY p.product_types->>0`);
+    const invAlertQuery = await db.query(`SELECT COUNT(*)::int AS count FROM inventory_stock WHERE quantity < 100`);
+    const qualityQuery = await db.query(`SELECT COALESCE(SUM(actual_qty),0) AS passed, COALESCE(SUM(scrap_qty),0) AS failed FROM production_tasks WHERE actual_qty > 0 OR scrap_qty > 0`);
 
-    res.json({ kpi: kpi.rows[0] });
+    res.json({
+      kpi: kpi.rows[0],
+      charts: {
+        trend: trendQuery.rows,
+        status: statusQuery.rows,
+        products: productQuery.rows,
+        inventory: inventoryQuery.rows,
+        inventoryAlert: invAlertQuery.rows[0].count,
+        quality: qualityQuery.rows[0]
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy dữ liệu KPI' });

@@ -39,6 +39,14 @@ function SpecFields({ specs, onChange, disabled, cls = inputCls }) {
             </div>
           </label>
         ); }
+        if (spec.kind === "text") {
+          return (
+            <label key={spec.name}>{lbl}
+              <input type="text" className={cls} disabled={disabled} value={get(spec.name)} placeholder={spec.placeholder || ""}
+                onChange={(e) => setV(spec.name, e.target.value)} />
+            </label>
+          );
+        }
         const { num, unit } = splitNU(get(spec.name)); const cu = unit || spec.units[0];
         return (
           <label key={spec.name}>{lbl}

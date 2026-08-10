@@ -5,7 +5,7 @@ import { Download, Activity, Factory, PieChart as PieChartIcon } from 'lucide-re
 import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line
+  PieChart, Pie, Cell, LineChart, Line, ComposedChart
 } from 'recharts';
 import { fmt, fmtDate, statusClass } from '../../ui.js';
 
@@ -53,24 +53,157 @@ function TabButton({ id, label, current, onClick, icon: Icon }) {
 // ==========================================
 function KpiReport() {
   const [data, setData] = useState(null);
+  const [charts, setCharts] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     reports.kpi().then(res => {
-      setData(res);
+      setData(res.kpi);
+      setCharts(res.charts);
       setLoading(false);
     });
   }, []);
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
-  if (!data) return null;
+  if (!data || !charts) return null;
+
+  // Xử lý dữ liệu hiệu suất (D)
+  const performanceData = charts.trend.map(t => ({
+    date: t.date,
+    perf: t.plan_qty > 0 ? ((t.actual_qty / t.plan_qty) * 100).toFixed(1) : 0
+  }));
+
+  const FPY = charts.quality.passed > 0 
+    ? ((charts.quality.passed / (charts.quality.passed + charts.quality.failed)) * 100).toFixed(1)
+    : 100;
+  
+  const qualData = [
+    { name: 'Đạt', value: Number(charts.quality.passed) || 1 }, // fallbacks cho UI nếu chưa có data
+    { name: 'Không đạt', value: Number(charts.quality.failed) || 0 }
+  ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <KpiCard title="Tổng Lệnh Sản Xuất" value={data.total_production_orders} color="blue" />
-      <KpiCard title="Lệnh Đang Sản Xuất" value={data.active_production_orders} color="emerald" />
-      <KpiCard title="Máy Đang Hoạt Động" value={data.active_machines} color="amber" />
-      <KpiCard title="Tổng Số Tồn Kho" value={fmt(data.total_inventory_items)} color="purple" />
+    <div className="space-y-6">
+      {/* 4 thẻ KPI gốc */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <KpiCard title="Tổng Lệnh Sản Xuất" value={data.total_production_orders} color="blue" />
+        <KpiCard title="Lệnh Đang Sản Xuất" value={data.active_production_orders} color="emerald" />
+        <KpiCard title="Máy Đang Hoạt Động" value={data.active_machines} color="amber" />
+        <KpiCard title="Tổng Số Tồn Kho" value={fmt(data.total_inventory_items)} color="purple" />
+      </div>
+
+      {/* Grid 6 Biểu đồ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        {/* A. Kế hoạch vs Thực tế */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">A. Kế hoạch vs Thực tế (7 ngày)</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={charts.trend}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" fontSize={12} tickMargin={10} />
+                <YAxis fontSize={12} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="actual_qty" name="Thực tế" fill="#3b82f6" radius={[4,4,0,0]} barSize={30} />
+                <Line type="monotone" dataKey="plan_qty" name="Kế hoạch" stroke="#f59e0b" strokeWidth={3} dot={{r: 4}} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* B. Tình trạng Lệnh SX */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">B. Tình trạng Lệnh Sản Xuất</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={charts.status} cx="50%" cy="50%" innerRadius={60} outerRadius={90} paddingAngle={2} dataKey="value">
+                  {charts.status.map((e, i) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* C. Sản lượng theo sản phẩm */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">C. Top Sản lượng theo Sản phẩm</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={charts.products} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                <XAxis type="number" fontSize={12} />
+                <YAxis dataKey="name" type="category" width={100} fontSize={11} />
+                <Tooltip />
+                <Bar dataKey="plan_qty" name="Sản lượng" fill="#10b981" radius={[0,4,4,0]} barSize={20} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* D. Hiệu suất sản xuất */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">D. Hiệu suất sản xuất (%)</h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={performanceData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" fontSize={12} tickMargin={10} />
+                <YAxis fontSize={12} domain={[0, 100]} />
+                <Tooltip />
+                <Line type="monotone" dataKey="perf" name="% Hoàn thành" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* E. Tình trạng tồn kho */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">E. Tình trạng tồn kho</h3>
+          {charts.inventoryAlert > 0 && (
+             <div className="absolute top-5 right-5 bg-rose-50 text-rose-600 text-xs font-semibold px-2 py-1 rounded-md border border-rose-200">
+               ⚠ {charts.inventoryAlert} vật tư dưới định mức
+             </div>
+          )}
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={charts.inventory}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="value" name="Số lượng" fill="#6366f1" radius={[4,4,0,0]} barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* F. Tỷ lệ đạt chất lượng */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
+          <h3 className="text-base font-semibold mb-4 text-slate-800">F. Tỷ lệ đạt chất lượng (FPY)</h3>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-3 text-center">
+             <span className="block text-2xl font-bold text-slate-700">{FPY}%</span>
+             <span className="block text-xs text-slate-400">FPY</span>
+          </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={qualData} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={2} dataKey="value">
+                  <Cell fill="#10b981" />
+                  <Cell fill="#ef4444" />
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

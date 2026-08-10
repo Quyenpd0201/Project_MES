@@ -122,7 +122,7 @@ export const inventory = {
 };
 
 export const reports = {
-  kpi: () => http(`/reports/kpi`).then(r => r.kpi),
+  kpi: () => http(`/reports/kpi`),
   detailed: (fromDate, toDate) => {
     let url = `/reports/detailed`;
     if (fromDate && toDate) {
