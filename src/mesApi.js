@@ -8,7 +8,7 @@ export function setToken(t) {
 }
 export function getToken() { return authToken; }
 
-async function http(path, opts = {}) {
+export async function http(path, opts = {}) {
   const res = await fetch(`${API_BASE}/api${path}`, {
     ...opts,
     headers: { "Content-Type": "application/json", ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...(opts.headers || {}) },

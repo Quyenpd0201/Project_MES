@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, NavLink, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Settings, ClipboardCheck, CheckSquare, AlertTriangle, Plus, Pencil, Trash2, Save, X } from "lucide-react";
-import { toast, PageHeader, statusClass } from "../../ui";
+import { toast, statusClass } from "../../ui.js";
+import { PageHeader } from "../../components.jsx";
 import { http } from "../../mesApi.js";
 
 function QualityConfig({ lookups }) {
