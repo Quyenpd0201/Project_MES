@@ -146,7 +146,12 @@ function TreeTab({ lookups }) {
   const norm = (s) => (s || "").toString().toLowerCase();
   const rows = data.filter((p) => {
     const qMatch = !q || norm(p.product_code).includes(norm(q)) || norm(p.product_name).includes(norm(q));
-    const lowMatch = !lowStockOnly || (p.min_quantity != null && p.total < p.min_quantity);
+    const lowMatch = !lowStockOnly || (
+      p.warehouse_limits && p.warehouse_limits.some(w => {
+        const qty = p.warehouse_totals?.[w.warehouse_id] || 0;
+        return w.min_quantity != null && qty < Number(w.min_quantity);
+      })
+    );
     return qMatch && lowMatch;
   });
 
@@ -187,9 +192,15 @@ function TreeTab({ lookups }) {
                   <span className="font-semibold text-blue-600 shrink-0">{p.product_code}</span>
                   <span className="text-slate-700 truncate">{p.product_name}</span>
                   <span className={`ml-1 inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClass(p.product_type)}`}>{p.product_type}</span>
-                  {p.min_quantity != null && p.total < p.min_quantity && (
-                    <span className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700" title={`Tồn kho tối thiểu: ${fmt(p.min_quantity)}`}>⚠ Dưới định mức</span>
-                  )}
+                  {p.warehouse_limits && p.warehouse_limits.filter(w => {
+                    const qty = p.warehouse_totals?.[w.warehouse_id] || 0;
+                    return w.min_quantity != null && qty < Number(w.min_quantity);
+                  }).map(w => {
+                    const whName = lookups?.warehouses?.find(x => x.id === w.warehouse_id)?.name || "Kho";
+                    return (
+                      <span key={w.warehouse_id} className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700" title={`Thiếu hàng tại ${whName} (Tối thiểu: ${fmt(w.min_quantity)}, Thực tế: ${fmt(p.warehouse_totals?.[w.warehouse_id] || 0)})`}>⚠ {whName}</span>
+                    );
+                  })}
                   <span className="text-xs text-slate-400">· {p.groups.length} nhóm</span>
                 </div>
                 <div className="col-span-3 text-slate-400 text-sm">—</div>

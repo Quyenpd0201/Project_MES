@@ -20,14 +20,23 @@ exports.kpi = async (req, res) => {
     `);
     const inventoryQuery = await db.query(`SELECT p.product_types->>0 AS name, SUM(s.quantity) AS value FROM inventory_stock s JOIN products p ON p.id = s.product_id GROUP BY p.product_types->>0`);
     const invAlertQuery = await db.query(`
-      SELECT COUNT(*)::int AS count
-      FROM (
-        SELECT s.product_id, SUM(s.quantity) AS total_qty
+      WITH stock_per_wh AS (
+        SELECT s.product_id, l.warehouse_id, SUM(s.quantity) AS qty
         FROM inventory_stock s
-        GROUP BY s.product_id
-      ) agg
-      JOIN products p ON p.id = agg.product_id
-      WHERE p.min_quantity IS NOT NULL AND agg.total_qty < p.min_quantity
+        JOIN locations l ON l.id = s.location_id
+        GROUP BY s.product_id, l.warehouse_id
+      ),
+      product_limits AS (
+        SELECT id AS product_id,
+               (jsonb_array_elements(warehouse_limits)->>'warehouse_id')::uuid AS warehouse_id,
+               (jsonb_array_elements(warehouse_limits)->>'min_quantity')::numeric AS min_quantity
+        FROM products
+        WHERE warehouse_limits IS NOT NULL AND jsonb_array_length(warehouse_limits) > 0
+      )
+      SELECT COUNT(DISTINCT pl.product_id)::int AS count
+      FROM product_limits pl
+      LEFT JOIN stock_per_wh spw ON pl.product_id = spw.product_id AND pl.warehouse_id = spw.warehouse_id
+      WHERE COALESCE(spw.qty, 0) < pl.min_quantity
     `);
     const qualityQuery = await db.query(`SELECT COALESCE(SUM(actual_qty),0) AS passed, COALESCE(SUM(scrap_qty),0) AS failed FROM production_tasks WHERE actual_qty > 0 OR scrap_qty > 0`);
 

@@ -92,7 +92,7 @@ exports.createProduct = async (req, res) => {
     const {
       product_name, production_area, category, product_group,
       unit, barcode_type, tracking_type, is_pqc_required, status,
-      description, attributes, min_quantity,
+      description, attributes, min_quantity, warehouse_limits,
     } = req.body;
 
     const { types, primary } = normalizeTypes(req.body);
@@ -105,17 +105,21 @@ exports.createProduct = async (req, res) => {
       ? attributes.filter(a => a && a.name && a.value).map(a => ({ name: a.name, value: a.value }))
       : [];
 
+    const whLimits = Array.isArray(warehouse_limits)
+      ? warehouse_limits.filter(w => w && w.warehouse_id && (w.min_quantity != null || w.max_quantity != null))
+      : [];
+
     const result = await db.query(
       `INSERT INTO products
          (product_name, production_area, category, product_type, product_types, product_group,
-          unit, barcode_type, tracking_type, is_pqc_required, status, description, attributes, min_quantity)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14)
+          unit, barcode_type, tracking_type, is_pqc_required, status, description, attributes, min_quantity, warehouse_limits)
+       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14,$15::jsonb)
        RETURNING *`,
       [
         product_name, production_area || null, category || null, primary, JSON.stringify(types), product_group || null,
         upUnit(unit), barcode_type || null, tracking_type || null,
         is_pqc_required ?? false, status || 'Hoạt động', description || null,
-        JSON.stringify(attrs), min_quantity || null,
+        JSON.stringify(attrs), min_quantity || null, JSON.stringify(whLimits),
       ]
     );
 
@@ -134,7 +138,7 @@ exports.updateProduct = async (req, res) => {
     const {
       product_name, production_area, category, product_group,
       unit, barcode_type, tracking_type, is_pqc_required, status,
-      description, attributes, min_quantity,
+      description, attributes, min_quantity, warehouse_limits,
     } = req.body;
 
     const { types, primary } = normalizeTypes(req.body);
@@ -145,18 +149,22 @@ exports.updateProduct = async (req, res) => {
       ? attributes.filter(a => a && a.name && a.value).map(a => ({ name: a.name, value: a.value }))
       : [];
 
+    const whLimits = Array.isArray(warehouse_limits)
+      ? warehouse_limits.filter(w => w && w.warehouse_id && (w.min_quantity != null || w.max_quantity != null))
+      : [];
+
     const result = await db.query(
       `UPDATE products SET
          product_name=$1, production_area=$2, category=$3, product_type=$4, product_types=$5::jsonb, product_group=$6,
          unit=$7, barcode_type=$8, tracking_type=$9, is_pqc_required=$10, status=$11,
-         description=$12, attributes=$13::jsonb, min_quantity=$14
-       WHERE id=$15 AND is_deleted=FALSE
+         description=$12, attributes=$13::jsonb, min_quantity=$14, warehouse_limits=$15::jsonb
+       WHERE id=$16 AND is_deleted=FALSE
        RETURNING *`,
       [
         product_name, production_area || null, category || null, primary, JSON.stringify(types), product_group || null,
         upUnit(unit), barcode_type || null, tracking_type || null,
         is_pqc_required ?? false, status || 'Hoạt động', description || null,
-        JSON.stringify(attrs), min_quantity || null, req.params.id,
+        JSON.stringify(attrs), min_quantity || null, JSON.stringify(whLimits), req.params.id,
       ]
     );
     if (!result.rows.length) return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });

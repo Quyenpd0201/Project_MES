@@ -14,10 +14,10 @@ exports.tree = async (req, res) => {
     if (q)          { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = await db.query(`
-      SELECT s.id, s.product_id, p.product_code, p.product_name, p.product_type, p.min_quantity,
+      SELECT s.id, s.product_id, p.product_code, p.product_name, p.product_type, p.min_quantity, p.warehouse_limits,
              s.spec_key, s.specs, s.lot_code, s.prod_order_id, po.order_code AS lot_order_code,
              s.quantity, s.unit, s.expiry_date,
-             w.name AS warehouse_name, l.name AS location_name
+             w.id AS warehouse_id, w.name AS warehouse_name, l.name AS location_name
       FROM inventory_stock s
       JOIN products p ON p.id = s.product_id
       LEFT JOIN locations l ON l.id = s.location_id
@@ -31,11 +31,14 @@ exports.tree = async (req, res) => {
       if (!prods.has(r.product_id)) {
         prods.set(r.product_id, {
           product_id: r.product_id, product_code: r.product_code, product_name: r.product_name,
-          product_type: r.product_type, min_quantity: r.min_quantity, unit: r.unit, total: 0, groups: new Map(),
+          product_type: r.product_type, min_quantity: r.min_quantity, warehouse_limits: r.warehouse_limits || [], unit: r.unit, total: 0, groups: new Map(), warehouse_totals: {},
         });
       }
       const P = prods.get(r.product_id);
       P.total += Number(r.quantity) || 0;
+      if (r.warehouse_id) {
+        P.warehouse_totals[r.warehouse_id] = (P.warehouse_totals[r.warehouse_id] || 0) + (Number(r.quantity) || 0);
+      }
       if (!P.unit && r.unit) P.unit = r.unit;
       const gkey = r.spec_key || '';
       if (!P.groups.has(gkey)) P.groups.set(gkey, { spec_key: gkey, specs: r.specs || {}, total: 0, lots: [] });

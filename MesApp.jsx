@@ -436,9 +436,6 @@ function ProductFields({ form, set, disabled, code }) {
           {!hid("product_group") && <Field label="Nhóm sản phẩm">
             <input className={cls("product_group")} disabled={dis("product_group")} value={form.product_group || ""} onChange={(e) => set("product_group", e.target.value)} />
           </Field>}
-          {!hid("min_quantity") && <Field label="Tồn kho tối thiểu">
-            <input type="number" min="0" className={cls("min_quantity")} disabled={dis("min_quantity")} value={form.min_quantity || ""} onChange={(e) => set("min_quantity", e.target.value)} placeholder="0" />
-          </Field>}
 
           {/* Hàng 4: theo dõi / mã vạch */}
           {!hid("tracking_type") && <Field label="Hình thức theo dõi">
@@ -471,13 +468,58 @@ function ProductFields({ form, set, disabled, code }) {
   );
 }
 
+function WarehouseLimitsList({ limits, setLimits, lookups, disabled }) {
+  const addLimit = () => setLimits((l) => [...l, { _key: Date.now(), warehouse_id: "", min_quantity: "", max_quantity: "" }]);
+  const removeLimit = (key) => setLimits((l) => l.filter((x) => x._key !== key));
+  const updateLimit = (key, field, val) => setLimits((l) => l.map((x) => (x._key === key ? { ...x, [field]: val } : x)));
+
+  return (
+    <Section title="Định mức theo Kho" action={!disabled && (
+      <button onClick={addLimit} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50">
+        <Plus size={16} /> Thêm kho
+      </button>
+    )}>
+      {(!limits || limits.length === 0) && <div className="text-sm text-slate-400 py-2">Chưa cấu hình định mức kho.</div>}
+      {limits && limits.length > 0 && (
+        <div className="space-y-3">
+          {limits.map((l) => (
+            <div key={l._key || l.warehouse_id} className="flex flex-wrap items-center gap-4 attr-row p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Kho chứa</label>
+                <select className={inputCls} disabled={disabled} value={l.warehouse_id || ""} onChange={(e) => updateLimit(l._key, "warehouse_id", e.target.value)}>
+                  <option value="">-- Chọn Kho --</option>
+                  {(lookups?.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </div>
+              <div className="w-32">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Tồn tối thiểu</label>
+                <input type="number" min="0" className={inputCls} disabled={disabled} value={l.min_quantity || ""} onChange={(e) => updateLimit(l._key, "min_quantity", e.target.value)} placeholder="0" />
+              </div>
+              <div className="w-32">
+                <label className="block text-xs font-medium text-slate-500 mb-1">Tồn tối đa</label>
+                <input type="number" min="0" className={inputCls} disabled={disabled} value={l.max_quantity || ""} onChange={(e) => updateLimit(l._key, "max_quantity", e.target.value)} placeholder="0" />
+              </div>
+              {!disabled && (
+                <button onClick={() => removeLimit(l._key)} className="mt-5 p-2 text-rose-500 hover:bg-rose-100 rounded-md transition" title="Xóa">
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
 /* ============================ PRODUCT FORM ============================ */
-function ProductForm({ productId, copyId, onBack, onSaved }) {
+function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   const [form, setForm] = useState({
     product_name: "", production_area: "", category: "", product_types: ["Thành phẩm"],
     product_group: "", unit: "", barcode_type: "", tracking_type: "Theo lô",
-    is_pqc_required: false, status: "Hoạt động", description: "", min_quantity: "",
+    is_pqc_required: false, status: "Hoạt động", description: "",
   });
+  const [warehouseLimits, setWarehouseLimits] = useState([]);
   // mỗi attr có _key ổn định để React render mượt khi thêm/xóa
   const [attributes, setAttributes] = useState([{ _key: 1, name: "", value: "" }]);
   const [keySeq, setKeySeq] = useState(2);
@@ -495,8 +537,10 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
         product_name: (d.product_name || "") + " (copy)", production_area: d.production_area || "", category: d.category || "",
         product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
         barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
       });
+      const whLimits = (d.warehouse_limits || []).map((w, i) => ({ _key: i + 1, ...w }));
+      setWarehouseLimits(whLimits);
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
       setKeySeq((attrs.length || 1) + 1);
@@ -512,8 +556,10 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
         product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
         product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
         barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
       });
+      const whLimits = (d.warehouse_limits || []).map((w, i) => ({ _key: i + 1, ...w }));
+      setWarehouseLimits(whLimits);
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
       setKeySeq((attrs.length || 1) + 1);
@@ -533,9 +579,10 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
     const cleanAttrs = attributes
       .filter((a) => a.name && a.value)
       .map(({ name, value }) => ({ name, value }));
+    const cleanLimits = warehouseLimits.map(({ warehouse_id, min_quantity, max_quantity }) => ({ warehouse_id, min_quantity, max_quantity }));
     try {
-      if (productId) await api.update(productId, { ...form, attributes: cleanAttrs });
-      else await api.create({ ...form, attributes: cleanAttrs });
+      if (productId) await api.update(productId, { ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits });
+      else await api.create({ ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits });
       toast.success("Đã lưu thành công"); onSaved();
     } catch (e) {
       toast.error("Lỗi lưu sản phẩm: " + e.message);
@@ -548,6 +595,7 @@ function ProductForm({ productId, copyId, onBack, onSaved }) {
         actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu sản phẩm</button>} />
 
       <ProductFields form={form} set={set} code={code} disabled={false} />
+      <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={false} />
 
       <style>{`
         .attr-row { animation: slideIn .18s ease; }
@@ -565,6 +613,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
   const [related, setRelated] = useState({ salesOrders: [], productionOrders: [] });
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
+  const [warehouseLimits, setWarehouseLimits] = useState([]);
   const [attributes, setAttributes] = useState([]);
   const [keySeq, setKeySeq] = useState(1);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -578,8 +627,10 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
       product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
       barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-      is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "", min_quantity: d.min_quantity || "",
+      is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
     });
+    const whLimits = (d.warehouse_limits || []).map((w, i) => ({ _key: i + 1, ...w }));
+    setWarehouseLimits(whLimits);
     const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
     setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
     setKeySeq((attrs.length || 1) + 1);
@@ -619,7 +670,8 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
   const save = async () => {
     if (!form.product_name) return toast.error("Vui lòng nhập Tên sản phẩm");
     const cleanAttrs = attributes.filter((a) => a.name && a.value).map(({ name, value }) => ({ name, value }));
-    try { await api.update(id, { ...form, attributes: cleanAttrs }); toast.success("Lưu sản phẩm thành công"); await load(); setEditing(false); }
+    const cleanLimits = warehouseLimits.map(({ warehouse_id, min_quantity, max_quantity }) => ({ warehouse_id, min_quantity, max_quantity }));
+    try { await api.update(id, { ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits }); toast.success("Lưu sản phẩm thành công"); await load(); setEditing(false); }
     catch (e) { toast.error("Lỗi lưu sản phẩm: " + e.message); }
   };
   const cancel = () => { load(); setEditing(false); };
@@ -658,6 +710,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       {tab === "info" && (
         <>
           <ProductFields disabled={!editing} form={form} set={set} code={p.product_code} />
+          <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={!editing} />
 
           <Section title="Hình ảnh & tài liệu"
             action={can("products", "edit") && (
@@ -1161,13 +1214,13 @@ export default function MesApp() {
             onCopy={(id) => { setProductEditId(null); setProductCopyId(id); navigate("/products/form"); }}
             onOpen={(id) => { setDetailId(id); setDetailBack("/products"); navigate("/products/detail"); }} 
           />} />
-          <Route path="/products/form" element={<ProductForm productId={productEditId} copyId={productCopyId}
+          <Route path="/products/form" element={lookups ? <ProductForm productId={productEditId} copyId={productCopyId} lookups={lookups}
             onBack={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
             onSaved={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }} 
-          />} />
-          <Route path="/products/detail" element={<ProductDetail id={detailId} onBack={() => navigate(detailBack)}
-            onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} 
-          />} />
+          /> : loadingEl} />
+          <Route path="/products/detail" element={lookups ? <ProductDetail id={detailId} onBack={() => navigate(detailBack)}
+            onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} lookups={lookups}
+          /> : loadingEl} />
           
           <Route path="/planning" element={lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "/planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl} />
           <Route path="/production" element={lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
