@@ -393,9 +393,7 @@ function InspectionExecution({ lookups }) {
   // Create Form State
   const [orders, setOrders] = useState([]);
   const [criteria, setCriteria] = useState([]);
-  const [form, setForm] = useState({ production_order_id: '', criteria_id: '', inspector_name: '', note: '' });
-  const [formDetails, setFormDetails] = useState([]);
-  const { user } = auth();
+
 
   const load = async () => {
     setLoading(true);
