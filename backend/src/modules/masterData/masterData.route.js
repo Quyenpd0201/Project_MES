@@ -18,30 +18,36 @@ mountCrud('/customers', makeCrud({
   table: 'customers',
   columns: ['name', 'customer_type', 'phone', 'email', 'address', 'status'],
   searchCols: ['name', 'customer_code', 'phone'], exactCols: ['customer_type', 'status'], codeCol: 'customer_code',
-  blockDeleteStatuses: ['Ho?t d?ng'],
+  blockDeleteStatuses: ['Hoạt động'],
 }));
 
 mountCrud('/machines', makeCrud({
   table: 'machines',
   columns: ['name', 'factory', 'machine_type', 'status'],
   searchCols: ['name', 'machine_code'], exactCols: ['factory', 'status'], codeCol: 'machine_code',
-  blockDeleteStatuses: ['Ho?t d?ng', 'B?o tr�'],
+  blockDeleteStatuses: ['Hoạt động', 'Bảo trì'],
   extraSelect: `,
     CASE WHEN EXISTS (
       SELECT 1 FROM production_tasks pt JOIN production_orders po ON po.id = pt.production_order_id
-      WHERE po.is_deleted = FALSE AND pt.machine_id = machines.id AND pt.status = '�ang s?n xu?t')
+      WHERE po.is_deleted = FALSE AND pt.machine_id = machines.id AND pt.status = 'Đang sản xuất')
     OR EXISTS (
       SELECT 1 FROM production_orders po
-      WHERE po.is_deleted = FALSE AND po.machine_id = machines.id AND po.status = '�ang s?n xu?t')
-    THEN '�ang s?n xu?t' ELSE 'Ch? s?n xu?t' END AS production_status`,
+      WHERE po.is_deleted = FALSE AND po.machine_id = machines.id AND po.status = 'Đang sản xuất')
+    THEN 'Đang sản xuất' ELSE 'Chờ sản xuất' END AS production_status`,
 }));
 router.get('/machines/:id/orders', production.byMachine);
 
 mountCrud('/warehouses', makeCrud({
   table: 'warehouses',
-  columns: ['name', 'warehouse_type', 'status'],
+  columns: [
+    'name', 'warehouse_type', 'status', 'purpose', 'factory', 'workshop',
+    'address', 'manager', 'department', 'phone', 'description',
+    'allow_inbound', 'allow_outbound', 'allow_transfer', 'allow_manufacturing',
+    'require_qc', 'require_approval', 'outbound_method',
+    'capacity_unit', 'max_capacity', 'capacity_warning'
+  ],
   searchCols: ['name', 'warehouse_code'], exactCols: ['warehouse_type', 'status'], codeCol: 'warehouse_code',
-  blockDeleteStatuses: ['Ho?t d?ng', '�ang ki?m d?m'],
+  blockDeleteStatuses: ['Hoạt động', 'Đang kiểm đếm'],
 }));
 
 mountCrud('/locations', makeCrud({
@@ -54,15 +60,15 @@ mountCrud('/shifts', makeCrud({
   table: 'shifts',
   columns: ['name', 'start_time', 'end_time', 'status'],
   searchCols: ['name', 'shift_code'], exactCols: ['status'], orderBy: 'shift_code', codeCol: 'shift_code',
-  blockDeleteStatuses: ['Ho?t d?ng'],
+  blockDeleteStatuses: ['Hoạt động'],
 }));
 
 mountCrud('/employees', makeCrud({
   table: 'employees',
   columns: ['name', 'factory', 'position', 'skill_level', 'phone', 'status'],
   searchCols: ['name', 'employee_code', 'phone'], exactCols: ['factory', 'status'], codeCol: 'employee_code',
-  blockDeleteStatuses: ['Ho?t d?ng'],
-  blockDeleteMessage: 'Kh�ng th? x�a nh�n vi�n dang "Ho?t d?ng" � h? c� th? dang du?c ph�n c�ng ? c�ng vi?c kh�c. Vui l�ng chuy?n tr?ng th�i sang "Kh�ng ho?t d?ng" (ho?c "�� ngh?") tru?c, r?i m?i x�a.',
+  blockDeleteStatuses: ['Hoạt động'],
+  blockDeleteMessage: 'Không thể xóa nhân viên đang "Hoạt động" - họ có thể đang được phân công ở công việc khác. Vui lòng chuyển trạng thái sang "Không hoạt động" (hoặc "Đã nghỉ") trước, rồi mới xóa.',
 }));
 
 module.exports = router;

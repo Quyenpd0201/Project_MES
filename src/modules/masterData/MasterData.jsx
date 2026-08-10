@@ -60,35 +60,59 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
     <div className="space-y-5">
       <PageHeader title={`${isEdit ? "Sửa" : "Thêm"} ${cfg.title.toLowerCase()}`} onBack={onBack}
         actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>} />
-      <Section title="Thông tin">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-          <Field label={cfg.columns[0]?.label || "Mã"}>
-            <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={code || "(tự sinh khi lưu)"} />
-          </Field>
-          {cfg.fields.filter((fl) => !(fl.readOnly && !isEdit)).map((fl) => (
-            <div key={fl.key} className={fl.full ? "md:col-span-2 lg:col-span-3" : ""}>
-              <Field label={fl.label} required={fl.required}>
-                {fl.readOnly ? (
-                  fl.badge
-                    ? <div className="pt-1"><span className={`inline-flex px-2.5 py-1 rounded-full text-sm font-medium ${statusClass(record?.[fl.key])}`}>{record?.[fl.key] || "—"}</span></div>
-                    : <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={record?.[fl.key] ?? "—"} />
-                ) : fl.type === "select" ? (
-                  <select className={inputCls} value={f[fl.key]} onChange={(e) => set(fl.key, e.target.value)}>
-                    <option value="">-- Chọn --</option>
-                    {fl.options.map((o) =>
-                      typeof o === "string"
-                        ? <option key={o} value={o}>{o}</option>
-                        : <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                ) : (
-                  <input type={fl.type || "text"} className={inputCls} value={f[fl.key]}
-                    onChange={(e) => set(fl.key, e.target.value)} placeholder={fl.placeholder || ""} />
-                )}
-              </Field>
+      {(() => {
+        const groups = {};
+        const defaultGroup = cfg.fields.some(f => f.group === "Thông tin chung") ? "Thông tin chung" : "Thông tin";
+        groups[defaultGroup] = [{ _isCode: true }];
+        cfg.fields.filter((fl) => !(fl.readOnly && !isEdit)).forEach((fl) => {
+          const g = fl.group || defaultGroup;
+          if (!groups[g]) groups[g] = [];
+          groups[g].push(fl);
+        });
+
+        return Object.keys(groups).map((gName) => (
+          <Section key={gName} title={gName}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+              {groups[gName].map((fl) => {
+                if (fl._isCode) {
+                  return (
+                    <Field key="code" label={cfg.columns[0]?.label || "Mã"}>
+                      <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={code || "(tự sinh khi lưu)"} />
+                    </Field>
+                  );
+                }
+                return (
+                  <div key={fl.key} className={fl.full ? "md:col-span-2 lg:col-span-3" : ""}>
+                    <Field label={fl.label} required={fl.required}>
+                      {fl.readOnly ? (
+                        fl.badge
+                          ? <div className="pt-1"><span className={`inline-flex px-2.5 py-1 rounded-full text-sm font-medium ${statusClass(record?.[fl.key])}`}>{record?.[fl.key] || "—"}</span></div>
+                          : <input className={inputCls + " bg-slate-50 text-slate-500"} disabled value={record?.[fl.key] ?? "—"} />
+                      ) : fl.type === "checkbox" ? (
+                        <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                          <input type="checkbox" className="w-4 h-4 accent-blue-600" checked={!!f[fl.key]} onChange={(e) => set(fl.key, e.target.checked)} />
+                          <span className="text-sm font-medium text-slate-700">{fl.checkboxLabel || fl.label}</span>
+                        </label>
+                      ) : fl.type === "select" ? (
+                        <select className={inputCls} value={f[fl.key] ?? ""} onChange={(e) => set(fl.key, e.target.value)}>
+                          <option value="">-- Chọn --</option>
+                          {fl.options.map((o) =>
+                            typeof o === "string"
+                              ? <option key={o} value={o}>{o}</option>
+                              : <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      ) : (
+                        <input type={fl.type || "text"} className={inputCls} value={f[fl.key] ?? ""}
+                          onChange={(e) => set(fl.key, e.target.value)} placeholder={fl.placeholder || ""} />
+                      )}
+                    </Field>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      </Section>
+          </Section>
+        ));
+      })()}
 
       {showOrders && (
         <Section title={`Đơn hàng đã mua (${orders.length})`}>
@@ -319,12 +343,35 @@ function buildConfigs(lookups) {
       columns: [
         { key: "warehouse_code", label: "Mã kho" }, { key: "name", label: "Tên kho" },
         { key: "warehouse_type", label: "Loại kho", filter: "select" },
+        { key: "factory", label: "Nhà máy", filter: "select" },
         { key: "status", label: "Trạng thái", badge: true },
       ],
       fields: [
-        { key: "name", label: "Tên kho", required: true, full: true },
-        { key: "warehouse_type", label: "Loại kho", type: "select", options: ["NVL", "BTP", "TP"], default: "NVL" },
-        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Đang kiểm đếm", "Không hoạt động"], default: "Hoạt động" },
+        // Thông tin chung
+        { key: "name", label: "Tên kho", required: true, full: true, group: "Thông tin chung" },
+        { key: "warehouse_type", label: "Loại kho", type: "select", options: ["NVL", "BTP", "TP"], default: "NVL", group: "Thông tin chung" },
+        { key: "purpose", label: "Mục đích sử dụng", group: "Thông tin chung" },
+        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Đang kiểm đếm", "Ngừng hoạt động"], default: "Hoạt động", group: "Thông tin chung" },
+        // Địa điểm & quản lý
+        { key: "factory", label: "Nhà máy", type: "select", options: ["Nhà máy 1", "Nhà máy 2", "Nhà máy 3"], group: "Địa điểm & quản lý", required: true },
+        { key: "workshop", label: "Xưởng", group: "Địa điểm & quản lý" },
+        { key: "manager", label: "Người phụ trách", group: "Địa điểm & quản lý" },
+        { key: "department", label: "Bộ phận quản lý", group: "Địa điểm & quản lý" },
+        { key: "phone", label: "Số điện thoại", group: "Địa điểm & quản lý" },
+        { key: "address", label: "Địa chỉ", full: true, group: "Địa điểm & quản lý" },
+        // Cấu hình nghiệp vụ
+        { key: "allow_inbound", label: "Cho phép nhập kho", type: "checkbox", default: true, group: "Cấu hình nghiệp vụ" },
+        { key: "allow_outbound", label: "Cho phép xuất kho", type: "checkbox", default: true, group: "Cấu hình nghiệp vụ" },
+        { key: "allow_transfer", label: "Cho phép chuyển kho", type: "checkbox", default: true, group: "Cấu hình nghiệp vụ" },
+        { key: "allow_manufacturing", label: "Cấp phát sản xuất", type: "checkbox", default: true, group: "Cấu hình nghiệp vụ" },
+        { key: "require_qc", label: "Yêu cầu QC khi nhập", type: "checkbox", default: false, group: "Cấu hình nghiệp vụ" },
+        { key: "require_approval", label: "Yêu cầu phê duyệt", type: "checkbox", default: false, group: "Cấu hình nghiệp vụ" },
+        { key: "outbound_method", label: "Phương pháp xuất kho", type: "select", options: ["FIFO", "FEFO", "LIFO", "Theo chỉ định"], default: "FIFO", group: "Cấu hình nghiệp vụ" },
+        // Cấu hình nâng cao
+        { key: "capacity_unit", label: "Đơn vị sức chứa", type: "select", options: ["Pallet", "Kg", "Tấn", "Thùng", "m³"], group: "Cấu hình nâng cao" },
+        { key: "max_capacity", label: "Sức chứa tối đa", type: "number", group: "Cấu hình nâng cao" },
+        { key: "capacity_warning", label: "Cảnh báo sức chứa", type: "number", group: "Cấu hình nâng cao" },
+        { key: "description", label: "Mô tả / Ghi chú", full: true, group: "Cấu hình nâng cao" },
       ],
     },
     locations: {
