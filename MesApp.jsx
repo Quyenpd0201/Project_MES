@@ -124,34 +124,54 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   const location = useLocation();
   const allItems = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
-    { key: "bom", label: "Định mức (BOM)", icon: FlaskConical, path: "/bom" },
-    { key: "process", label: "Quy trình CN", icon: GitBranch, path: "/process" },
+    { type: "header", label: "KINH DOANH" },
     { key: "orders", label: "Đơn hàng", icon: ShoppingCart, path: "/orders" },
     { key: "deliveries", label: "Phiếu giao hàng", icon: FileText, path: "/deliveries" },
-    { key: "planning", label: "Kế hoạch", icon: ClipboardList, path: "/planning" },
-    { key: "production", label: "Sản xuất", icon: Factory, path: "/production" },
+    
+    { type: "header", label: "KẾ HOẠCH" },
+    { key: "planning", label: "Kế hoạch sản xuất", icon: ClipboardList, path: "/planning" },
+    { key: "workschedule", label: "Lịch sản xuất", icon: CalendarDays, path: "/workschedule" },
+    
+    { type: "header", label: "SẢN XUẤT" },
+    { key: "production", label: "Lệnh sản xuất", icon: Factory, path: "/production" },
     { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
-    { key: "execution", label: "Thực thi SX", icon: Hammer, path: "/execution" },
-    { key: "qrlabels", label: "In tem xuất xứ", icon: FileText, path: "/qrlabels" },
-    { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
-    { key: "workschedule", label: "Lịch làm việc", icon: CalendarDays, path: "/workschedule" },
+    { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
+    { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
+    { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
+    
+    { type: "header", label: "KHO" },
     { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
-    { key: "reports", label: "Báo cáo", icon: Activity, path: "/reports" },
-    { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+    { key: "inv_inbound", label: "Nhập kho", icon: Download, path: "/inventory/inbound" },
+    { key: "inv_outbound", label: "Xuất kho", icon: Upload, path: "/inventory/outbound" },
+    { key: "inv_transfer", label: "Chuyển kho", icon: RotateCcw, path: "/inventory/transfer" },
+    { key: "inv_adjust", label: "Điều chỉnh tồn kho", icon: Wrench, path: "/inventory/adjust" },
+    
+    { type: "header", label: "TRUY XUẤT" },
+    { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
+    { key: "trace_lot", label: "Truy xuất lô", icon: ScanLine, path: "/traceability/lot" },
+    
+    { type: "header", label: "BÁO CÁO" },
+    { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
+    { key: "rep_prod", label: "Báo cáo sản xuất", icon: Factory, path: "/reports/production" },
+    { key: "rep_qa", label: "Báo cáo chất lượng", icon: ShieldCheck, path: "/reports/quality" },
+    { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
+    { key: "rep_machine", label: "Báo cáo máy móc", icon: Wrench, path: "/reports/machines" },
+    
+    { type: "header", label: "THÔNG TIN CHUNG" },
+    { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
+    { key: "bom", label: "Định mức (BOM)", icon: FlaskConical, path: "/bom" },
+    { key: "process", label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
+    { key: "md:machines", label: "Máy móc", icon: Wrench, path: "/master-data/machines", perm: "masterdata" },
+    { key: "md:employees", label: "Nhân viên", icon: Users, path: "/master-data/employees", perm: "masterdata" },
+    { key: "md:shifts", label: "Ca làm việc", icon: Clock, path: "/master-data/shifts", perm: "masterdata" },
+    { key: "md:warehouses", label: "Kho", icon: Warehouse, path: "/master-data/warehouses", perm: "masterdata" },
+    { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations", perm: "masterdata" },
+    { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers", perm: "masterdata" },
+    
+    { type: "header", label: "QUẢN TRỊ HỆ THỐNG" },
     { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true, path: "/users" },
-    {
-      key: "masterdata", label: "Danh mục", icon: Database, perm: "masterdata",
-      children: [
-        { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers" },
-        { key: "md:machines", label: "Máy móc", icon: Wrench, path: "/master-data/machines" },
-        { key: "md:employees", label: "Nhân viên", icon: Users, path: "/master-data/employees" },
-        { key: "md:shifts", label: "Ca làm việc", icon: Clock, path: "/master-data/shifts" },
-        { key: "md:warehouses", label: "Kho", icon: Warehouse, path: "/master-data/warehouses" },
-        { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations" },
-        { key: "md:roles", label: "Vai trò", icon: Shield, path: "/master-data/roles" },
-      ],
-    },
+    { key: "md:roles", label: "Vai trò", icon: Shield, path: "/master-data/roles", perm: "masterdata" },
+    { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
   ];
   const isAdmin = !!user?.is_admin;
   const canSee = (it) => {
@@ -165,6 +185,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
 
   const filteredItems = items.map(it => {
     const term = search.toLowerCase();
+    if (it.type === "header") return isSearchActive ? null : it;
     if (it.children) {
       const matchC = it.children.filter(c => c.label.toLowerCase().includes(term));
       if (matchC.length > 0 || it.label.toLowerCase().includes(term)) {
@@ -214,7 +235,16 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         </div>
       )}
       <nav className={`nav-scroll flex-1 min-h-0 overflow-y-auto ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
-        {filteredItems.map((it) => {
+        {filteredItems.map((it, idx) => {
+          if (it.type === "header") {
+            if (collapsed) return <div key={`hdr-${idx}`} className="my-2 border-t border-slate-200" />;
+            return (
+              <div key={`hdr-${idx}`} className="mt-5 mb-2 px-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                {it.label}
+              </div>
+            );
+          }
+          
           const Icon = it.icon;
           if (it.children) {
             const childActive = it.children.some((c) => location.pathname.startsWith(c.path));
