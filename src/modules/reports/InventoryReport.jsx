@@ -8,7 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
 } from "recharts";
-import { PageHeader } from "../../components.jsx";
+import { ListHeader } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { fmt, fmtDate, toast } from "../../ui.js";
 import * as XLSX from "xlsx";
@@ -206,7 +206,17 @@ export default function InventoryReport({ lookups }) {
     })));
     XLSX.utils.book_append_sheet(wb, ws3, "Cảnh báo tồn");
 
-    XLSX.writeFile(wb, `bao-cao-kho-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bao-cao-kho-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    
     toast.success("Đã xuất Excel thành công!");
   };
 
@@ -219,19 +229,20 @@ export default function InventoryReport({ lookups }) {
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <PageHeader title="Báo cáo kho" icon={Warehouse} />
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-2 text-sm">
-            <RefreshCcw size={14} className={loading ? "animate-spin" : ""} /> Làm mới
-          </button>
-          <button onClick={exportExcel} className="btn-primary flex items-center gap-2 text-sm">
-            <Download size={14} /> Xuất Excel
-          </button>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <ListHeader 
+        title="Báo cáo kho" 
+        actions={
+          <>
+            <button onClick={load} disabled={loading} className="btn-ghost flex items-center gap-2 text-sm">
+              <RefreshCcw size={14} className={loading ? "animate-spin" : ""} /> Làm mới
+            </button>
+            <button onClick={exportExcel} className="btn-primary flex items-center gap-2 text-sm">
+              <Download size={14} /> Xuất Excel
+            </button>
+          </>
+        }
+      />
 
       {/* Filter bar */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm px-4 py-3 flex flex-wrap items-end gap-4">

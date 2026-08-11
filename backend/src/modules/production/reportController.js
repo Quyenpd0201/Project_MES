@@ -59,27 +59,127 @@ exports.kpi = async (req, res) => {
 
 exports.detailed = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
-    
-    let dateFilter = '';
+    const { fromDate, toDate, orderCode, productId, status } = req.query;
+
+    // Build filter conditions
     const params = [];
+    const conditions = ['po.is_deleted = FALSE'];
+
     if (fromDate && toDate) {
-      dateFilter = 'AND po.created_at >= $1 AND po.created_at <= $2';
       params.push(fromDate, toDate);
+      conditions.push(`po.created_at::date >= $${params.length - 1} AND po.created_at::date <= $${params.length}`);
     }
-    
-    const detailed = await db.query(`
-      SELECT po.id, po.order_code, po.quantity, po.unit, po.status, po.planned_date, po.due_date,
-             p.product_name, c.name AS customer_name
+    if (orderCode) {
+      params.push(`%${orderCode}%`);
+      conditions.push(`po.order_code ILIKE $${params.length}`);
+    }
+    if (productId) {
+      params.push(productId);
+      conditions.push(`po.product_id = $${params.length}`);
+    }
+    if (status && status !== 'Tất cả') {
+      params.push(status);
+      conditions.push(`po.status = $${params.length}`);
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Summary stats
+    const summaryQuery = await db.query(`
+      SELECT
+        COUNT(*)::int AS total_orders,
+        COALESCE(SUM(po.quantity), 0) AS total_plan_qty,
+        COALESCE(SUM(COALESCE(pt.done_qty, 0)), 0) AS total_done_qty,
+        COUNT(*) FILTER (WHERE po.status = 'Đang sản xuất')::int AS in_production,
+        COUNT(*) FILTER (WHERE po.due_date < CURRENT_DATE AND po.status NOT IN ('Hoàn thành', 'Đã hủy'))::int AS overdue
+      FROM production_orders po
+      LEFT JOIN (
+        SELECT production_order_id, SUM(actual_qty) AS done_qty
+        FROM production_tasks GROUP BY production_order_id
+      ) pt ON pt.production_order_id = po.id
+      WHERE ${whereClause}
+    `, params);
+
+    // Chart 1: Quantity by status (bar chart)
+    const byStatusQuery = await db.query(`
+      SELECT po.status, COALESCE(SUM(po.quantity), 0) AS plan_qty,
+             COALESCE(SUM(COALESCE(pt.done_qty, 0)), 0) AS done_qty,
+             COUNT(*)::int AS cnt
+      FROM production_orders po
+      LEFT JOIN (
+        SELECT production_order_id, SUM(actual_qty) AS done_qty
+        FROM production_tasks GROUP BY production_order_id
+      ) pt ON pt.production_order_id = po.id
+      WHERE ${whereClause}
+      GROUP BY po.status
+    `, params);
+
+    // Chart 2: Plan vs Done over time (line chart, group by planned_date)
+    const trendQuery = await db.query(`
+      SELECT to_char(po.planned_date, 'DD/MM') AS date,
+             COALESCE(SUM(po.quantity), 0) AS plan_qty,
+             COALESCE(SUM(COALESCE(pt.done_qty, 0)), 0) AS done_qty
+      FROM production_orders po
+      LEFT JOIN (
+        SELECT production_order_id, SUM(actual_qty) AS done_qty
+        FROM production_tasks GROUP BY production_order_id
+      ) pt ON pt.production_order_id = po.id
+      WHERE ${whereClause}
+      GROUP BY po.planned_date
+      ORDER BY po.planned_date
+    `, params);
+
+    // Chart 3: Status distribution (donut)
+    const statusDistQuery = await db.query(`
+      SELECT po.status AS name, COUNT(*)::int AS value
+      FROM production_orders po
+      WHERE ${whereClause}
+      GROUP BY po.status
+    `, params);
+
+    // Main list
+    const detailedQuery = await db.query(`
+      SELECT po.id, po.order_code, po.quantity, po.unit, po.status,
+             po.planned_date, po.due_date, po.note,
+             p.product_name, c.name AS customer_name,
+             COALESCE(pt.done_qty, 0) AS actual_qty
       FROM production_orders po
       JOIN products p ON p.id = po.product_id
       LEFT JOIN customers c ON c.id = po.customer_id
-      WHERE po.is_deleted = FALSE ${dateFilter}
+      LEFT JOIN (
+        SELECT production_order_id, SUM(actual_qty) AS done_qty
+        FROM production_tasks GROUP BY production_order_id
+      ) pt ON pt.production_order_id = po.id
+      WHERE ${whereClause}
       ORDER BY po.created_at DESC
-      LIMIT 100
+      LIMIT 200
     `, params);
 
-    res.json({ data: detailed.rows });
+    // Products list for filter dropdown
+    const productsQuery = await db.query(`
+      SELECT id, product_name FROM products
+      WHERE is_deleted = FALSE
+      ORDER BY product_name
+    `);
+
+    // Order codes list for filter dropdown
+    const orderCodesQuery = await db.query(`
+      SELECT order_code FROM production_orders
+      WHERE is_deleted = FALSE
+      ORDER BY order_code DESC
+    `);
+
+    res.json({
+      summary: summaryQuery.rows[0],
+      charts: {
+        byStatus: byStatusQuery.rows,
+        trend: trendQuery.rows,
+        statusDist: statusDistQuery.rows
+      },
+      data: detailedQuery.rows,
+      products: productsQuery.rows,
+      orderCodes: orderCodesQuery.rows.map(r => r.order_code)
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy dữ liệu chi tiết' });
@@ -96,15 +196,18 @@ exports.machines = async (req, res) => {
       GROUP BY status
     `);
 
-    // Dữ liệu máy để dự đoán và hiển thị tuổi thọ
+    // Dữ liệu máy — chỉ dùng các cột thực sự tồn tại trong schema
     const machinesQuery = await db.query(`
-      SELECT id, machine_code, name, factory, status, 
-             capacity_per_hour, expected_lifespan_hours, installation_date,
-             (SELECT COALESCE(SUM(EXTRACT(EPOCH FROM (COALESCE(t.actual_end_time, now()) - t.actual_start_time))/3600), 0)
-              FROM production_tasks t 
-              WHERE t.machine_id = machines.id AND t.actual_start_time IS NOT NULL) AS current_run_hours
-      FROM machines
-      WHERE is_deleted = FALSE
+      SELECT m.id, m.machine_code, m.name, m.factory, m.machine_type, m.status,
+             COALESCE(m.capacity_per_hour, 0) AS capacity_per_hour,
+             COUNT(t.id) FILTER (WHERE t.status = 'Hoàn thành')::int AS tasks_done,
+             COUNT(t.id)::int AS tasks_total,
+             COALESCE(SUM(t.actual_qty) FILTER (WHERE t.status = 'Hoàn thành'), 0) AS total_actual_qty
+      FROM machines m
+      LEFT JOIN production_tasks t ON t.machine_id = m.id
+      WHERE m.is_deleted = FALSE
+      GROUP BY m.id, m.machine_code, m.name, m.factory, m.machine_type, m.status, m.capacity_per_hour
+      ORDER BY m.machine_code
     `);
     
     // Dự đoán sản lượng trong 7 ngày tới dựa trên capacity

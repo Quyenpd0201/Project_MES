@@ -123,12 +123,9 @@ export const inventory = {
 
 export const reports = {
   kpi: () => http(`/reports/kpi`),
-  detailed: (fromDate, toDate) => {
-    let url = `/reports/detailed`;
-    if (fromDate && toDate) {
-      url += `?fromDate=${fromDate}&toDate=${toDate}`;
-    }
-    return http(url).then(r => r.data);
+  detailed: (params = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null && v !== 'Tất cả'));
+    return http(`/reports/detailed?${q.toString()}`).then(r => r);
   },
   machines: () => http(`/reports/machines`),
 };

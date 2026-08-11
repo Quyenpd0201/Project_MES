@@ -219,7 +219,16 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, cfg.title.slice(0, 31));
-    XLSX.writeFile(wb, `${cfg.title}.xlsx`);
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${cfg.title}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // ---- Tải file mẫu (chỉ tiêu đề các trường nhập) ----
@@ -227,7 +236,16 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
     const ws = XLSX.utils.aoa_to_sheet([cfg.fields.map((f) => f.label)]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Mau");
-    XLSX.writeFile(wb, `Mau_${cfg.title}.xlsx`);
+    const wbout2 = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob2 = new Blob([wbout2], { type: 'application/octet-stream' });
+    const url2 = URL.createObjectURL(blob2);
+    const a2 = document.createElement('a');
+    a2.href = url2;
+    a2.download = `Mau_${cfg.title}.xlsx`;
+    document.body.appendChild(a2);
+    a2.click();
+    document.body.removeChild(a2);
+    setTimeout(() => URL.revokeObjectURL(url2), 1000);
   };
 
   // ---- Import Excel ----
