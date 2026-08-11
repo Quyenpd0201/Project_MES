@@ -138,7 +138,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
               <tr>
                 <th className="text-left px-4 py-2.5">Sản phẩm</th>
                 <th className="text-left px-4 py-2.5">Thông số</th>
-                <th className="text-right px-4 py-2.5 w-24">SL</th>
+                <th className="text-right px-4 py-2.5 w-24" title="Số lượng Kế hoạch">SL KH</th>
+                <th className="text-right px-4 py-2.5 w-28" title="Số lượng Thực tế">SL Thực tế</th>
                 <th className="text-left px-4 py-2.5 w-20">ĐVT</th>
                 {showMoney && <th className="text-right px-4 py-2.5 w-32">Đơn giá</th>}
                 {showMoney && <th className="text-right px-4 py-2.5 w-36">Thành tiền</th>}
@@ -147,7 +148,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
             </thead>
             <tbody className="divide-y divide-slate-100">
               {items.map((it) => {
-                const amount = (Number(it.quantity) || 0) * (Number(it.unit_price) || 0);
+                const actQty = it.actual_quantity === "" || it.actual_quantity == null ? null : Number(it.actual_quantity);
+                const amount = (actQty !== null ? actQty : (Number(it.quantity) || 0)) * (Number(it.unit_price) || 0);
                 return (
                   <tr key={it._k}>
                     <td className="px-4 py-1.5">
@@ -158,6 +160,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                     </td>
                     <td className="px-4 py-1.5 text-slate-500">{specShort(it.specs) || "—"}</td>
                     <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upItem(it._k, "quantity", e.target.value)} /></td>
+                    <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right font-medium text-blue-600"} value={it.actual_quantity !== null && it.actual_quantity !== undefined ? it.actual_quantity : ""} placeholder={it.quantity || "0"} onChange={(e) => upItem(it._k, "actual_quantity", e.target.value)} /></td>
                     <td className="px-4 py-1.5"><UnitSelect value={it.unit} onChange={(v) => upItem(it._k, "unit", v)} /></td>
                     {showMoney && <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} disabled={!moneyEdit} value={it.unit_price} onChange={(e) => upItem(it._k, "unit_price", e.target.value)} /></td>}
                     {showMoney && <td className="px-4 py-1.5 text-right font-semibold text-slate-800">{fmt(amount)}</td>}
@@ -255,7 +258,7 @@ function DeliveryVoucher({ id, onBack }) {
                 <td className={td + " text-center"}>{it ? i + 1 : ""}</td>
                 <td className={td}>{it ? <><span className="font-medium">{it.product_name}</span>{specShort(it.specs) ? <span className="text-slate-500"> · {specShort(it.specs)}</span> : null}</> : ""}</td>
                 <td className={td + " text-center"}>{it ? it.unit : ""}</td>
-                <td className={td + " text-right"}>{it ? fmt(it.quantity) : ""}</td>
+                <td className={td + " text-right"}>{it ? (it.actual_quantity !== null && it.actual_quantity !== undefined && it.actual_quantity !== "" ? fmt(it.actual_quantity) : fmt(it.quantity)) : ""}</td>
                 {showMoney && <td className={td + " text-right"}>{it ? fmt(it.unit_price) : ""}</td>}
                 {showMoney && <td className={td + " text-right"}>{it ? fmt(it.amount) : ""}</td>}
                 <td className={td}>{it ? (it.note || "") : ""}</td>

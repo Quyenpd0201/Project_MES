@@ -5,7 +5,7 @@ export const PRODUCT_SPECS = [
   { name: "Chiều ngang", kind: "num", unit: "Cm" },
   { name: "Chiều dài", kind: "num", unit: "Cm" },
   { name: "Độ dày", kind: "numunit", units: ["dem", "cem", "zem"] },
-  { name: "Màu sắc", kind: "select", options: ["Trắng", "Đỏ", "Cam", "Vàng", "Lục", "Lam", "Chàm", "Tím"] },
+  { name: "Màu sắc", kind: "text", placeholder: "vd: Trắng sữa" },
 ];
 export const SPEC_NAMES = PRODUCT_SPECS.map((s) => s.name);
 

@@ -68,12 +68,13 @@ async function saveItems(client, noteId, items) {
   for (const it of list) {
     const p = it.product_id ? pmap[it.product_id] : null;
     const qty = num(it.quantity), price = num(it.unit_price);
-    const amount = qty * price; total += amount;
+    const actQty = it.actual_quantity === '' || it.actual_quantity == null ? null : num(it.actual_quantity);
+    const amount = (actQty !== null ? actQty : qty) * price; total += amount;
     await client.query(
-      `INSERT INTO delivery_note_items (delivery_note_id, product_id, product_name, specs, quantity, unit, unit_price, amount, line_no)
-       VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9)`,
+      `INSERT INTO delivery_note_items (delivery_note_id, product_id, product_name, specs, quantity, unit, unit_price, amount, line_no, actual_quantity)
+       VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10)`,
       [noteId, it.product_id || null, it.product_name || (p && p.product_name) || null, JSON.stringify(it.specs || {}),
-       qty, upUnit(it.unit || (p && p.unit)), price, amount, n++]);
+       qty, upUnit(it.unit || (p && p.unit)), price, amount, n++, actQty]);
   }
   return total;
 }
