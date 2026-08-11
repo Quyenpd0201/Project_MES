@@ -555,7 +555,7 @@ function WarehouseLimitsList({ limits, setLimits, lookups, disabled, productUnit
 function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   const [form, setForm] = useState({
     product_name: "", production_area: "", category: "", product_types: ["Thành phẩm"],
-    product_group: "", unit: "cm", barcode_type: "", tracking_type: "Theo lô",
+    product_group: "", unit: "Cm", barcode_type: "", tracking_type: "Theo lô",
     is_pqc_required: false, status: "Hoạt động", description: "",
   });
   const [warehouseLimits, setWarehouseLimits] = useState([]);
