@@ -278,10 +278,19 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       {!fhid("attributes") && (
       <Section title={<>Thông số đặc thù <span className="text-slate-400 font-normal">(kế thừa xuyên suốt)</span></>}>
         <fieldset disabled={fdis("attributes")}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Field label="Kích thước">
-            <input className={inputCls} list="sizes" value={f.attr_size} onChange={(e) => set("attr_size", e.target.value)} placeholder="vd: 20x30cm" />
-            <datalist id="sizes">{(lookups.sizes || []).map((s) => <option key={s} value={s} />)}</datalist>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Field label="Chiều dài (Cm)">
+            <input className={inputCls} list="sizes" value={(f.attr_size || "").split('x')[0] || ""} onChange={(e) => {
+              const r = (f.attr_size || "").split('x')[1] || "";
+              set("attr_size", e.target.value ? `${e.target.value}x${r}` : (r ? `x${r}` : ""));
+            }} placeholder="vd: 30" />
+            <datalist id="sizes">{(lookups.sizes || []).map((s) => <option key={s} value={s.split('x')[0]} />)}</datalist>
+          </Field>
+          <Field label="Chiều rộng (Cm)">
+            <input className={inputCls} value={(f.attr_size || "").split('x')[1] || ""} onChange={(e) => {
+              const d = (f.attr_size || "").split('x')[0] || "";
+              set("attr_size", e.target.value ? `${d}x${e.target.value}` : (d ? `${d}x` : ""));
+            }} placeholder="vd: 20" />
           </Field>
           <Field label="Độ dày">
             <input className={inputCls} list="thicknesses" value={f.attr_thickness} onChange={(e) => set("attr_thickness", e.target.value)} placeholder="vd: 20mic" />

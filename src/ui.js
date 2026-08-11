@@ -14,7 +14,7 @@ export const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "�
 export const fmtDateTime = (d) => (d ? new Date(d).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
 
 // Danh mục đơn vị tính dùng chung (chọn từ dropdown, không nhập tự do)
-export const UNITS = ["Kg", "Cái", "Chiếc", "Dem", "Gram", "Cuộn", "Thùng"];
+export const UNITS = ["Kg", "Cái", "Chiếc", "Dem", "Gram", "Cuộn", "Thùng", "cm"];
 
 // Badge trạng thái dùng chung (map màu theo trạng thái lệnh SX / đơn hàng)
 const STATUS_COLORS = {

@@ -13,9 +13,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 // Thông tin đơn vị bán hàng (in trên phiếu xuất kho)
 const COMPANY = {
-  name: "CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT BAO BÌ NGỌC AN THƯ",
+  name: "CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT XNK BAO BÌ NGỌC AN THƯ",
   tax: "0316748578",
-  address: "Số 8F3, Đường DD6, Khu Phố 4, P. Tân Hưng Thuận, Quận 12, TP. HCM",
+  address: "119/1 Đường Đỗ Mười, Tổ 4, Khu phố 1, Phường Thới An, Thành Phố Hồ Chí Minh",
   phone: "0938 446 156",
 };
 const MIN_ROWS = 8; // số dòng tối thiểu của bảng (in giấy cho đẹp)

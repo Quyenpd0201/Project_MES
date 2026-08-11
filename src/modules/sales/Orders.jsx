@@ -327,7 +327,7 @@ function OrderVoucher({ id, onBack }) {
         <div className="flex items-center gap-4 border-b-2 border-blue-700 pb-3 mb-4">
           <Logo className="h-14 w-auto shrink-0" />
           <div className="flex-1 text-center">
-            <div className="text-sm font-semibold text-slate-700">CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT BAO BÌ NGỌC AN THƯ</div>
+            <div className="text-sm font-semibold text-slate-700">CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT XNK BAO BÌ NGỌC AN THƯ</div>
             <h2 className="text-xl font-bold text-slate-900 mt-2 uppercase">Phiếu đặt hàng</h2>
             <div className="text-sm text-slate-600 mt-0.5">Số: <b>{o.order_code}</b></div>
           </div>

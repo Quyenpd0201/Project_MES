@@ -501,7 +501,7 @@ function ProductFields({ form, set, disabled, code }) {
   );
 }
 
-function WarehouseLimitsList({ limits, setLimits, lookups, disabled }) {
+function WarehouseLimitsList({ limits, setLimits, lookups, disabled, productUnit }) {
   const addLimit = () => setLimits((l) => [...l, { _key: Date.now(), warehouse_id: "", min_quantity: "", max_quantity: "" }]);
   const removeLimit = (key) => setLimits((l) => l.filter((x) => x._key !== key));
   const updateLimit = (key, field, val) => setLimits((l) => l.map((x) => (x._key === key ? { ...x, [field]: val } : x)));
@@ -526,11 +526,17 @@ function WarehouseLimitsList({ limits, setLimits, lookups, disabled }) {
               </div>
               <div className="w-32">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Tồn tối thiểu</label>
-                <input type="number" min="0" className={inputCls} disabled={disabled} value={l.min_quantity || ""} onChange={(e) => updateLimit(l._key, "min_quantity", e.target.value)} placeholder="0" />
+                <div className="relative">
+                  <input type="number" min="0" className={inputCls + (productUnit ? " pr-10" : "")} disabled={disabled} value={l.min_quantity || ""} onChange={(e) => updateLimit(l._key, "min_quantity", e.target.value)} placeholder="0" />
+                  {productUnit && <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-medium pointer-events-none">{productUnit}</span>}
+                </div>
               </div>
               <div className="w-32">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Tồn tối đa</label>
-                <input type="number" min="0" className={inputCls} disabled={disabled} value={l.max_quantity || ""} onChange={(e) => updateLimit(l._key, "max_quantity", e.target.value)} placeholder="0" />
+                <div className="relative">
+                  <input type="number" min="0" className={inputCls + (productUnit ? " pr-10" : "")} disabled={disabled} value={l.max_quantity || ""} onChange={(e) => updateLimit(l._key, "max_quantity", e.target.value)} placeholder="0" />
+                  {productUnit && <span className="absolute right-2.5 top-1.5 text-[11px] text-slate-400 font-medium pointer-events-none">{productUnit}</span>}
+                </div>
               </div>
               {!disabled && (
                 <button onClick={() => removeLimit(l._key)} className="mt-5 p-2 text-rose-500 hover:bg-rose-100 rounded-md transition" title="Xóa">
@@ -549,7 +555,7 @@ function WarehouseLimitsList({ limits, setLimits, lookups, disabled }) {
 function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   const [form, setForm] = useState({
     product_name: "", production_area: "", category: "", product_types: ["Thành phẩm"],
-    product_group: "", unit: "", barcode_type: "", tracking_type: "Theo lô",
+    product_group: "", unit: "cm", barcode_type: "", tracking_type: "Theo lô",
     is_pqc_required: false, status: "Hoạt động", description: "",
   });
   const [warehouseLimits, setWarehouseLimits] = useState([]);
@@ -628,7 +634,7 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
         actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu sản phẩm</button>} />
 
       <ProductFields form={form} set={set} code={code} disabled={false} />
-      <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={false} />
+      <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={false} productUnit={form.unit} />
 
       <style>{`
         .attr-row { animation: slideIn .18s ease; }
@@ -749,7 +755,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       {tab === "info" && (
         <>
           <ProductFields disabled={!editing} form={form} set={set} code={p.product_code} />
-          <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={!editing} />
+          <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={!editing} productUnit={form.unit} />
 
           <Section title="Hình ảnh & tài liệu"
             action={can("products", "edit") && (
