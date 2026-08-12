@@ -174,11 +174,21 @@ export default function InventoryReport({ lookups }) {
   });
   const warehouseBarData = [...whMap.entries()].map(([name, value]) => ({ name, value }));
 
-  /* ── F. Top sản phẩm tồn kho ────────────────────────────────── */
+  /* ── F. Top sản phẩm tồn kho ─────────────────────────────── */
   const topProducts = [...filteredStock]
     .sort((a, b) => (Number(b.total) || 0) - (Number(a.total) || 0))
     .slice(0, 8)
-    .map(p => ({ name: p.product_code || p.product_name, value: Number(p.total) || 0, unit: p.unit }));
+    .map(p => ({
+      code:           p.product_code || '',
+      name:           p.product_name || '',
+      label:          `${p.product_code} · ${p.product_name}`,
+      value:          Number(p.total) || 0,
+      unit:           p.unit || '',
+      warehouse_totals: p.warehouse_totals || {},
+    }));
+
+  // Max value cho thanh bar tương đối
+  const topMax = topProducts[0]?.value || 1;
 
   /* ── Export Excel ────────────────────────────────────────────── */
   const exportExcel = () => {
@@ -468,20 +478,88 @@ export default function InventoryReport({ lookups }) {
         {topProducts.length === 0 ? (
           <div className="h-48 flex items-center justify-center text-slate-400 text-sm">Chưa có dữ liệu</div>
         ) : (
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topProducts} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="Tồn kho" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={20}>
-                  {topProducts.map((_, i) => (
-                    <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left">Mã SP</th>
+                  <th className="px-4 py-3 text-left">Tên sản phẩm</th>
+                  <th className="px-4 py-3 text-right">Tổng tồn</th>
+                  <th className="px-4 py-3 text-left" style={{ minWidth: 180 }}>Tồn theo kho</th>
+                  <th className="px-4 py-3 text-left">Tỷ lệ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {topProducts.map((p, idx) => {
+                  const warehouseEntries = Object.entries(p.warehouse_totals)
+                    .map(([wid, qty]) => ({
+                      wh: (lookups?.warehouses || []).find(x => String(x.id) === String(wid)),
+                      qty: Number(qty) || 0,
+                      wid,
+                    }))
+                    .filter(e => e.qty > 0)
+                    .sort((a, b) => b.qty - a.qty);
+
+                  const pct = Math.round((p.value / topMax) * 100);
+
+                  return (
+                    <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                      {/* Mã SP */}
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-blue-600 whitespace-nowrap">
+                        {p.code}
+                      </td>
+                      {/* Tên SP */}
+                      <td className="px-4 py-3 text-slate-700 max-w-[180px] truncate" title={p.name}>
+                        {p.name}
+                      </td>
+                      {/* Tổng tồn */}
+                      <td className="px-4 py-3 text-right font-bold text-slate-800 whitespace-nowrap">
+                        {fmt(p.value)}
+                        <span className="ml-1 text-xs font-normal text-slate-400">{p.unit}</span>
+                      </td>
+                      {/* Tồn theo kho */}
+                      <td className="px-4 py-3">
+                        {warehouseEntries.length === 0 ? (
+                          <span className="text-slate-300 text-xs">Chưa phân kho</span>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {warehouseEntries.map((e, wi) => (
+                              <span key={wi}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium"
+                                style={{
+                                  background: `${DONUT_COLORS[wi % DONUT_COLORS.length]}18`,
+                                  color: DONUT_COLORS[wi % DONUT_COLORS.length],
+                                  border: `1px solid ${DONUT_COLORS[wi % DONUT_COLORS.length]}40`,
+                                }}
+                              >
+                                <span className="font-semibold">{e.wh?.name || `Kho ${e.wid.slice(0,6)}…`}</span>
+                                <span className="opacity-70">·</span>
+                                <span>{fmt(e.qty)}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      {/* Thanh tỷ lệ */}
+                      <td className="px-4 py-3" style={{ minWidth: 100 }}>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${pct}%`,
+                                background: DONUT_COLORS[idx % DONUT_COLORS.length],
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-400 w-8 text-right">{pct}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </ChartCard>
