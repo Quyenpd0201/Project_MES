@@ -162,20 +162,20 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
     
     { type: "header", label: "THÔNG TIN CHUNG" },
-    { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
-    { key: "bom", label: "Định mức (BOM)", icon: FlaskConical, path: "/bom" },
-    { key: "process", label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
-    { key: "md:machines", label: "Máy móc", icon: Wrench, path: "/master-data/machines", perm: "masterdata" },
-    { key: "md:employees", label: "Nhân viên", icon: Users, path: "/master-data/employees", perm: "masterdata" },
-    { key: "md:shifts", label: "Ca làm việc", icon: Clock, path: "/master-data/shifts", perm: "masterdata" },
-    { key: "md:warehouses", label: "Kho", icon: Warehouse, path: "/master-data/warehouses", perm: "masterdata" },
-    { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations", perm: "masterdata" },
-    { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers", perm: "masterdata" },
-    
+    { key: "products",     label: "Sản phẩm",         icon: Package,    path: "/products" },
+    { key: "bom",          label: "Định mức (BOM)",    icon: FlaskConical, path: "/bom" },
+    { key: "process",      label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
+    { key: "md:machines",  label: "Máy móc",           icon: Wrench,     path: "/master-data/machines",  perm: "md_machines" },
+    { key: "md:employees", label: "Nhân viên",          icon: Users,      path: "/master-data/employees", perm: "md_employees" },
+    { key: "md:shifts",    label: "Ca làm việc",        icon: Clock,      path: "/master-data/shifts",    perm: "md_shifts" },
+    { key: "md:warehouses",label: "Kho (danh mục)",    icon: Warehouse,  path: "/master-data/warehouses",perm: "md_warehouses" },
+    { key: "md:locations", label: "Vị trí lưu trữ",    icon: MapPin,     path: "/master-data/locations", perm: "md_locations" },
+    { key: "md:customers", label: "Khách hàng",         icon: Users,      path: "/master-data/customers", perm: "md_customers" },
+
     { type: "header", label: "QUẢN TRỊ HỆ THỐNG" },
-    { key: "users", label: "Tài khoản", icon: UserCog, adminOnly: true, path: "/users" },
-    { key: "md:roles", label: "Vai trò", icon: Shield, path: "/master-data/roles", perm: "masterdata" },
-    { key: "permissions", label: "Phân quyền", icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+    { key: "users",        label: "Tài khoản",          icon: UserCog,    adminOnly: true, path: "/users" },
+    { key: "md:roles",     label: "Vai trò",             icon: Shield,     path: "/master-data/roles",    perm: "md_roles" },
+    { key: "permissions",  label: "Phân quyền",          icon: ShieldCheck, adminOnly: true, path: "/permissions" },
   ];
   const isAdmin = !!user?.is_admin;
   const canSee = (it) => {
@@ -1207,7 +1207,14 @@ export default function MesApp() {
       { key: "bom", path: "/bom" }, { key: "process", path: "/process" },
       { key: "inventory", path: "/inventory" }, { key: "qrlabels", path: "/qrlabels" },
       { key: "qrscan", path: "/qrscan" }, { key: "workschedule", path: "/workschedule" },
-      { key: "masterdata", path: "/master-data/customers" }
+      { key: "md_customers",  path: "/master-data/customers" },
+      { key: "md_employees",  path: "/master-data/employees" },
+      { key: "md_machines",   path: "/master-data/machines" },
+      { key: "md_shifts",     path: "/master-data/shifts" },
+      { key: "md_warehouses", path: "/master-data/warehouses" },
+      { key: "md_locations",  path: "/master-data/locations" },
+      { key: "md_roles",      path: "/master-data/roles" },
+      { key: "masterdata",    path: "/master-data/customers" }, // backward compat
     ];
     const first = order.find((k) => perms[k.key]?.view);
     if (first) navigate(first.path, { replace: true });

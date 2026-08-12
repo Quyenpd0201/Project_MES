@@ -69,7 +69,16 @@ module.exports.requirePerm = (permString) => {
       'inventory':   ['inventory', 'inv_inbound', 'inv_outbound', 'inv_transfer', 'inv_adjust'],
       'trace':       ['qrscan', 'trace_lot'],
       'reports':     ['reports', 'rep_inv'],
-      'sys':         ['masterdata', 'users', 'roles'],
+      // Danh mục: mỗi module có key riêng; 'sys' map toàn bộ danh mục
+      'sys':         ['md_machines', 'md_employees', 'md_shifts', 'md_warehouses', 'md_locations', 'md_customers', 'md_roles', 'masterdata'],
+      // Alias trực tiếp (khi backend dùng key cụ thể)
+      'md_machines':  ['md_machines'],
+      'md_employees': ['md_employees'],
+      'md_shifts':    ['md_shifts'],
+      'md_warehouses':['md_warehouses'],
+      'md_locations': ['md_locations'],
+      'md_customers': ['md_customers'],
+      'md_roles':     ['md_roles'],
     };
     
     const possibleModules = appMap[moduleKey] || [moduleKey];

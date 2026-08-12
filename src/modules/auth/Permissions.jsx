@@ -55,7 +55,19 @@ const APPS = [
     ["name", "Tên định mức"], ["bom_type", "Loại định mức"], ["product_id", "Sản phẩm đầu ra"],
     ["output_quantity", "Định mức SL"], ["lines", "Thành phần / NVL"] ] },
   { key: "process", label: "Quy trình công nghệ" },
-  { key: "masterdata", label: "Danh mục (Máy móc, Nhân viên, Ca, Kho, Khách hàng, Vai trò...)" },
+
+  // ── DANH MỤC (mỗi module riêng biệt) ────────────────────────────────────
+  { key: "md_machines",  label: "Máy móc" },
+  { key: "md_employees", label: "Nhân viên", fields: [
+    ["full_name", "Họ tên"], ["employee_code", "Mã NV"], ["factory", "Tổ / Bộ phận"],
+    ["position", "Chức vụ"], ["phone", "Số điện thoại"], ["status", "Trạng thái"] ] },
+  { key: "md_shifts",    label: "Ca làm việc" },
+  { key: "md_warehouses",label: "Kho (danh mục)" },
+  { key: "md_locations", label: "Vị trí lưu trữ" },
+  { key: "md_customers", label: "Khách hàng", fields: [
+    ["name", "Tên khách hàng"], ["phone", "Điện thoại"], ["address", "Địa chỉ"],
+    ["tax_code", "Mã số thuế"], ["contact", "Người liên hệ"], ["note", "Ghi chú"] ] },
+  { key: "md_roles",     label: "Vai trò" },
 ];
 
 const ACTIONS = [
