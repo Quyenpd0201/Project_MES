@@ -73,14 +73,29 @@ function KpiReport() {
     perf: t.plan_qty > 0 ? ((t.actual_qty / t.plan_qty) * 100).toFixed(1) : 0
   }));
 
-  const FPY = charts.quality.passed > 0 
-    ? ((charts.quality.passed / (charts.quality.passed + charts.quality.failed)) * 100).toFixed(1)
-    : 100;
-  
-  const qualData = [
-    { name: 'Đạt', value: Number(charts.quality.passed) || 1 }, // fallbacks cho UI nếu chưa có data
-    { name: 'Không đạt', value: Number(charts.quality.failed) || 0 }
-  ];
+  // F. Tỷ lệ phế phẩm / chất lượng
+  // passed = SUM(actual_qty): tổng sản phẩm hoàn thành
+  // failed = SUM(scrap_qty) : tổng phế phẩm
+  const completedQty = Number(charts.quality.passed) || 0;
+  const scrapQty     = Number(charts.quality.failed) || 0;
+  const totalQty     = completedQty + scrapQty;
+
+  // Tỷ lệ phế phẩm (%) = scrap / (hoàn thành + scrap)
+  const scrapRate = totalQty > 0
+    ? ((scrapQty / totalQty) * 100).toFixed(1)
+    : '0.0';
+
+  // Tỷ lệ đạt chất lượng (%) = hoàn thành / tổng
+  const passRate = totalQty > 0
+    ? ((completedQty / totalQty) * 100).toFixed(1)
+    : '100.0';
+
+  const qualData = totalQty > 0
+    ? [
+        { name: 'Đạt',      value: completedQty },
+        { name: 'Phế phẩm', value: scrapQty },
+      ]
+    : [{ name: 'Chưa có dữ liệu', value: 1 }]; // placeholder khi chưa có data
 
   return (
     <div className="space-y-6">
@@ -182,24 +197,76 @@ function KpiReport() {
           </div>
         </div>
 
-        {/* F. Tỷ lệ đạt chất lượng */}
+        {/* F. Tỷ lệ đạt chất lượng / Phế phẩm */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
-          <h3 className="text-base font-semibold mb-4 text-slate-800">F. Tỷ lệ đạt chất lượng (FPY)</h3>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 mt-3 text-center">
-             <span className="block text-2xl font-bold text-slate-700">{FPY}%</span>
-             <span className="block text-xs text-slate-400">FPY</span>
-          </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={qualData} cx="50%" cy="50%" innerRadius={70} outerRadius={90} paddingAngle={2} dataKey="value">
-                  <Cell fill="#10b981" />
-                  <Cell fill="#ef4444" />
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+          <h3 className="text-base font-semibold mb-1 text-slate-800">F. Tỷ lệ đạt chất lượng</h3>
+          <p className="text-xs text-slate-400 mb-3">Phế phẩm so với sản phẩm hoàn thành</p>
+          <div className="flex items-center gap-4">
+            {/* Donut chart */}
+            <div className="relative" style={{ width: 160, height: 160, flexShrink: 0 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={qualData}
+                    cx="50%" cy="50%"
+                    innerRadius={52} outerRadius={72}
+                    paddingAngle={totalQty > 0 ? 2 : 0}
+                    dataKey="value"
+                    startAngle={90} endAngle={-270}
+                  >
+                    {totalQty > 0
+                      ? [<Cell key="pass" fill="#10b981" />, <Cell key="fail" fill="#ef4444" />]
+                      : [<Cell key="empty" fill="#e2e8f0" />]
+                    }
+                  </Pie>
+                  <Tooltip
+                    formatter={(value, name) => [
+                      `${Number(value).toLocaleString('vi-VN')} sp`,
+                      name
+                    ]}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+              {/* Center label */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                {totalQty > 0 ? (
+                  <>
+                    <span className="text-xl font-bold text-slate-800 leading-none">{passRate}%</span>
+                    <span className="text-[10px] text-slate-400 mt-0.5">Đạt CL</span>
+                  </>
+                ) : (
+                  <span className="text-xs text-slate-400 text-center leading-tight px-2">Chưa có dữ liệu</span>
+                )}
+              </div>
+            </div>
+
+            {/* Stats bên phải */}
+            <div className="flex-1 space-y-3">
+              <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-emerald-800">Hoàn thành</span>
+                </div>
+                <div className="text-right">
+                  <span className="block text-base font-bold text-emerald-700">{completedQty.toLocaleString('vi-VN')}</span>
+                  <span className="text-[10px] text-emerald-500">{passRate}%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 border border-red-100">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-red-800">Phế phẩm</span>
+                </div>
+                <div className="text-right">
+                  <span className="block text-base font-bold text-red-700">{scrapQty.toLocaleString('vi-VN')}</span>
+                  <span className="text-[10px] text-red-500">{scrapRate}%</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
+                <span className="text-xs text-slate-500">Tổng đã xử lý</span>
+                <span className="text-sm font-semibold text-slate-700">{totalQty.toLocaleString('vi-VN')} sp</span>
+              </div>
+            </div>
           </div>
         </div>
 
