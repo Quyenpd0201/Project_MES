@@ -291,9 +291,12 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
                 {open && !collapsed && (
                   <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
                     {it.children.map((c) => (
-                      <NavLink key={c.key} to={c.path} onClick={() => onCloseMobile?.()}
-                        className={({ isActive }) => `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
-                          isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`}>
+                      <NavLink key={c.key} to={c.path} end={true} onClick={() => onCloseMobile?.()}
+                        className={({ isActive }) => {
+                          const active = isActive || (c.key === 'products' && location.pathname.startsWith('/products'));
+                          return `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
+                            active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
+                        }}>
                         <c.icon size={15} className="shrink-0" /> <span className="truncate">{c.label}</span>
                       </NavLink>
                     ))}
