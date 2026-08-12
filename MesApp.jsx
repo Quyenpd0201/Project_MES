@@ -181,7 +181,8 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   const canSee = (it) => {
     if (isAdmin || it.always) return true;
     if (it.adminOnly) return false;
-    return !!user?.permissions?.[it.perm || it.key]?.view;
+    const v = user?.permissions?.[it.perm || it.key]?.view;
+    return v === 'ALLOW' || v === true;
   };
   const items = allItems.filter(canSee);
   const [expanded, setExpanded] = useState({});
@@ -1199,7 +1200,7 @@ export default function MesApp() {
   useEffect(() => {
     if (!user || user.is_admin || location.pathname !== "/") return;
     const perms = user.permissions || {};
-    if (perms.dashboard?.view) return; // được xem dashboard thì giữ nguyên
+    if (perms.dashboard?.view === 'ALLOW' || perms.dashboard?.view === true) return;
     const order = [
       { key: "execution", path: "/execution" }, { key: "production", path: "/production" },
       { key: "planning", path: "/planning" }, { key: "orders", path: "/orders" },
@@ -1216,7 +1217,7 @@ export default function MesApp() {
       { key: "md_roles",      path: "/master-data/roles" },
       { key: "masterdata",    path: "/master-data/customers" }, // backward compat
     ];
-    const first = order.find((k) => perms[k.key]?.view);
+    const first = order.find((k) => perms[k.key]?.view === 'ALLOW' || perms[k.key]?.view === true);
     if (first) navigate(first.path, { replace: true });
   }, [user, location.pathname, navigate]);
 
