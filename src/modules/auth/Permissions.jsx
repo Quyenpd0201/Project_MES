@@ -6,7 +6,46 @@ import { inputCls, toast } from "../../ui.js";
 
 /* Đăng ký ứng dụng + trường để phân quyền */
 const APPS = [
+  // ── DASHBOARD ────────────────────────────────────────────────────────
   { key: "dashboard", label: "Dashboard" },
+
+  // ── KINH DOANH ───────────────────────────────────────────────────────
+  { key: "orders", label: "Đơn hàng", fields: [
+    ["customer_id", "Khách hàng"], ["order_date", "Ngày đặt"], ["due_date", "Ngày giao"],
+    ["status", "Trạng thái"], ["note", "Ghi chú"], ["items", "Dòng hàng"] ] },
+  { key: "deliveries", label: "Phiếu giao hàng & thanh toán", fields: [
+    ["customer_id", "Khách hàng"], ["delivery_date", "Ngày giao"], ["status", "Trạng thái"],
+    ["items", "Dòng hàng"], ["amounts", "Thông tin tiền (đơn giá / tổng / đã trả / công nợ)"] ] },
+
+  // ── KẾ HOẠCH ─────────────────────────────────────────────────────────
+  { key: "planning", label: "Kế hoạch sản xuất" },
+  { key: "workschedule", label: "Lịch sản xuất" },
+
+  // ── SẢN XUẤT ─────────────────────────────────────────────────────────
+  { key: "production", label: "Lệnh sản xuất", fields: [
+    ["product_id", "Sản phẩm"], ["customer_id", "Khách hàng"], ["quantity", "Số lượng"],
+    ["attributes", "Thông số (màu/KT/dày)"], ["finishing", "Yêu cầu gia công"], ["tasks", "Phân công / lô"] ] },
+  { key: "orderstatus", label: "Lệnh theo trạng thái" },
+  { key: "execution", label: "Thực thi sản xuất" },
+  { key: "prod_output", label: "Sản lượng" },
+  { key: "qrlabels", label: "In tem xuất xứ" },
+
+  // ── KHO ──────────────────────────────────────────────────────────────
+  { key: "inventory", label: "Tồn kho" },
+  { key: "inv_inbound", label: "Nhập kho" },
+  { key: "inv_outbound", label: "Xuất kho" },
+  { key: "inv_transfer", label: "Chuyển kho" },
+  { key: "inv_adjust", label: "Điều chỉnh tồn kho" },
+
+  // ── TRUY XUẤT ────────────────────────────────────────────────────────
+  { key: "qrscan", label: "Tra cứu xuất xứ" },
+  { key: "trace_lot", label: "Truy xuất lô" },
+
+  // ── BÁO CÁO ──────────────────────────────────────────────────────────
+  { key: "reports", label: "Báo cáo KPI" },
+  { key: "rep_inv", label: "Báo cáo kho" },
+
+  // ── THÔNG TIN CHUNG ───────────────────────────────────────────────────
   { key: "products", label: "Sản phẩm", fields: [
     ["product_name", "Tên sản phẩm"], ["product_type", "Loại sản phẩm"], ["production_area", "Khu vực SX"],
     ["category", "Danh mục"], ["product_group", "Nhóm SP"], ["unit", "Đơn vị tính"], ["barcode_type", "Loại mã vạch"],
@@ -15,23 +54,8 @@ const APPS = [
   { key: "bom", label: "Định mức (BOM)", fields: [
     ["name", "Tên định mức"], ["bom_type", "Loại định mức"], ["product_id", "Sản phẩm đầu ra"],
     ["output_quantity", "Định mức SL"], ["lines", "Thành phần / NVL"] ] },
-  { key: "orders", label: "Đơn hàng", fields: [
-    ["customer_id", "Khách hàng"], ["order_date", "Ngày đặt"], ["due_date", "Ngày giao"],
-    ["status", "Trạng thái"], ["note", "Ghi chú"], ["items", "Dòng hàng"] ] },
-  { key: "deliveries", label: "Phiếu giao hàng & thanh toán", fields: [
-    ["customer_id", "Khách hàng"], ["delivery_date", "Ngày giao"], ["status", "Trạng thái"],
-    ["items", "Dòng hàng"], ["amounts", "Thông tin tiền (đơn giá / tổng / đã trả / công nợ)"] ] },
   { key: "process", label: "Quy trình công nghệ" },
-  { key: "planning", label: "Kế hoạch" },
-  { key: "production", label: "Sản xuất", fields: [
-    ["product_id", "Sản phẩm"], ["customer_id", "Khách hàng"], ["quantity", "Số lượng"],
-    ["attributes", "Thông số (màu/KT/dày)"], ["finishing", "Yêu cầu gia công"], ["tasks", "Phân công / lô"] ] },
-  { key: "execution", label: "Thực thi sản xuất" },
-  { key: "qrlabels", label: "Tem QR" },
-  { key: "qrscan", label: "Quét QR" },
-  { key: "workschedule", label: "Lịch làm việc" },
-  { key: "inventory", label: "Tồn kho" },
-  { key: "masterdata", label: "Danh mục (master data)" },
+  { key: "masterdata", label: "Danh mục (Máy móc, Nhân viên, Ca, Kho, Khách hàng, Vai trò...)" },
 ];
 
 const ACTIONS = [

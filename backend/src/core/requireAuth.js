@@ -64,10 +64,12 @@ module.exports.requirePerm = (permString) => {
     // Map old backend perm strings to new frontend app keys
     const appMap = {
       'engineering': ['products', 'bom', 'process'],
-      'sales': ['orders', 'deliveries'],
-      'production': ['production', 'planning', 'workschedule', 'execution'],
-      'inventory': ['inventory'],
-      'sys': ['masterdata', 'users', 'roles'] // approximated
+      'sales':       ['orders', 'deliveries'],
+      'production':  ['production', 'planning', 'workschedule', 'execution', 'orderstatus', 'prod_output'],
+      'inventory':   ['inventory', 'inv_inbound', 'inv_outbound', 'inv_transfer', 'inv_adjust'],
+      'trace':       ['qrscan', 'trace_lot'],
+      'reports':     ['reports', 'rep_inv'],
+      'sys':         ['masterdata', 'users', 'roles'],
     };
     
     const possibleModules = appMap[moduleKey] || [moduleKey];
