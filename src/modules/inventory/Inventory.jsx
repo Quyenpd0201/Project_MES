@@ -165,8 +165,7 @@ function TreeTab({ lookups }) {
             Chỉ hiện hàng dưới định mức
           </label>
         </div>
-        {(can("inventory", "edit") || can("inventory", "create")) &&
-          <button onClick={() => setAdjusting(true)} className="btn-primary"><PackagePlus size={16} /> Nhập / Xuất kho</button>}
+        {/* Đã ẩn nút Nhập/Xuất kho vì có module riêng */}
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
