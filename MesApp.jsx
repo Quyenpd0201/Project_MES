@@ -131,67 +131,103 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   const location = useLocation();
   const allItems = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, path: "/" },
-    { type: "header", label: "KINH DOANH" },
-    { key: "orders", label: "Đơn hàng", icon: ShoppingCart, path: "/orders" },
-    { key: "deliveries", label: "Phiếu giao hàng", icon: FileText, path: "/deliveries" },
-    
-    { type: "header", label: "KẾ HOẠCH" },
-    { key: "planning", label: "Kế hoạch sản xuất", icon: ClipboardList, path: "/planning" },
-    { key: "workschedule", label: "Lịch sản xuất", icon: CalendarDays, path: "/workschedule" },
-    
-    { type: "header", label: "SẢN XUẤT" },
-    { key: "production", label: "Lệnh sản xuất", icon: Factory, path: "/production" },
-    { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
-    { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
-    { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
-    { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
-    
-    { type: "header", label: "KHO" },
-    { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
-    { key: "inv_inbound", label: "Nhập kho", icon: Download, path: "/inventory/inbound" },
-    { key: "inv_outbound", label: "Xuất kho", icon: Upload, path: "/inventory/outbound" },
-    { key: "inv_transfer", label: "Chuyển kho", icon: RotateCcw, path: "/inventory/transfer" },
-    { key: "inv_adjust", label: "Điều chỉnh tồn kho", icon: Wrench, path: "/inventory/adjust" },
-    
-    { type: "header", label: "TRUY XUẤT" },
-    { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
-    { key: "trace_lot", label: "Truy xuất lô", icon: ScanLine, path: "/traceability/lot" },
-    
-    { type: "header", label: "BÁO CÁO" },
-    { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
-    { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
-    
-    { type: "header", label: "THÔNG TIN CHUNG" },
-    { key: "products",     label: "Sản phẩm",         icon: Package,    path: "/products" },
-    { key: "bom",          label: "Định mức (BOM)",    icon: FlaskConical, path: "/bom" },
-    { key: "process",      label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
-    { key: "md:machines",  label: "Máy móc",           icon: Wrench,     path: "/master-data/machines",  perm: "md_machines" },
-    { key: "md:employees", label: "Nhân viên",          icon: Users,      path: "/master-data/employees", perm: "md_employees" },
-    { key: "md:shifts",    label: "Ca làm việc",        icon: Clock,      path: "/master-data/shifts",    perm: "md_shifts" },
-    { key: "md:warehouses",label: "Kho (danh mục)",    icon: Warehouse,  path: "/master-data/warehouses",perm: "md_warehouses" },
-    { key: "md:locations", label: "Vị trí lưu trữ",    icon: MapPin,     path: "/master-data/locations", perm: "md_locations" },
-    { key: "md:customers", label: "Khách hàng",         icon: Users,      path: "/master-data/customers", perm: "md_customers" },
-
-    { type: "header", label: "QUẢN TRỊ HỆ THỐNG" },
-    { key: "users",        label: "Tài khoản",          icon: UserCog,    adminOnly: true, path: "/users" },
-    { key: "md:roles",     label: "Vai trò",             icon: Shield,     path: "/master-data/roles",    perm: "md_roles" },
-    { key: "permissions",  label: "Phân quyền",          icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+    {
+      key: "grp_sales", label: "Kinh doanh", icon: ShoppingCart,
+      children: [
+        { key: "orders", label: "Đơn hàng", icon: ShoppingCart, path: "/orders" },
+        { key: "deliveries", label: "Phiếu giao hàng", icon: FileText, path: "/deliveries" },
+      ]
+    },
+    {
+      key: "grp_plan", label: "Kế hoạch", icon: ClipboardList,
+      children: [
+        { key: "planning", label: "Kế hoạch sản xuất", icon: ClipboardList, path: "/planning" },
+        { key: "workschedule", label: "Lịch sản xuất", icon: CalendarDays, path: "/workschedule" },
+      ]
+    },
+    {
+      key: "grp_prod", label: "Sản xuất", icon: Factory,
+      children: [
+        { key: "production", label: "Lệnh sản xuất", icon: Factory, path: "/production" },
+        { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
+        { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
+        { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
+        { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
+      ]
+    },
+    {
+      key: "grp_inv", label: "Kho", icon: Warehouse,
+      children: [
+        { key: "inventory", label: "Tồn kho", icon: Warehouse, path: "/inventory" },
+        { key: "inv_inbound", label: "Nhập kho", icon: Download, path: "/inventory/inbound" },
+        { key: "inv_outbound", label: "Xuất kho", icon: Upload, path: "/inventory/outbound" },
+        { key: "inv_transfer", label: "Chuyển kho", icon: RotateCcw, path: "/inventory/transfer" },
+        { key: "inv_adjust", label: "Điều chỉnh tồn kho", icon: Wrench, path: "/inventory/adjust" },
+      ]
+    },
+    {
+      key: "grp_trace", label: "Truy xuất", icon: Search,
+      children: [
+        { key: "qrscan", label: "Tra cứu xuất xứ", icon: Search, path: "/qrscan" },
+        { key: "trace_lot", label: "Truy xuất lô", icon: ScanLine, path: "/traceability/lot" },
+      ]
+    },
+    {
+      key: "grp_rep", label: "Báo cáo", icon: Activity,
+      children: [
+        { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
+        { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
+      ]
+    },
+    {
+      key: "grp_master", label: "Thông tin chung", icon: Package,
+      children: [
+        { key: "products",     label: "Sản phẩm",         icon: Package,    path: "/products" },
+        { key: "bom",          label: "Định mức (BOM)",    icon: FlaskConical, path: "/bom" },
+        { key: "process",      label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
+        { key: "md:machines",  label: "Máy móc",           icon: Wrench,     path: "/master-data/machines",  perm: "md_machines" },
+        { key: "md:employees", label: "Nhân viên",          icon: Users,      path: "/master-data/employees", perm: "md_employees" },
+        { key: "md:shifts",    label: "Ca làm việc",        icon: Clock,      path: "/master-data/shifts",    perm: "md_shifts" },
+        { key: "md:warehouses",label: "Kho (danh mục)",    icon: Warehouse,  path: "/master-data/warehouses",perm: "md_warehouses" },
+        { key: "md:locations", label: "Vị trí lưu trữ",    icon: MapPin,     path: "/master-data/locations", perm: "md_locations" },
+        { key: "md:customers", label: "Khách hàng",         icon: Users,      path: "/master-data/customers", perm: "md_customers" },
+      ]
+    },
+    {
+      key: "grp_sys", label: "Quản trị hệ thống", icon: Shield,
+      children: [
+        { key: "users",        label: "Tài khoản",          icon: UserCog,    adminOnly: true, path: "/users" },
+        { key: "md:roles",     label: "Vai trò",             icon: Shield,     path: "/master-data/roles",    perm: "md_roles" },
+        { key: "permissions",  label: "Phân quyền",          icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+      ]
+    }
   ];
+
   const isAdmin = !!user?.is_admin;
-  const canSee = (it) => {
+  
+  const checkPerm = (it) => {
     if (isAdmin || it.always) return true;
     if (it.adminOnly) return false;
     const v = user?.permissions?.[it.perm || it.key]?.view;
     return v === 'ALLOW' || v === true;
   };
-  const items = allItems.filter(canSee);
+
+  const items = allItems.map(it => {
+    if (it.children) {
+      return { ...it, children: it.children.filter(checkPerm) };
+    }
+    return it;
+  }).filter(it => {
+    if (it.children) return it.children.length > 0;
+    return checkPerm(it);
+  });
+
   const [expanded, setExpanded] = useState({});
   const [search, setSearch] = useState("");
   const isSearchActive = search.trim().length > 0;
 
   const filteredItems = items.map(it => {
     const term = search.toLowerCase();
-    if (it.type === "header") return isSearchActive ? null : it;
     if (it.children) {
       const matchC = it.children.filter(c => c.label.toLowerCase().includes(term));
       if (matchC.length > 0 || it.label.toLowerCase().includes(term)) {
@@ -240,15 +276,6 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
       )}
       <nav className={`nav-scroll flex-1 min-h-0 overflow-y-auto ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
         {filteredItems.map((it, idx) => {
-          if (it.type === "header") {
-            if (collapsed) return <div key={`hdr-${idx}`} className="my-2 border-t border-slate-200" />;
-            return (
-              <div key={`hdr-${idx}`} className="mt-5 mb-2 px-3 text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                {it.label}
-              </div>
-            );
-          }
-          
           const Icon = it.icon;
           if (it.children) {
             const childActive = it.children.some((c) => location.pathname.startsWith(c.path));
