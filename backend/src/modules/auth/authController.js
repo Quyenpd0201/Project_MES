@@ -1,6 +1,7 @@
 // backend/controllers/authController.js — đăng nhập + phiên (token trong bộ nhớ)
 const crypto = require('crypto');
 const db = require('../../core/db');
+const { calculateEffectivePermissions } = require('./roleController');
 
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'mes_fallback_secret_key';
@@ -56,7 +57,11 @@ async function userPayload(id) {
            r.id AS role_id, r.name AS role_name, COALESCE(r.is_admin, FALSE) AS is_admin, COALESCE(r.permissions, '{}'::jsonb) AS permissions
     FROM users u LEFT JOIN roles r ON r.id = u.role_id
     WHERE u.id = $1 AND u.is_deleted = FALSE`, [id]);
-  return rows[0];
+  const user = rows[0];
+  if (user && user.role_id) {
+    user.permissions = await calculateEffectivePermissions(user.role_id);
+  }
+  return user;
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────

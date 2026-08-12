@@ -1,5 +1,6 @@
 // backend/middleware/requireAuth.js — xác thực Bearer token cho mọi request
 const { verifyToken } = require('../modules/auth/authController');
+const { calculateEffectivePermissions } = require('../modules/auth/roleController');
 const db = require('./db');
 
 /**
@@ -28,6 +29,10 @@ module.exports = async function requireAuth(req, res, next) {
 
     req.userId = userId;
     req.user   = rows[0];
+    // Tính quyền hiệu lực (gộp cả kế thừa từ role cha)
+    if (req.user.role_id) {
+      req.user.permissions = await calculateEffectivePermissions(req.user.role_id);
+    }
     next();
   } catch (err) {
     console.error('[requireAuth]', err);
@@ -40,11 +45,51 @@ module.exports = async function requireAuth(req, res, next) {
  * Cần đặt sau requireAuth.
  * Kiểm tra xem user có phải admin, hoặc có quyền được cấu hình không.
  */
-module.exports.requirePerm = (perm) => {
+module.exports.requirePerm = (permString) => {
   return (req, res, next) => {
     if (!req.user) return res.status(401).json({ message: 'Chưa xác thực' });
     if (req.user.is_admin) return next();
-    if (req.user.permissions && req.user.permissions[perm]) return next();
+    
+    // permString format: "module:action" e.g., "engineering:edit" or "products:edit"
+    // Backward compatibility: map old string to new apps if needed
+    let moduleKey = permString;
+    let action = 'view';
+    
+    if (permString.includes(':')) {
+      const parts = permString.split(':');
+      moduleKey = parts[0];
+      action = parts[1];
+    }
+    
+    // Map old backend perm strings to new frontend app keys
+    const appMap = {
+      'engineering': ['products', 'bom', 'process'],
+      'sales': ['orders', 'deliveries'],
+      'production': ['production', 'planning', 'workschedule', 'execution'],
+      'inventory': ['inventory'],
+      'sys': ['masterdata', 'users', 'roles'] // approximated
+    };
+    
+    const possibleModules = appMap[moduleKey] || [moduleKey];
+    
+    let hasPerm = false;
+    for (const mod of possibleModules) {
+       const modPerms = req.user.permissions && req.user.permissions[mod];
+       if (modPerms) {
+           // New format: modPerms[action] can be 'ALLOW', 'DENY', 'INHERIT'
+           // Old format: modPerms[action] is boolean true/false
+           if (modPerms[action] === 'ALLOW' || modPerms[action] === true) {
+               hasPerm = true;
+               break;
+           }
+       }
+    }
+    // Backward comp fallback: if user has literal permission
+    if (!hasPerm && req.user.permissions && req.user.permissions[permString] === true) {
+       hasPerm = true;
+    }
+
+    if (hasPerm) return next();
     res.status(403).json({ message: 'Bạn không có quyền thực hiện thao tác này' });
   };
 };

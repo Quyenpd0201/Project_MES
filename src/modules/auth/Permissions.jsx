@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { RotateCcw, ChevronDown, Save, ShieldCheck, Eraser } from "lucide-react";
+import { ChevronDown, Save, ShieldCheck, Eraser, Info } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
-import {  inputCls , toast } from "../../ui.js";
+import { inputCls, toast } from "../../ui.js";
 
 /* Đăng ký ứng dụng + trường để phân quyền */
 const APPS = [
@@ -33,95 +33,281 @@ const APPS = [
   { key: "inventory", label: "Tồn kho" },
   { key: "masterdata", label: "Danh mục (master data)" },
 ];
-const ACTIONS = [["view", "Xem"], ["create", "Thêm"], ["edit", "Sửa"], ["delete", "Xoá"]];
-const FIELD_PERMS = [["edit", "Cho sửa"], ["view", "Chỉ xem"], ["hidden", "Ẩn"]];
+
+const ACTIONS = [
+  ["view", "Xem"], ["create", "Thêm"], ["edit", "Sửa"], ["delete", "Xoá"],
+  ["approve", "Phê duyệt"], ["reject", "Từ chối"], ["import", "Import"], ["export", "Export"],
+  ["print", "In"], ["execute", "Thực hiện"], ["assign", "Phân công"], ["cancel", "Hủy"], ["complete", "Hoàn thành"]
+];
+
+// Để giữ tính tương thích với yêu cầu: "như cấu hình hiện tại",
+// Ta chỉ định những action cơ bản cho mọi module, 
+// nhưng nếu sau này muốn mở rộng thì cấu hình ở đây.
+const DEFAULT_ACTIONS = ["view", "create", "edit", "delete"];
+
+const PERM_STATES = [
+  { value: "INHERIT", label: "Kế thừa" },
+  { value: "ALLOW", label: "Cho phép" },
+  { value: "DENY", label: "Từ chối" }
+];
+
+const FIELD_PERMS = [
+  { value: "INHERIT", label: "Kế thừa" },
+  { value: "edit", label: "Cho sửa" },
+  { value: "view", label: "Chỉ xem" },
+  { value: "hidden", label: "Ẩn" }
+];
 
 export default function PermissionsModule() {
   const [roleList, setRoleList] = useState([]);
   const [roleId, setRoleId] = useState("");
+  const [parentId, setParentId] = useState("");
   const [perms, setPerms] = useState({});
-  const [open, setOpen] = useState({});
+  const [openDetail, setOpenDetail] = useState(null); // Chỉ mở 1 chi tiết tại một thời điểm
+  const [effectivePerms, setEffectivePerms] = useState({});
 
-  useEffect(() => { roles.list().then((r) => { setRoleList(r); if (r[0]) selectRole(r[0].id); }).catch(() => {}); }, []); // eslint-disable-line
+  const fetchRoles = useCallback(async () => {
+    try {
+      const r = await roles.list();
+      setRoleList(r);
+      if (r.length > 0 && !roleId) {
+        selectRole(r[0].id, r);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [roleId]);
 
-  const selectRole = useCallback(async (id) => {
-    setRoleId(id);
-    if (!id) { setPerms({}); return; }
-    try { const r = await roles.get(id); setPerms(r.permissions || {}); }
-    catch (e) { toast.error("Lỗi tải vai trò: " + e.message); }
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
+
+  const fetchEffectivePerms = useCallback(async (id) => {
+    try {
+      const ep = await roles.getEffectivePermissions(id);
+      setEffectivePerms(ep);
+    } catch (e) {
+      console.error("Failed to fetch effective permissions", e);
+    }
   }, []);
 
+  const selectRole = useCallback(async (id, list = roleList) => {
+    setRoleId(id);
+    if (!id) {
+      setPerms({});
+      setParentId("");
+      setEffectivePerms({});
+      return;
+    }
+    try {
+      const r = await roles.get(id);
+      setPerms(r.permissions || {});
+      setParentId(r.parent_id || "");
+      fetchEffectivePerms(id);
+    } catch (e) {
+      toast.error("Lỗi tải vai trò: " + e.message);
+    }
+  }, [roleList, fetchEffectivePerms]);
+
   const ap = (k) => perms[k] || {};
-  const setApp = (k, patch) => setPerms((p) => ({ ...p, [k]: { ...(p[k] || {}), ...patch } }));
-  const setField = (k, fk, v) => setPerms((p) => ({ ...p, [k]: { ...(p[k] || {}), fields: { ...((p[k] || {}).fields || {}), [fk]: v } } }));
-  const fieldVal = (k, fk) => ap(k).fields?.[fk] || "edit";
+  const setAppAction = (k, actionKey, value) => {
+    setPerms((p) => ({
+      ...p,
+      [k]: { ...(p[k] || {}), [actionKey]: value }
+    }));
+  };
+  const setField = (k, fk, v) => {
+    setPerms((p) => ({
+      ...p,
+      [k]: {
+        ...(p[k] || {}),
+        fields: { ...((p[k] || {}).fields || {}), [fk]: v }
+      }
+    }));
+  };
+  
+  const fieldVal = (k, fk) => ap(k).fields?.[fk] || "INHERIT";
+  const actionVal = (k, actionKey) => {
+    const val = ap(k)[actionKey];
+    if (val === true) return "ALLOW"; // backward compatibility
+    if (val === false) return "DENY";
+    return val || "INHERIT";
+  };
 
   const grantAll = () => {
     const all = {};
-    APPS.forEach((a) => { all[a.key] = { view: true, create: true, edit: true, delete: true, fields: Object.fromEntries((a.fields || []).map(([fk]) => [fk, "edit"])) }; });
+    APPS.forEach((a) => {
+      const appPerm = {};
+      DEFAULT_ACTIONS.forEach(act => appPerm[act] = "ALLOW");
+      if (a.fields) {
+        appPerm.fields = Object.fromEntries(a.fields.map(([fk]) => [fk, "edit"]));
+      }
+      all[a.key] = appPerm;
+    });
     setPerms(all);
   };
+
   const save = async () => {
-    try { await roles.savePermissions(roleId, perms); toast.error("Đã lưu phân quyền cho vai trò."); }
-    catch (e) { toast.error("Lỗi lưu: " + e.message); }
+    try {
+      await roles.savePermissions(roleId, perms, parentId || null);
+      toast.success("Đã lưu phân quyền cho vai trò.");
+      fetchEffectivePerms(roleId);
+    } catch (e) {
+      toast.error("Lỗi lưu: " + e.message);
+    }
   };
 
-  return (
-    <div className="space-y-5">
-      <ListHeader title="Phân quyền theo vai trò" />
+  const parentOptions = roleList.filter(r => r.id !== roleId);
 
-      <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-end gap-3">
-        <div className="flex-1 min-w-[220px]">
-          <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò</label>
-          <select className={inputCls} value={roleId} onChange={(e) => selectRole(e.target.value)}>
-            <option value="">-- Chọn vai trò --</option>
-            {roleList.map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
-          </select>
+  return (
+    <div className="space-y-6">
+      <ListHeader title="Phân quyền hệ thống" />
+
+      {/* Box: Phân quyền theo vai trò */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
+        <h3 className="font-semibold text-slate-800 border-b border-slate-100 pb-2">Phân quyền theo vai trò</h3>
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[250px]">
+            <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò</label>
+            <select className={inputCls} value={roleId} onChange={(e) => selectRole(e.target.value)}>
+              <option value="">-- Chọn vai trò --</option>
+              {roleList.map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[250px]">
+            <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò cha (Kế thừa)</label>
+            <select className={inputCls} value={parentId} onChange={(e) => setParentId(e.target.value)} disabled={!roleId}>
+              <option value="">-- Không kế thừa --</option>
+              {parentOptions.map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={grantAll} disabled={!roleId} className="btn-ghost text-sm"><ShieldCheck size={16} /> Cấp toàn quyền</button>
+            <button onClick={() => setPerms({})} disabled={!roleId} className="btn-ghost text-sm text-red-600 hover:bg-red-50"><Eraser size={16} /> Bỏ hết</button>
+            <button onClick={save} disabled={!roleId} className="btn-primary text-sm px-6"><Save size={16} /> Lưu</button>
+          </div>
         </div>
-        <button onClick={grantAll} disabled={!roleId} className="btn-ghost"><ShieldCheck size={16} /> Cấp toàn quyền</button>
-        <button onClick={() => setPerms({})} disabled={!roleId} className="btn-ghost"><Eraser size={16} /> Bỏ hết</button>
-        <button onClick={save} disabled={!roleId} className="btn-primary"><Save size={16} /> Lưu phân quyền</button>
       </div>
 
       {!roleId && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">Chọn một vai trò để cấu hình quyền.</div>}
 
       {roleId && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {APPS.map((a) => {
-            const p = ap(a.key);
             const hasFields = !!a.fields;
-            const isOpen = open[a.key];
+            const p = ap(a.key);
+            const ep = effectivePerms[a.key] || {};
+            
+            // Tính số lượng action được ALLOW trong số mặc định
+            const allowedActionsCount = DEFAULT_ACTIONS.filter(act => 
+              p[act] === 'ALLOW' || p[act] === true
+            ).length;
+            
+            const isDetailOpen = openDetail === a.key;
+
             return (
-              <div key={a.key} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                <div className="px-5 py-3 flex items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
-                  <button onClick={() => hasFields && setOpen((o) => ({ ...o, [a.key]: !o[a.key] }))}
-                    className="flex items-center gap-2 font-semibold text-slate-800 text-sm">
-                    {hasFields && <ChevronDown size={16} className={`transition ${isOpen ? "rotate-180" : ""}`} />}
-                    {a.label}
-                    {hasFields && <span className="text-[11px] text-slate-400 font-normal">({a.fields.length} trường)</span>}
-                  </button>
-                  <div className="flex items-center gap-4 text-sm shrink-0">
-                    {ACTIONS.map(([k, lb]) => (
-                      <label key={k} className="flex items-center gap-1.5 text-slate-600">
-                        <input type="checkbox" checked={!!p[k]} onChange={(e) => setApp(a.key, { [k]: e.target.checked })} className="w-4 h-4 accent-blue-600" />
-                        {lb}
-                      </label>
-                    ))}
+              <div key={a.key} className="col-span-1 flex flex-col h-full">
+                <div className={`bg-white rounded-xl border transition-colors shadow-sm flex-1 flex flex-col ${isDetailOpen ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'}`}>
+                  {/* Tóm tắt */}
+                  <div className="p-4 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-semibold text-slate-800">{a.label}</h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {hasFields ? `${a.fields.length} trường dữ liệu` : "Không có trường"} 
+                        {" · Quyền: "}
+                        <span className="font-medium text-blue-600">{allowedActionsCount}/{DEFAULT_ACTIONS.length}</span>
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => setOpenDetail(isDetailOpen ? null : a.key)}
+                      className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors ${
+                        isDetailOpen ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      Chi tiết <ChevronDown size={14} className={`transition-transform ${isDetailOpen ? 'rotate-180' : ''}`} />
+                    </button>
                   </div>
-                </div>
-                {hasFields && isOpen && (
-                  <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {a.fields.map(([fk, flb]) => (
-                      <div key={fk} className="flex items-center justify-between gap-2 border border-slate-100 rounded-lg px-3 py-2">
-                        <span className="text-sm text-slate-700">{flb}</span>
-                        <select className="px-2 py-1 rounded-md border border-slate-300 text-xs" value={fieldVal(a.key, fk)}
-                          onChange={(e) => setField(a.key, fk, e.target.value)}>
-                          {FIELD_PERMS.map(([v, lb]) => <option key={v} value={v}>{lb}</option>)}
-                        </select>
+
+                  {/* Chi tiết (Accordion) */}
+                  {isDetailOpen && (
+                    <div className="border-t border-slate-100 bg-slate-50/50 flex-1 p-4 flex flex-col gap-5">
+                      
+                      {/* Section: CRUD */}
+                      <div>
+                        <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quyền thao tác (CRUD)</h5>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {DEFAULT_ACTIONS.map(actKey => {
+                            const act = ACTIONS.find(x => x[0] === actKey);
+                            if (!act) return null;
+                            const [k, lb] = act;
+                            const val = actionVal(a.key, k);
+                            const effectiveVal = ep[k];
+                            const isInheriting = val === 'INHERIT' && effectiveVal;
+                            
+                            return (
+                              <div key={k} className="flex flex-col gap-1.5 p-2 bg-white rounded-md border border-slate-100 shadow-sm">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-sm text-slate-700 font-medium">{lb}</span>
+                                  {isInheriting && <span className={`text-[10px] px-1.5 py-0.5 rounded ${effectiveVal === 'ALLOW' || effectiveVal === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    Thực tế: {effectiveVal === 'ALLOW' || effectiveVal === true ? 'Cho phép' : 'Từ chối'}
+                                  </span>}
+                                </div>
+                                <select 
+                                  className="w-full text-sm border-slate-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5"
+                                  value={val}
+                                  onChange={(e) => setAppAction(a.key, k, e.target.value)}
+                                >
+                                  {PERM_STATES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                )}
+
+                      {/* Section: Fields */}
+                      {hasFields && (
+                        <div>
+                          <div className="w-full h-px bg-slate-200 mb-4"></div>
+                          <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Trường dữ liệu</h5>
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                            {a.fields.map(([fk, flb]) => {
+                               const val = fieldVal(a.key, fk);
+                               const effectiveVal = ep.fields?.[fk];
+                               const isInheriting = val === 'INHERIT' && effectiveVal && effectiveVal !== 'INHERIT';
+                               
+                               return (
+                                <div key={fk} className="flex items-center justify-between gap-2 border border-slate-200 bg-white rounded-lg px-3 py-2">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm text-slate-700">{flb}</span>
+                                    {isInheriting && <span className="text-[10px] text-blue-500">Kế thừa: {FIELD_PERMS.find(x => x.value === effectiveVal)?.label || effectiveVal}</span>}
+                                  </div>
+                                  <select 
+                                    className="px-2 py-1.5 rounded-md border border-slate-300 text-xs shadow-sm bg-slate-50 min-w-[100px]" 
+                                    value={val}
+                                    onChange={(e) => setField(a.key, fk, e.target.value)}
+                                  >
+                                    {FIELD_PERMS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                  </select>
+                                </div>
+                               );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Chỗ dành cho Data Scope sau này */}
+                      {/* <div>
+                        <div className="w-full h-px bg-slate-200 mb-4"></div>
+                        <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
+                          Phạm vi dữ liệu <Info size={14} className="text-slate-400" title="Đang cấu hình quản lý tập trung" />
+                        </h5>
+                        <p className="text-sm text-slate-500 italic">Quản lý tập trung toàn hệ thống.</p>
+                      </div> */}
+
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}

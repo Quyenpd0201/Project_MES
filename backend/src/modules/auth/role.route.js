@@ -15,10 +15,11 @@ function mountCrud(path, crud) {
 
 mountCrud('/roles', makeCrud({
   table: 'roles',
-  columns: ['name', 'description', 'status'],
+  columns: ['name', 'description', 'status', 'parent_id'],
   searchCols: ['name', 'role_code'], exactCols: ['status'], codeCol: 'role_code',
   blockDeleteStatuses: ['Hoạt động'],
 }));
-router.put('/roles/:id/permissions', requirePerm('sys:roles:manage'), role.savePermissions);
+router.put('/roles/:id/permissions', requirePerm('sys:roles:edit'), role.savePermissions);
+router.get('/roles/:id/effective-permissions', role.getEffectivePermissions);
 
 module.exports = router;

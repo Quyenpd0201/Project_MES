@@ -58,7 +58,8 @@ export const workSchedules = {
 
 export const roles = {
   ...resource("roles"),
-  savePermissions: (id, permissions) => http(`/roles/${id}/permissions`, body("PUT", { permissions })),
+  savePermissions: (id, permissions, parent_id) => http(`/roles/${id}/permissions`, body("PUT", { permissions, parent_id })),
+  getEffectivePermissions: (id) => http(`/roles/${id}/effective-permissions`),
 };
 
 export const deliveries = {
