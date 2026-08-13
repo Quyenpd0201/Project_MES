@@ -252,10 +252,12 @@ export default function OutboundModule({ lookups }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Xuất kho" icon={Upload} />
-      {can("inventory", "edit") && (
+      {(can("inv_outbound", "create") || can("inv_outbound", "edit")) && (
         <OutboundForm lookups={lookups} onSaved={() => setRefreshKey(k => k + 1)} />
       )}
-      <OutboundHistory key={refreshKey} />
+      {can("inv_outbound", "view") && (
+        <OutboundHistory key={refreshKey} />
+      )}
     </div>
   );
 }

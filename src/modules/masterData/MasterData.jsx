@@ -289,8 +289,8 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
     {
       key: "__act", label: "", align: "right",
       render: (r) => (<>
-        {can("masterdata", "edit") && <button onClick={() => setEditing(r)} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>}
-        {can("masterdata", "delete") && <button onClick={() => del(r.id)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>}
+        {can("md_" + cfg.resource, "edit") && <button onClick={() => setEditing(r)} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>}
+        {can("md_" + cfg.resource, "delete") && <button onClick={() => del(r.id)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>}
       </>),
     },
   ];
@@ -304,7 +304,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
       <ListHeader title={cfg.title} actions={<>
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         <button onClick={downloadTemplate} className="btn-ghost"><FileDown size={16} /> Tải mẫu</button>
-        {can("masterdata", "create") && (
+        {can("md_" + cfg.resource, "create") && (
           <label className="btn-ghost cursor-pointer">
             <Upload size={16} /> Nhập Excel
             <input type="file" accept=".xlsx,.xls" className="hidden"
@@ -312,7 +312,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
           </label>
         )}
         <button onClick={exportExcel} className="btn-ghost"><Download size={16} /> Xuất Excel</button>
-        {can("masterdata", "create") && <button onClick={() => setEditing({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
+        {can("md_" + cfg.resource, "create") && <button onClick={() => setEditing({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
       <DataTable rows={rows} rowKey={(r) => r.id} emptyText="Chưa có dữ liệu" columns={dtCols} />
     </div>

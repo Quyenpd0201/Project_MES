@@ -221,10 +221,12 @@ export default function InboundModule({ lookups }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Nhập kho" icon={PackagePlus} />
-      {can("inventory", "edit") && (
+      {(can("inv_inbound", "create") || can("inv_inbound", "edit")) && (
         <InboundForm lookups={lookups} onSaved={() => setRefreshKey(k => k + 1)} />
       )}
-      <TransactionHistory key={refreshKey} type="Nhập" />
+      {can("inv_inbound", "view") && (
+        <TransactionHistory key={refreshKey} type="Nhập" />
+      )}
     </div>
   );
 }

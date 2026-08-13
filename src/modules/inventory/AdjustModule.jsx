@@ -230,10 +230,12 @@ export default function AdjustModule({ lookups }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Điều chỉnh tồn kho" icon={Wrench} />
-      {can("inventory", "edit") && (
+      {(can("inv_adjust", "create") || can("inv_adjust", "edit")) && (
         <AdjustForm lookups={lookups} onSaved={() => setRefreshKey(k => k + 1)} />
       )}
-      <AdjustHistory key={refreshKey} />
+      {can("inv_adjust", "view") && (
+        <AdjustHistory key={refreshKey} />
+      )}
     </div>
   );
 }

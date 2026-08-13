@@ -179,6 +179,23 @@ exports.adjust = async (req, res) => {
     if (!VALID_TRX_TYPES.includes(b.trx_type))
       return res.status(400).json({ message: `Loại giao dịch không hợp lệ. Chỉ chấp nhận: ${VALID_TRX_TYPES.join(', ')}` });
 
+    if (!req.user.is_admin) {
+      let reqApp = 'inventory';
+      if (b.trx_type === 'Nhập') reqApp = 'inv_inbound';
+      if (b.trx_type === 'Xuất') reqApp = 'inv_outbound';
+      if (b.trx_type === 'Điều chỉnh') reqApp = 'inv_adjust';
+      // Note: Chuyển kho is two transactions (Xuất then Nhập), it will require both if we secure them both. But the frontend might just use 'inventory:edit' as a fallback.
+      
+      const p = req.user.permissions?.[reqApp];
+      const hasPerm = p && (p.edit === 'ALLOW' || p.edit === true || p.create === 'ALLOW' || p.create === true);
+      const pFallback = req.user.permissions?.['inventory'];
+      const hasFallback = pFallback && (pFallback.edit === 'ALLOW' || pFallback.edit === true);
+      
+      if (!hasPerm && !hasFallback) {
+         return res.status(403).json({ message: 'Bạn không có quyền thực hiện loại giao dịch này' });
+      }
+    }
+
     const delta = b.trx_type === 'Xuất' ? -Math.abs(Number(b.quantity)) : Number(b.quantity);
     const specs = specsFromBody(b);
     const a = legacyAttrs(specs);

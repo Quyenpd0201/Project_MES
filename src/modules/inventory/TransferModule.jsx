@@ -229,10 +229,12 @@ export default function TransferModule({ lookups }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Chuyển kho" icon={RotateCcw} />
-      {can("inventory", "edit") && (
+      {(can("inv_transfer", "create") || can("inv_transfer", "edit")) && (
         <TransferForm lookups={lookups} onSaved={() => setRefreshKey(k => k + 1)} />
       )}
-      <TransferHistory key={refreshKey} />
+      {can("inv_transfer", "view") && (
+        <TransferHistory key={refreshKey} />
+      )}
     </div>
   );
 }
