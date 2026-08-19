@@ -351,8 +351,8 @@ export default function PermissionsModule() {
         const scopeValue = val?.scopeValue || "";
 
         list.push({
-          moduleKey,
-          actionKey,
+          moduleKey: modKey,
+          actionKey: actKey,
           scope,
           scopeValue,
           isDirect
