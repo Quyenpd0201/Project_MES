@@ -21,7 +21,5 @@ mountCrud('/roles', makeCrud({
 }));
 router.put('/roles/:id/permissions', requirePerm('sys:roles:edit'), role.savePermissions);
 router.get('/roles/:id/effective-permissions', role.getEffectivePermissions);
-router.get('/roles/:id/users', role.getRoleUsers);
-router.put('/roles/:id/users', requirePerm('sys:roles:edit'), role.assignRoleUsers);
 
 module.exports = router;

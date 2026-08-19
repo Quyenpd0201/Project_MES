@@ -82,30 +82,3 @@ exports.getEffectivePermissions = async (req, res) => {
     console.error(err); res.status(500).json({ message: 'Lỗi tính toán quyền hiệu lực' });
   }
 };
-
-exports.getRoleUsers = async (req, res) => {
-  try {
-    const { rows } = await db.query(
-      `SELECT id, username, full_name, status, team FROM users WHERE role_id = $1 AND is_deleted = FALSE ORDER BY username`,
-      [req.params.id]
-    );
-    res.json({ data: rows });
-  } catch (err) {
-    console.error(err); res.status(500).json({ message: 'Lỗi lấy danh sách tài khoản' });
-  }
-};
-
-exports.assignRoleUsers = async (req, res) => {
-  try {
-    const { user_ids } = req.body;
-    if (!Array.isArray(user_ids)) return res.status(400).json({ message: 'user_ids phải là mảng' });
-    
-    await db.query(`UPDATE users SET role_id = NULL WHERE role_id = $1 AND is_deleted = FALSE`, [req.params.id]);
-    if (user_ids.length > 0) {
-      await db.query(`UPDATE users SET role_id = $1 WHERE id = ANY($2) AND is_deleted = FALSE`, [req.params.id, user_ids]);
-    }
-    res.json({ message: 'Đã cập nhật danh sách tài khoản' });
-  } catch (err) {
-    console.error(err); res.status(500).json({ message: 'Lỗi phân tài khoản' });
-  }
-};

@@ -17,7 +17,7 @@ exports.list = async (req, res) => {
 exports.getById = async (req, res) => {
   try {
     const { rows } = await db.query(
-      `SELECT id, username, full_name, status, role_id, team, COALESCE(user_permissions, '{}'::jsonb) AS user_permissions FROM users WHERE id = $1 AND is_deleted = FALSE`, [req.params.id]);
+      `SELECT id, username, full_name, status, role_id, team, COALESCE(permissions, '{}'::jsonb) AS permissions FROM users WHERE id = $1 AND is_deleted = FALSE`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
     res.json(rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi' }); }
@@ -27,7 +27,7 @@ const VALID_STATUSES = ['Hoạt động', 'Không hoạt động'];
 
 exports.create = async (req, res) => {
   try {
-    const { username, password, full_name, role_id, status, team, user_permissions } = req.body;
+    const { username, password, full_name, role_id, status, team } = req.body;
     if (!username || typeof username !== 'string' || username.trim().length < 3 || username.trim().length > 50)
       return res.status(400).json({ message: 'Tài khoản phải từ 3–50 ký tự' });
     if (!password || typeof password !== 'string' || password.length < 6 || password.length > 100)
@@ -36,9 +36,9 @@ exports.create = async (req, res) => {
     if (!VALID_STATUSES.includes(resolvedStatus))
       return res.status(400).json({ message: 'Trạng thái không hợp lệ' });
     const { rows } = await db.query(
-      `INSERT INTO users (username, password_hash, full_name, role_id, status, team, user_permissions) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      `INSERT INTO users (username, password_hash, full_name, role_id, status, team) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
       [username.trim(), hashPassword(password), full_name ? String(full_name).slice(0, 100) : null,
-       role_id || null, resolvedStatus, team ? String(team).slice(0, 100) : null, user_permissions || {}]);
+       role_id || null, resolvedStatus, team ? String(team).slice(0, 100) : null]);
     res.status(201).json({ id: rows[0].id });
   } catch (e) {
     if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
@@ -49,7 +49,7 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
   try {
-    const { username, password, full_name, role_id, status, team, user_permissions } = req.body;
+    const { username, password, full_name, role_id, status, team, permissions } = req.body;
     const cols = [], vals = []; let i = 1;
     const add = (c, v) => { cols.push(`${c} = $${i++}`); vals.push(v); };
     if (username !== undefined) {
@@ -64,7 +64,7 @@ exports.update = async (req, res) => {
       add('status', status);
     }
     if (team !== undefined) add('team', team ? String(team).slice(0, 100) : null);
-    if (user_permissions !== undefined) add('user_permissions', user_permissions);
+    if (permissions !== undefined) add('permissions', JSON.stringify(permissions));
     if (password) {
       if (typeof password !== 'string' || password.length < 6 || password.length > 100)
         return res.status(400).json({ message: 'Mật khẩu phải từ 6–100 ký tự' });

@@ -1,5 +1,5 @@
 -- =============================================================
--- MES v43 — Quyền mở rộng cá nhân cho tài khoản (Individual Permissions)
+-- MES v43 — Thêm quyền riêng lẻ cho từng User (Override Role)
 -- =============================================================
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS user_permissions JSONB DEFAULT '{}'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS permissions JSONB NOT NULL DEFAULT '{}'::jsonb;

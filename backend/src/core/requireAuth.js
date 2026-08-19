@@ -18,10 +18,9 @@ module.exports = async function requireAuth(req, res, next) {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.full_name, u.status, u.team,
-              COALESCE(u.user_permissions, '{}'::jsonb) AS user_permissions,
+              COALESCE(u.permissions, '{}'::jsonb) AS user_permissions,
               r.id AS role_id, r.name AS role_name,
-              COALESCE(r.is_admin, FALSE) AS is_admin,
-              COALESCE(r.permissions, '{}'::jsonb) AS permissions
+              COALESCE(r.is_admin, FALSE) AS is_admin
        FROM users u LEFT JOIN roles r ON r.id = u.role_id
        WHERE u.id = $1 AND u.is_deleted = FALSE AND u.status = 'Hoạt động'`,
       [userId]
@@ -31,22 +30,24 @@ module.exports = async function requireAuth(req, res, next) {
     req.userId = userId;
     req.user   = rows[0];
     
-    // Tính quyền hiệu lực (gộp cả kế thừa từ role cha)
-    let effective = {};
+    // Tính quyền hiệu lực (kế thừa từ role cha)
+    let rolePerms = {};
     if (req.user.role_id) {
-      effective = await calculateEffectivePermissions(req.user.role_id);
+      rolePerms = await calculateEffectivePermissions(req.user.role_id);
     }
+
+    // Merge quyền riêng của user (ghi đè/bổ sung lên quyền của role)
+    const customPerms = req.user.user_permissions || {};
+    const merged = JSON.parse(JSON.stringify(rolePerms));
     
-    // Gộp quyền riêng lẻ (user_permissions)
-    const indPerms = req.user.user_permissions;
-    for (const [modKey, actions] of Object.entries(indPerms)) {
-      if (!effective[modKey]) effective[modKey] = {};
-      for (const [actKey, val] of Object.entries(actions)) {
-         effective[modKey][actKey] = val; // ghi đè/cộng dồn
-      }
-    }
+    Object.keys(customPerms).forEach(mod => {
+      if (!merged[mod]) merged[mod] = {};
+      Object.keys(customPerms[mod]).forEach(act => {
+        merged[mod][act] = customPerms[mod][act];
+      });
+    });
     
-    req.user.permissions = effective;
+    req.user.permissions = merged;
     next();
   } catch (err) {
     console.error('[requireAuth]', err);
@@ -107,10 +108,8 @@ module.exports.requirePerm = (permString) => {
            const pval = modPerms[action];
            if (pval) {
              if (typeof pval === 'object' && pval.status === 'ALLOW') {
-               if (!pval.users || pval.users.length === 0 || pval.users.includes(req.user.id)) {
-                 hasPerm = true;
-                 break;
-               }
+               hasPerm = true;
+               break;
              } else if (pval === 'ALLOW' || pval === true) {
                hasPerm = true;
                break;

@@ -11,8 +11,8 @@ import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nex
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/auth/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
-import { fmt, fmtDate, statusClass, dueTone } from "./src/ui.js";
-import RolesModule from "./src/modules/auth/RolesModule.jsx";
+import PermissionsModule from "./src/modules/auth/PermissionEditor.jsx";
+import RolesModule from "./src/modules/auth/Roles.jsx";
 import ProductionModule from "./src/modules/production/Production.jsx";
 import ExecutionModule from "./src/modules/production/Execution.jsx";
 import PlanningModule, { OrderStatusModule } from "./src/modules/production/Planning.jsx";
@@ -199,7 +199,8 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
       key: "grp_sys", label: "Quản trị hệ thống", icon: Shield,
       children: [
         { key: "users",        label: "Tài khoản",          icon: UserCog,    adminOnly: true, path: "/users" },
-        { key: "roles",        label: "Vai trò & Phân quyền",icon: ShieldCheck, adminOnly: true, path: "/roles" },
+        { key: "md:roles",     label: "Vai trò",             icon: Shield,     path: "/master-data/roles",    perm: "md_roles" },
+        { key: "permissions",  label: "Phân quyền",          icon: ShieldCheck, adminOnly: true, path: "/permissions" },
       ]
     }
   ];
@@ -1325,7 +1326,7 @@ export default function MesApp() {
           <Route path="/reports" element={needLookups(ReportsModule)} />
           <Route path="/reports/inventory" element={lookups ? <InventoryReport lookups={lookups} /> : loadingEl} />
           <Route path="/reports/employees" element={<EmployeeReport />} />
-          <Route path="/roles" element={<RolesModule />} />
+          <Route path="/permissions" element={<PermissionsModule />} />
           <Route path="/users" element={needLookups(UsersModule)} />
           <Route path="/bom" element={needLookups(BomModule)} />
           <Route path="/process" element={needLookups(ProcessModule)} />
