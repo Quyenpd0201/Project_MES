@@ -87,11 +87,18 @@ module.exports.requirePerm = (permString) => {
     for (const mod of possibleModules) {
        const modPerms = req.user.permissions && req.user.permissions[mod];
        if (modPerms) {
-           // New format: modPerms[action] can be 'ALLOW', 'DENY', 'INHERIT'
+           // New format: modPerms[action] is an object { status: 'ALLOW', scope: '...' }
+           // Intermediate format: modPerms[action] is 'ALLOW', 'DENY', 'INHERIT'
            // Old format: modPerms[action] is boolean true/false
-           if (modPerms[action] === 'ALLOW' || modPerms[action] === true) {
+           const pval = modPerms[action];
+           if (pval) {
+             if (typeof pval === 'object' && pval.status === 'ALLOW') {
                hasPerm = true;
                break;
+             } else if (pval === 'ALLOW' || pval === true) {
+               hasPerm = true;
+               break;
+             }
            }
        }
     }

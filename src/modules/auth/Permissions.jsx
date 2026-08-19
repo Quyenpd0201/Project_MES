@@ -1,106 +1,294 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { ChevronDown, Save, ShieldCheck, Eraser, Info } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  ShieldCheck, Search, Plus, Filter, Edit, Trash2, X, ChevronRight,
+  Package, Factory, LayoutDashboard, Calendar, ClipboardList,
+  BarChart2, Settings, Save, Users
+} from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
-import { inputCls, toast } from "../../ui.js";
+import { toast, statusClass } from "../../ui.js";
 
-/* Đăng ký ứng dụng + trường để phân quyền */
-const APPS = [
-  // ── DASHBOARD ────────────────────────────────────────────────────────
-  { key: "dashboard", label: "Dashboard" },
+/* ─── 1. KẾT CẤU CÂY MODULE & THAO TÁC (RBAC) ─── */
+const ACTION_LABELS = {
+  view: "Xem", create: "Tạo mới", edit: "Sửa", delete: "Xóa",
+  approve: "Duyệt", publish: "Phát hành", assign: "Phân công",
+  execute: "Thực thi", import: "Import", export: "Xuất Excel"
+};
 
-  // ── KINH DOANH ───────────────────────────────────────────────────────
-  { key: "orders", label: "Đơn hàng", fields: [
-    ["customer_id", "Khách hàng"], ["order_date", "Ngày đặt"], ["due_date", "Ngày giao"],
-    ["status", "Trạng thái"], ["note", "Ghi chú"], ["items", "Dòng hàng"] ] },
-  { key: "deliveries", label: "Phiếu giao hàng & thanh toán", fields: [
-    ["customer_id", "Khách hàng"], ["delivery_date", "Ngày giao"], ["status", "Trạng thái"],
-    ["items", "Dòng hàng"], ["amounts", "Thông tin tiền (đơn giá / tổng / đã trả / công nợ)"] ] },
-
-  // ── KẾ HOẠCH ─────────────────────────────────────────────────────────
-  { key: "planning", label: "Kế hoạch sản xuất" },
-  { key: "workschedule", label: "Lịch sản xuất" },
-
-  // ── SẢN XUẤT ─────────────────────────────────────────────────────────
-  { key: "production", label: "Lệnh sản xuất", fields: [
-    ["product_id", "Sản phẩm"], ["customer_id", "Khách hàng"], ["quantity", "Số lượng"],
-    ["attributes", "Thông số (màu/KT/dày)"], ["finishing", "Yêu cầu gia công"], ["tasks", "Phân công / lô"] ] },
-  { key: "orderstatus", label: "Lệnh theo trạng thái" },
-  { key: "execution", label: "Thực thi sản xuất" },
-  { key: "prod_output", label: "Sản lượng" },
-  { key: "qrlabels", label: "In tem xuất xứ" },
-
-  // ── KHO ──────────────────────────────────────────────────────────────
-  { key: "inventory", label: "Tồn kho" },
-  { key: "inv_inbound", label: "Nhập kho" },
-  { key: "inv_outbound", label: "Xuất kho" },
-  { key: "inv_transfer", label: "Chuyển kho" },
-  { key: "inv_adjust", label: "Điều chỉnh tồn kho" },
-
-  // ── TRUY XUẤT ────────────────────────────────────────────────────────
-  { key: "qrscan", label: "Tra cứu xuất xứ" },
-  { key: "trace_lot", label: "Truy xuất lô" },
-
-  // ── BÁO CÁO ──────────────────────────────────────────────────────────
-  { key: "reports", label: "Báo cáo KPI" },
-  { key: "rep_inv", label: "Báo cáo kho" },
-
-  // ── THÔNG TIN CHUNG ───────────────────────────────────────────────────
-  { key: "products", label: "Sản phẩm", fields: [
-    ["product_name", "Tên sản phẩm"], ["product_type", "Loại sản phẩm"], ["production_area", "Khu vực SX"],
-    ["category", "Danh mục"], ["product_group", "Nhóm SP"], ["unit", "Đơn vị tính"], ["barcode_type", "Loại mã vạch"],
-    ["tracking_type", "Hình thức theo dõi"], ["is_pqc_required", "Cần kiểm tra PQC"], ["status", "Trạng thái"],
-    ["description", "Mô tả"], ["attributes", "Thuộc tính sản phẩm"] ] },
-  { key: "bom", label: "Định mức (BOM)", fields: [
-    ["name", "Tên định mức"], ["bom_type", "Loại định mức"], ["product_id", "Sản phẩm đầu ra"],
-    ["output_quantity", "Định mức SL"], ["lines", "Thành phần / NVL"] ] },
-  { key: "process", label: "Quy trình công nghệ" },
-
-  // ── DANH MỤC (mỗi module riêng biệt) ────────────────────────────────────
-  { key: "md_machines",  label: "Máy móc" },
-  { key: "md_employees", label: "Nhân viên", fields: [
-    ["full_name", "Họ tên"], ["employee_code", "Mã NV"], ["factory", "Tổ / Bộ phận"],
-    ["position", "Chức vụ"], ["phone", "Số điện thoại"], ["status", "Trạng thái"] ] },
-  { key: "md_shifts",    label: "Ca làm việc" },
-  { key: "md_warehouses",label: "Kho (danh mục)" },
-  { key: "md_locations", label: "Vị trí lưu trữ" },
-  { key: "md_customers", label: "Khách hàng", fields: [
-    ["name", "Tên khách hàng"], ["phone", "Điện thoại"], ["address", "Địa chỉ"],
-    ["tax_code", "Mã số thuế"], ["contact", "Người liên hệ"], ["note", "Ghi chú"] ] },
-  { key: "md_roles",     label: "Vai trò" },
+const PERM_TREE = [
+  {
+    category: "Hệ thống chung",
+    icon: LayoutDashboard,
+    modules: [
+      { key: "dashboard", label: "Dashboard", actions: ["view"] }
+    ]
+  },
+  {
+    category: "Kinh doanh & Kế hoạch",
+    icon: Calendar,
+    modules: [
+      { key: "orders", label: "Đơn hàng", actions: ["view", "create", "edit", "delete", "approve"] },
+      { key: "planning", label: "Kế hoạch sản xuất", actions: ["view", "create", "edit", "publish"] },
+    ]
+  },
+  {
+    category: "Sản xuất",
+    icon: Factory,
+    modules: [
+      { key: "production", label: "Lệnh sản xuất", actions: ["view", "create", "edit", "delete", "publish", "assign", "export"] },
+      { key: "execution", label: "Thực thi sản xuất", actions: ["view", "execute"] },
+      { key: "prod_output", label: "Sản lượng", actions: ["view", "edit", "export"] },
+    ]
+  },
+  {
+    category: "Kho",
+    icon: Package,
+    modules: [
+      { key: "inventory", label: "Tồn kho", actions: ["view", "export"] },
+      { key: "inv_inbound", label: "Nhập kho", actions: ["view", "create", "edit", "delete", "approve"] },
+      { key: "inv_outbound", label: "Xuất kho", actions: ["view", "create", "edit", "delete", "approve"] },
+      { key: "inv_transfer", label: "Chuyển kho", actions: ["view", "create", "approve"] },
+    ]
+  },
+  {
+    category: "Báo cáo",
+    icon: BarChart2,
+    modules: [
+      { key: "reports", label: "Báo cáo KPI", actions: ["view", "export"] },
+      { key: "rep_inv", label: "Báo cáo kho", actions: ["view", "export"] },
+    ]
+  },
+  {
+    category: "Quản trị danh mục",
+    icon: Settings,
+    modules: [
+      { key: "products", label: "Sản phẩm", actions: ["view", "create", "edit", "delete"] },
+      { key: "bom", label: "Định mức (BOM)", actions: ["view", "create", "edit", "delete"] },
+      { key: "md_employees", label: "Nhân viên", actions: ["view", "create", "edit"] },
+      { key: "md_machines", label: "Máy móc", actions: ["view", "create", "edit"] },
+      { key: "md_roles", label: "Vai trò", actions: ["view", "create", "edit", "delete"] },
+    ]
+  }
 ];
 
-const ACTIONS = [
-  ["view", "Xem"], ["create", "Thêm"], ["edit", "Sửa"], ["delete", "Xoá"],
-  ["approve", "Phê duyệt"], ["reject", "Từ chối"], ["import", "Import"], ["export", "Export"],
-  ["print", "In"], ["execute", "Thực hiện"], ["assign", "Phân công"], ["cancel", "Hủy"], ["complete", "Hoàn thành"]
-];
+// Helper: Lấy thông tin module từ key
+const getModuleInfo = (key) => {
+  for (const cat of PERM_TREE) {
+    const mod = cat.modules.find(m => m.key === key);
+    if (mod) return { category: cat.category, ...mod };
+  }
+  return { category: "Khác", key, label: key, actions: ["view"] };
+};
 
-// Để giữ tính tương thích với yêu cầu: "như cấu hình hiện tại",
-// Ta chỉ định những action cơ bản cho mọi module, 
-// nhưng nếu sau này muốn mở rộng thì cấu hình ở đây.
-const DEFAULT_ACTIONS = ["view", "create", "edit", "delete"];
+/* ─── 2. COMPONENT DRAWER (THÊM / SỬA QUYỀN) ─── */
+function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
+  const [selectedModule, setSelectedModule] = useState(null);
+  
+  // local state cho quyền đang chỉnh sửa trong drawer:
+  // Format: { [moduleKey]: { [actionKey]: { status: 'ALLOW', scope: 'ALL', scopeValue: '' } } }
+  const [draft, setDraft] = useState({});
 
-const PERM_STATES = [
-  { value: "INHERIT", label: "Kế thừa" },
-  { value: "ALLOW", label: "Cho phép" },
-  { value: "DENY", label: "Từ chối" }
-];
+  // Reset draft khi mở lại
+  useEffect(() => {
+    if (isOpen) {
+      setDraft(initialPerms || {});
+      // Tự động chọn module đầu tiên
+      setSelectedModule(PERM_TREE[0].modules[0]);
+    }
+  }, [isOpen, initialPerms]);
 
-const FIELD_PERMS = [
-  { value: "INHERIT", label: "Kế thừa" },
-  { value: "edit", label: "Cho sửa" },
-  { value: "view", label: "Chỉ xem" },
-  { value: "hidden", label: "Ẩn" }
-];
+  if (!isOpen) return null;
 
+  // Xử lý tick chọn 1 thao tác
+  const toggleAction = (modKey, actKey, currentVal) => {
+    const modDraft = draft[modKey] || {};
+    if (currentVal?.status === "ALLOW") {
+      // Bỏ tick
+      const newModDraft = { ...modDraft };
+      delete newModDraft[actKey];
+      setDraft({ ...draft, [modKey]: newModDraft });
+    } else {
+      // Tick -> mặc định Toàn bộ
+      setDraft({ ...draft, [modKey]: { ...modDraft, [actKey]: { status: "ALLOW", scope: "ALL", scopeValue: "" } } });
+    }
+  };
+
+  // Xử lý đổi Data Scope
+  const changeScope = (modKey, actKey, field, val) => {
+    const actDraft = draft[modKey]?.[actKey] || { status: "ALLOW", scope: "ALL", scopeValue: "" };
+    setDraft({
+      ...draft,
+      [modKey]: {
+        ...draft[modKey],
+        [actKey]: { ...actDraft, [field]: val }
+      }
+    });
+  };
+
+  const handleSave = () => {
+    onSave(draft);
+  };
+
+  const modDraft = draft[selectedModule?.key] || {};
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-sm transition-all">
+      <div className="w-[85%] max-w-6xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+        {/* Header Drawer */}
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Cấu hình phân quyền</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Vai trò: <span className="font-semibold text-indigo-600">{roleName}</span></p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} className="btn-ghost text-slate-500 hover:text-slate-700">Hủy bỏ</button>
+            <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> Lưu quyền</button>
+          </div>
+        </div>
+
+        {/* Body Drawer: 2 cột */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Cột trái: Cây Module */}
+          <div className="w-72 bg-slate-50 border-r border-slate-200 flex flex-col h-full">
+            <div className="p-4 border-b border-slate-200">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input placeholder="Tìm module..." className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-4">
+              {PERM_TREE.map((cat) => (
+                <div key={cat.category}>
+                  <div className="flex items-center gap-2 px-2 mb-1">
+                    <cat.icon size={14} className="text-slate-400" />
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{cat.category}</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {cat.modules.map(mod => {
+                      const isSelected = selectedModule?.key === mod.key;
+                      // Tính số lượng quyền đã cấp cho module này
+                      const grantedCount = Object.keys(draft[mod.key] || {}).length;
+                      return (
+                        <button key={mod.key} onClick={() => setSelectedModule(mod)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-colors ${
+                            isSelected ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-600 hover:bg-slate-100"
+                          }`}>
+                          <span>{mod.label}</span>
+                          {grantedCount > 0 && <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">{grantedCount}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Cột phải: Cấu hình chi tiết */}
+          <div className="flex-1 bg-white overflow-y-auto p-8">
+            {selectedModule ? (
+              <div className="max-w-4xl mx-auto">
+                <div className="mb-6 pb-4 border-b border-slate-100">
+                  <h3 className="text-2xl font-bold text-slate-800">{selectedModule.label}</h3>
+                  <p className="text-slate-500 text-sm mt-1">Cấu hình các thao tác được phép và giới hạn phạm vi truy cập dữ liệu.</p>
+                </div>
+
+                <div className="space-y-6">
+                  {selectedModule.actions.map(actKey => {
+                    const val = modDraft[actKey];
+                    const isChecked = val?.status === "ALLOW" || val === true; // Tương thích dữ liệu cũ
+                    
+                    return (
+                      <div key={actKey} className={`p-5 rounded-xl border transition-colors ${isChecked ? "border-indigo-200 bg-indigo-50/30" : "border-slate-200 bg-white"}`}>
+                        <label className="flex items-start gap-3 cursor-pointer">
+                          <div className="mt-0.5">
+                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                              checked={isChecked}
+                              onChange={() => toggleAction(selectedModule.key, actKey, val)}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <span className="font-semibold text-slate-800 text-base">{ACTION_LABELS[actKey] || actKey}</span>
+                            
+                            {/* Cấu hình Scope (chỉ hiện khi được tick) */}
+                            {isChecked && (
+                              <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200 shadow-sm space-y-3 cursor-default" onClick={e => e.preventDefault()}>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Phạm vi truy cập dữ liệu</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  {["ALL", "FACTORY", "WAREHOUSE", "CUSTOM"].map(scopeCode => {
+                                    const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Theo Nhà máy", WAREHOUSE: "Theo Kho", CUSTOM: "Tùy chỉnh" };
+                                    return (
+                                      <label key={scopeCode} className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${val?.scope === scopeCode ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "border-slate-200 hover:bg-slate-50 text-slate-600"}`}>
+                                        <input type="radio" name={`scope_${actKey}`} className="text-indigo-600 focus:ring-indigo-500"
+                                          checked={val?.scope === scopeCode}
+                                          onChange={() => changeScope(selectedModule.key, actKey, "scope", scopeCode)}
+                                        />
+                                        <span className="text-sm font-medium">{scopeLabels[scopeCode]}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Form phụ thuộc Scope */}
+                                {val?.scope === "FACTORY" && (
+                                  <div className="mt-3">
+                                    <label className="block text-xs text-slate-500 mb-1">Chọn Nhà máy</label>
+                                    <select className="w-full text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                                      value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
+                                      <option value="">-- Tất cả nhà máy --</option>
+                                      <option value="Nhà máy thổi">Nhà máy thổi</option>
+                                      <option value="Nhà máy cắt">Nhà máy cắt</option>
+                                      <option value="Nhà máy in">Nhà máy in</option>
+                                    </select>
+                                  </div>
+                                )}
+                                {val?.scope === "WAREHOUSE" && (
+                                  <div className="mt-3">
+                                    <label className="block text-xs text-slate-500 mb-1">Chọn Kho</label>
+                                    <select className="w-full text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                                      value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
+                                      <option value="">-- Tất cả kho --</option>
+                                      <option value="Kho Nguyên vật liệu">Kho Nguyên vật liệu</option>
+                                      <option value="Kho Thành phẩm">Kho Thành phẩm</option>
+                                      <option value="Kho Phế liệu">Kho Phế liệu</option>
+                                    </select>
+                                  </div>
+                                )}
+                                {val?.scope === "CUSTOM" && (
+                                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm flex items-center gap-2">
+                                    <Settings size={16} /> Giao diện Rule Builder nâng cao đang được phát triển.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-slate-400">Chọn một module bên trái để cấu hình</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ─── 3. MÀN HÌNH CHÍNH ─── */
 export default function PermissionsModule() {
   const [roleList, setRoleList] = useState([]);
   const [roleId, setRoleId] = useState("");
   const [parentId, setParentId] = useState("");
   const [perms, setPerms] = useState({});
-  const [openDetail, setOpenDetail] = useState(null); // Chỉ mở 1 chi tiết tại một thời điểm
   const [effectivePerms, setEffectivePerms] = useState({});
+  
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchRoles = useCallback(async () => {
     try {
@@ -114,241 +302,251 @@ export default function PermissionsModule() {
     }
   }, [roleId]);
 
-  useEffect(() => {
-    fetchRoles();
-  }, [fetchRoles]);
+  useEffect(() => { fetchRoles(); }, [fetchRoles]);
 
   const fetchEffectivePerms = useCallback(async (id) => {
     try {
       const ep = await roles.getEffectivePermissions(id);
       setEffectivePerms(ep);
-    } catch (e) {
-      console.error("Failed to fetch effective permissions", e);
-    }
+    } catch (e) { console.error(e); }
   }, []);
 
   const selectRole = useCallback(async (id, list = roleList) => {
     setRoleId(id);
     if (!id) {
-      setPerms({});
-      setParentId("");
-      setEffectivePerms({});
+      setPerms({}); setParentId(""); setEffectivePerms({});
       return;
     }
     try {
       const r = await roles.get(id);
+      // Chuyển đổi dữ liệu cũ (true/false) sang format mới nếu cần, 
+      // nhưng ở đây ta cứ giữ nguyên JSONB trả về từ DB, lúc parse tính sau.
       setPerms(r.permissions || {});
       setParentId(r.parent_id || "");
       fetchEffectivePerms(id);
-    } catch (e) {
-      toast.error("Lỗi tải vai trò: " + e.message);
-    }
+    } catch (e) { toast.error("Lỗi tải vai trò: " + e.message); }
   }, [roleList, fetchEffectivePerms]);
 
-  const ap = (k) => perms[k] || {};
-  const setAppAction = (k, actionKey, value) => {
-    setPerms((p) => ({
-      ...p,
-      [k]: { ...(p[k] || {}), [actionKey]: value }
-    }));
-  };
-  const setField = (k, fk, v) => {
-    setPerms((p) => ({
-      ...p,
-      [k]: {
-        ...(p[k] || {}),
-        fields: { ...((p[k] || {}).fields || {}), [fk]: v }
-      }
-    }));
-  };
-  
-  const fieldVal = (k, fk) => ap(k).fields?.[fk] || "INHERIT";
-  const actionVal = (k, actionKey) => {
-    const val = ap(k)[actionKey];
-    if (val === true) return "ALLOW"; // backward compatibility
-    if (val === false) return "DENY";
-    return val || "INHERIT";
-  };
+  const activeRole = roleList.find(r => r.id === roleId);
 
-  const grantAll = () => {
-    const all = {};
-    APPS.forEach((a) => {
-      const appPerm = {};
-      DEFAULT_ACTIONS.forEach(act => appPerm[act] = "ALLOW");
-      if (a.fields) {
-        appPerm.fields = Object.fromEntries(a.fields.map(([fk]) => [fk, "edit"]));
-      }
-      all[a.key] = appPerm;
+  // Parse flattened permissions for the Table
+  // Format: [ { moduleKey, actionKey, isInherited, scope, scopeValue } ]
+  const flatTableData = useMemo(() => {
+    const list = [];
+    // Gộp cả perms (trực tiếp) và effectivePerms (kế thừa)
+    // Để phân biệt nguồn: nếu có trong perms thì là TRỰC TIẾP, nếu có trong effective nhưng k có trong perms thì KẾ THỪA
+    
+    // Duyệt qua tất cả effective (vì effective = inherited + direct)
+    Object.entries(effectivePerms).forEach(([modKey, actions]) => {
+      if (!actions) return;
+      Object.entries(actions).forEach(([actKey, val]) => {
+        // Bỏ qua fields cũ
+        if (actKey === "fields") return;
+        
+        const isAllow = (typeof val === 'object' && val.status === 'ALLOW') || val === true || val === 'ALLOW';
+        if (!isAllow) return;
+
+        const isDirect = perms[modKey]?.[actKey] !== undefined;
+        const scope = val?.scope || "ALL";
+        const scopeValue = val?.scopeValue || "";
+
+        list.push({
+          moduleKey,
+          actionKey,
+          scope,
+          scopeValue,
+          isDirect
+        });
+      });
     });
-    setPerms(all);
-  };
 
-  const save = async () => {
+    // Lọc theo tìm kiếm
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      return list.filter(item => {
+        const minfo = getModuleInfo(item.moduleKey);
+        const actLabel = ACTION_LABELS[item.actionKey] || item.actionKey;
+        return minfo.label.toLowerCase().includes(q) || actLabel.toLowerCase().includes(q);
+      });
+    }
+
+    // Sắp xếp theo module -> action
+    return list.sort((a, b) => a.moduleKey.localeCompare(b.moduleKey) || a.actionKey.localeCompare(b.actionKey));
+  }, [effectivePerms, perms, searchQuery]);
+
+  // Handle Save from Drawer
+  const handleSavePerms = async (newPerms) => {
     try {
-      await roles.savePermissions(roleId, perms, parentId || null);
-      toast.success("Đã lưu phân quyền cho vai trò.");
-      fetchEffectivePerms(roleId);
+      await roles.savePermissions(roleId, newPerms, parentId || null);
+      toast.success("Đã lưu phân quyền!");
+      setIsDrawerOpen(false);
+      // Reload current role
+      selectRole(roleId);
     } catch (e) {
       toast.error("Lỗi lưu: " + e.message);
     }
   };
 
-  const parentOptions = roleList.filter(r => r.id !== roleId);
+  // Nhanh chóng xóa 1 quyền từ bảng
+  const handleDeleteDirectPerm = async (modKey, actKey) => {
+    if (!window.confirm(`Bạn có chắc muốn gỡ quyền này?`)) return;
+    try {
+      const newPerms = JSON.parse(JSON.stringify(perms));
+      if (newPerms[modKey]) {
+        delete newPerms[modKey][actKey];
+        if (Object.keys(newPerms[modKey]).length === 0) delete newPerms[modKey];
+      }
+      await roles.savePermissions(roleId, newPerms, parentId || null);
+      toast.success("Đã xóa quyền");
+      selectRole(roleId);
+    } catch (e) { toast.error("Lỗi: " + e.message); }
+  };
+
+  // Thống kê nhanh
+  const statTotal = flatTableData.length;
+  const statModules = new Set(flatTableData.map(d => d.moduleKey)).size;
+  const statConstrained = flatTableData.filter(d => d.scope !== "ALL").length;
+  const statFull = statTotal - statConstrained;
 
   return (
     <div className="space-y-6">
-      <ListHeader title="Phân quyền hệ thống" />
+      <ListHeader title="Phân quyền hệ thống" subtitle="Quản lý quyền truy cập và phạm vi dữ liệu theo vai trò" />
 
-      {/* Box: Phân quyền theo vai trò */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm space-y-4">
-        <h3 className="font-semibold text-slate-800 border-b border-slate-100 pb-2">Phân quyền theo vai trò</h3>
-        <div className="flex flex-wrap items-end gap-4">
+      {/* ─── Control Bar ─── */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <div className="flex flex-wrap items-end gap-5">
           <div className="flex-1 min-w-[250px]">
-            <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò</label>
-            <select className={inputCls} value={roleId} onChange={(e) => selectRole(e.target.value)}>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">Vai trò đang chọn</label>
+            <select className="w-full border-slate-200 rounded-lg text-sm focus:ring-indigo-500" 
+              value={roleId} onChange={(e) => selectRole(e.target.value)}>
               <option value="">-- Chọn vai trò --</option>
               {roleList.map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
             </select>
           </div>
           <div className="flex-1 min-w-[250px]">
-            <label className="block text-sm font-medium text-slate-600 mb-1.5">Vai trò cha (Kế thừa)</label>
-            <select className={inputCls} value={parentId} onChange={(e) => setParentId(e.target.value)} disabled={!roleId}>
+            <label className="block text-sm font-medium text-slate-500 mb-2">Kế thừa quyền từ</label>
+            <select className="w-full border-slate-200 rounded-lg text-sm bg-slate-50 text-slate-500" 
+              value={parentId} onChange={(e) => setParentId(e.target.value)} disabled={!roleId}>
               <option value="">-- Không kế thừa --</option>
-              {parentOptions.map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
+              {roleList.filter(r => r.id !== roleId).map((r) => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
             </select>
           </div>
-          <div className="flex gap-2">
-            <button onClick={grantAll} disabled={!roleId} className="btn-ghost text-sm"><ShieldCheck size={16} /> Cấp toàn quyền</button>
-            <button onClick={() => setPerms({})} disabled={!roleId} className="btn-ghost text-sm text-red-600 hover:bg-red-50"><Eraser size={16} /> Bỏ hết</button>
-            <button onClick={save} disabled={!roleId} className="btn-primary text-sm px-6"><Save size={16} /> Lưu</button>
+          <div>
+            <button onClick={() => setIsDrawerOpen(true)} disabled={!roleId} className="btn-primary h-[38px] flex items-center gap-2">
+              <Plus size={16} /> Thêm / Sửa quyền
+            </button>
           </div>
         </div>
       </div>
 
-      {!roleId && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">Chọn một vai trò để cấu hình quyền.</div>}
-
-      {roleId && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {APPS.map((a) => {
-            const hasFields = !!a.fields;
-            const p = ap(a.key);
-            const ep = effectivePerms[a.key] || {};
-            
-            // Tính số lượng action được ALLOW trong số mặc định
-            const allowedActionsCount = DEFAULT_ACTIONS.filter(act => 
-              p[act] === 'ALLOW' || p[act] === true
-            ).length;
-            
-            const isDetailOpen = openDetail === a.key;
-
-            return (
-              <div key={a.key} className="col-span-1 flex flex-col h-full">
-                <div className={`bg-white rounded-xl border transition-colors shadow-sm flex-1 flex flex-col ${isDetailOpen ? 'border-blue-300 ring-1 ring-blue-100' : 'border-slate-200'}`}>
-                  {/* Tóm tắt */}
-                  <div className="p-4 flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold text-slate-800">{a.label}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        {hasFields ? `${a.fields.length} trường dữ liệu` : "Không có trường"} 
-                        {" · Quyền: "}
-                        <span className="font-medium text-blue-600">{allowedActionsCount}/{DEFAULT_ACTIONS.length}</span>
-                      </p>
-                    </div>
-                    <button 
-                      onClick={() => setOpenDetail(isDetailOpen ? null : a.key)}
-                      className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors ${
-                        isDetailOpen ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                      }`}
-                    >
-                      Chi tiết <ChevronDown size={14} className={`transition-transform ${isDetailOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                  </div>
-
-                  {/* Chi tiết (Accordion) */}
-                  {isDetailOpen && (
-                    <div className="border-t border-slate-100 bg-slate-50/50 flex-1 p-4 flex flex-col gap-5">
-                      
-                      {/* Section: CRUD */}
-                      <div>
-                        <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Quyền thao tác (CRUD)</h5>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {DEFAULT_ACTIONS.map(actKey => {
-                            const act = ACTIONS.find(x => x[0] === actKey);
-                            if (!act) return null;
-                            const [k, lb] = act;
-                            const val = actionVal(a.key, k);
-                            const effectiveVal = ep[k];
-                            const isInheriting = val === 'INHERIT' && effectiveVal;
-                            
-                            return (
-                              <div key={k} className="flex flex-col gap-1.5 p-2 bg-white rounded-md border border-slate-100 shadow-sm">
-                                <div className="flex justify-between items-center">
-                                  <span className="text-sm text-slate-700 font-medium">{lb}</span>
-                                  {isInheriting && <span className={`text-[10px] px-1.5 py-0.5 rounded ${effectiveVal === 'ALLOW' || effectiveVal === true ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                    Thực tế: {effectiveVal === 'ALLOW' || effectiveVal === true ? 'Cho phép' : 'Từ chối'}
-                                  </span>}
-                                </div>
-                                <select 
-                                  className="w-full text-sm border-slate-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 py-1.5"
-                                  value={val}
-                                  onChange={(e) => setAppAction(a.key, k, e.target.value)}
-                                >
-                                  {PERM_STATES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                </select>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Section: Fields */}
-                      {hasFields && (
-                        <div>
-                          <div className="w-full h-px bg-slate-200 mb-4"></div>
-                          <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Trường dữ liệu</h5>
-                          <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                            {a.fields.map(([fk, flb]) => {
-                               const val = fieldVal(a.key, fk);
-                               const effectiveVal = ep.fields?.[fk];
-                               const isInheriting = val === 'INHERIT' && effectiveVal && effectiveVal !== 'INHERIT';
-                               
-                               return (
-                                <div key={fk} className="flex items-center justify-between gap-2 border border-slate-200 bg-white rounded-lg px-3 py-2">
-                                  <div className="flex flex-col">
-                                    <span className="text-sm text-slate-700">{flb}</span>
-                                    {isInheriting && <span className="text-[10px] text-blue-500">Kế thừa: {FIELD_PERMS.find(x => x.value === effectiveVal)?.label || effectiveVal}</span>}
-                                  </div>
-                                  <select 
-                                    className="px-2 py-1.5 rounded-md border border-slate-300 text-xs shadow-sm bg-slate-50 min-w-[100px]" 
-                                    value={val}
-                                    onChange={(e) => setField(a.key, fk, e.target.value)}
-                                  >
-                                    {FIELD_PERMS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                                  </select>
-                                </div>
-                               );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Chỗ dành cho Data Scope sau này */}
-                      {/* <div>
-                        <div className="w-full h-px bg-slate-200 mb-4"></div>
-                        <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1">
-                          Phạm vi dữ liệu <Info size={14} className="text-slate-400" title="Đang cấu hình quản lý tập trung" />
-                        </h5>
-                        <p className="text-sm text-slate-500 italic">Quản lý tập trung toàn hệ thống.</p>
-                      </div> */}
-
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      {!roleId ? (
+        <div className="bg-white rounded-xl border border-slate-200 border-dashed p-16 flex flex-col items-center text-center">
+          <ShieldCheck size={48} className="text-slate-300 mb-4" />
+          <p className="text-lg font-semibold text-slate-600">Chưa chọn vai trò</p>
+          <p className="text-sm text-slate-400 mt-1">Vui lòng chọn một vai trò ở phía trên để xem và cấu hình quyền.</p>
         </div>
+      ) : (
+        <>
+          {/* ─── Tổng quan KPI ─── */}
+          <div className="grid grid-cols-4 gap-4">
+            {[
+              { label: "Tổng số quyền", val: statTotal, color: "text-blue-600" },
+              { label: "Module được truy cập", val: statModules, color: "text-indigo-600" },
+              { label: "Quyền có ràng buộc", val: statConstrained, color: "text-amber-600" },
+              { label: "Quyền toàn cục", val: statFull, color: "text-emerald-600" },
+            ].map((k, i) => (
+              <div key={i} className="bg-white rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-semibold text-slate-500 uppercase">{k.label}</p>
+                <p className={`text-2xl font-bold mt-1 ${k.color}`}>{k.val}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ─── Bảng quyền chi tiết ─── */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2"><ShieldCheck size={18} className="text-indigo-500"/> Chi tiết quyền của vai trò</h3>
+              <div className="relative w-72">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input placeholder="Tìm quyền..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white border-b border-slate-200 text-slate-500">
+                  <tr>
+                    <th className="py-3 px-5 text-left font-medium w-48">Phân hệ (Module)</th>
+                    <th className="py-3 px-5 text-left font-medium w-40">Thao tác</th>
+                    <th className="py-3 px-5 text-left font-medium">Phạm vi truy cập</th>
+                    <th className="py-3 px-5 text-center font-medium w-32">Nguồn</th>
+                    <th className="py-3 px-5 text-right font-medium w-24">Hành động</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {flatTableData.length === 0 ? (
+                    <tr><td colSpan={5} className="py-12 text-center text-slate-400">Không có quyền nào được cấp cho vai trò này.</td></tr>
+                  ) : (
+                    flatTableData.map((row, idx) => {
+                      const mInfo = getModuleInfo(row.moduleKey);
+                      const actLabel = ACTION_LABELS[row.actionKey] || row.actionKey;
+                      const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
+                      
+                      return (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-3 px-5">
+                            <span className="font-semibold text-slate-700 block">{mInfo.label}</span>
+                            <span className="text-xs text-slate-400">{mInfo.category}</span>
+                          </td>
+                          <td className="py-3 px-5">
+                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium text-xs">
+                              {actLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-5">
+                            {row.scope === "ALL" ? (
+                              <span className="text-emerald-600 font-medium text-xs bg-emerald-50 px-2 py-1 rounded">Toàn bộ</span>
+                            ) : (
+                              <div>
+                                <span className="font-medium text-amber-600 text-xs bg-amber-50 px-2 py-1 rounded mr-2">Theo {scopeLabels[row.scope]}</span>
+                                <span className="text-slate-600 font-semibold">{row.scopeValue}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-5 text-center">
+                            {row.isDirect ? (
+                              <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">Trực tiếp</span>
+                            ) : (
+                              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">Kế thừa</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-5 text-right">
+                            {row.isDirect && (
+                              <button onClick={() => handleDeleteDirectPerm(row.moduleKey, row.actionKey)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Xóa quyền">
+                                <Trash2 size={15} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
+
+      {/* Drawer */}
+      <PermissionDrawer 
+        isOpen={isDrawerOpen} 
+        onClose={() => setIsDrawerOpen(false)} 
+        roleName={activeRole?.name}
+        initialPerms={perms}
+        onSave={handleSavePerms}
+      />
     </div>
   );
 }
