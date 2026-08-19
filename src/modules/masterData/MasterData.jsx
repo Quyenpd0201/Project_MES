@@ -434,7 +434,6 @@ function buildConfigs(lookups) {
         { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Không hoạt động"], default: "Hoạt động" },
       ],
     },
-    },
   };
 }
 
