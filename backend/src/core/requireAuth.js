@@ -107,8 +107,10 @@ module.exports.requirePerm = (permString) => {
            const pval = modPerms[action];
            if (pval) {
              if (typeof pval === 'object' && pval.status === 'ALLOW') {
-               hasPerm = true;
-               break;
+               if (!pval.users || pval.users.length === 0 || pval.users.includes(req.user.id)) {
+                 hasPerm = true;
+                 break;
+               }
              } else if (pval === 'ALLOW' || pval === true) {
                hasPerm = true;
                break;
