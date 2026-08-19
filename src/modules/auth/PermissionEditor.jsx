@@ -81,7 +81,7 @@ const getModuleInfo = (key) => {
 };
 
 /* ─── 2. COMPONENT EDITOR (THÊM / SỬA QUYỀN TRÊN MÀN HÌNH RIÊNG) ─── */
-function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
+export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
   const [selectedModule, setSelectedModule] = useState(null);
   
   // local state cho quyền đang chỉnh sửa:
