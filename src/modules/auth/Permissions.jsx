@@ -374,6 +374,27 @@ export default function PermissionsModule() {
     return list.sort((a, b) => a.moduleKey.localeCompare(b.moduleKey) || a.actionKey.localeCompare(b.actionKey));
   }, [effectivePerms, perms, searchQuery]);
 
+  const [expandedModules, setExpandedModules] = useState({});
+
+  const toggleExpand = (modKey) => {
+    setExpandedModules(p => ({ ...p, [modKey]: !p[modKey] }));
+  };
+
+  const groupedData = useMemo(() => {
+    const map = new Map();
+    flatTableData.forEach(row => {
+      if (!map.has(row.moduleKey)) {
+        map.set(row.moduleKey, {
+           moduleKey: row.moduleKey,
+           info: getModuleInfo(row.moduleKey),
+           actions: []
+        });
+      }
+      map.get(row.moduleKey).actions.push(row);
+    });
+    return Array.from(map.values());
+  }, [flatTableData]);
+
   // Handle Save from Drawer
   const handleSavePerms = async (newPerms) => {
     try {
@@ -464,76 +485,88 @@ export default function PermissionsModule() {
 
           {/* ─── Bảng quyền chi tiết ─── */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
-            <div className="px-5 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center justify-between">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2"><ShieldCheck size={18} className="text-indigo-500"/> Chi tiết quyền của vai trò</h3>
               <div className="relative w-72">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input placeholder="Tìm quyền..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-white border-b border-slate-200 text-slate-500">
-                  <tr>
-                    <th className="py-3 px-5 text-left font-medium w-48">Phân hệ (Module)</th>
-                    <th className="py-3 px-5 text-left font-medium w-40">Thao tác</th>
-                    <th className="py-3 px-5 text-left font-medium">Phạm vi truy cập</th>
-                    <th className="py-3 px-5 text-center font-medium w-32">Nguồn</th>
-                    <th className="py-3 px-5 text-right font-medium w-24">Hành động</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {flatTableData.length === 0 ? (
-                    <tr><td colSpan={5} className="py-12 text-center text-slate-400">Không có quyền nào được cấp cho vai trò này.</td></tr>
-                  ) : (
-                    flatTableData.map((row, idx) => {
-                      const mInfo = getModuleInfo(row.moduleKey);
-                      const actLabel = ACTION_LABELS[row.actionKey] || row.actionKey;
-                      const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
-                      
-                      return (
-                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-3 px-5">
-                            <span className="font-semibold text-slate-700 block">{mInfo.label}</span>
-                            <span className="text-xs text-slate-400">{mInfo.category}</span>
-                          </td>
-                          <td className="py-3 px-5">
-                            <span className="inline-flex items-center px-2 py-1 rounded bg-slate-100 text-slate-700 font-medium text-xs">
-                              {actLabel}
-                            </span>
-                          </td>
-                          <td className="py-3 px-5">
-                            {row.scope === "ALL" ? (
-                              <span className="text-emerald-600 font-medium text-xs bg-emerald-50 px-2 py-1 rounded">Toàn bộ</span>
-                            ) : (
-                              <div>
-                                <span className="font-medium text-amber-600 text-xs bg-amber-50 px-2 py-1 rounded mr-2">Theo {scopeLabels[row.scope]}</span>
-                                <span className="text-slate-600 font-semibold">{row.scopeValue}</span>
-                              </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-5 text-center">
-                            {row.isDirect ? (
-                              <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-1 rounded-full border border-indigo-100">Trực tiếp</span>
-                            ) : (
-                              <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full border border-slate-200">Kế thừa</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-5 text-right">
-                            {row.isDirect && (
-                              <button onClick={() => handleDeleteDirectPerm(row.moduleKey, row.actionKey)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors" title="Xóa quyền">
-                                <Trash2 size={15} />
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
+            <div className="p-4 space-y-3 bg-slate-50 border-t border-slate-200 min-h-[300px]">
+              {groupedData.length === 0 ? (
+                <div className="py-12 text-center text-slate-400 bg-white rounded-lg border border-slate-200">Không có quyền nào được cấp cho vai trò này.</div>
+              ) : (
+                groupedData.map((group) => (
+                  <div key={group.moduleKey} className="bg-white rounded-lg border border-slate-200 overflow-hidden transition-all shadow-sm">
+                    {/* Header: Click to expand */}
+                    <div 
+                      className="px-5 py-3 flex items-center justify-between cursor-pointer hover:bg-indigo-50/30 transition-colors"
+                      onClick={() => toggleExpand(group.moduleKey)}
+                    >
+                      <div className="flex items-center gap-4">
+                         <div className="w-10 h-10 bg-indigo-50 rounded-lg text-indigo-600 flex items-center justify-center">
+                           <ShieldCheck size={20} />
+                         </div>
+                         <div>
+                           <div className="font-semibold text-slate-800 text-base">{group.info.label}</div>
+                           <div className="text-xs text-slate-400 uppercase tracking-wider font-medium mt-0.5">{group.info.category}</div>
+                         </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                           <span className="font-semibold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">{group.actions.length}</span> thao tác
+                        </div>
+                        <ChevronRight className={`text-slate-400 transition-transform ${expandedModules[group.moduleKey] ? 'rotate-90' : ''}`} size={20} />
+                      </div>
+                    </div>
+                    
+                    {/* Expanded Detail */}
+                    {expandedModules[group.moduleKey] && (
+                      <div className="border-t border-slate-100 bg-slate-50/50 p-5">
+                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                           {group.actions.map((row, idx) => {
+                              const actLabel = ACTION_LABELS[row.actionKey] || row.actionKey;
+                              const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
+                              
+                              return (
+                                <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+                                  <div>
+                                    <div className="font-semibold text-slate-700 text-sm flex items-center gap-2">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                      {actLabel}
+                                    </div>
+                                    <div className="text-xs mt-2 pl-3.5">
+                                      {row.scope === "ALL" ? (
+                                        <span className="text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded">Toàn bộ dữ liệu</span>
+                                      ) : (
+                                        <span className="text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded">Theo {scopeLabels[row.scope]}: <span className="font-bold">{row.scopeValue}</span></span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col items-end gap-3">
+                                     {row.isDirect ? (
+                                      <span className="text-[10px] uppercase tracking-wider text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">Trực tiếp</span>
+                                    ) : (
+                                      <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Kế thừa</span>
+                                    )}
+                                    
+                                    {row.isDirect && (
+                                      <button onClick={() => handleDeleteDirectPerm(row.moduleKey, row.actionKey)} className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1 rounded transition-colors" title="Xóa quyền">
+                                        <Trash2 size={16} />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                           })}
+                         </div>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </>
