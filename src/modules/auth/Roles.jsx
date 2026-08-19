@@ -1,9 +1,65 @@
 import React, { useState, useEffect } from "react";
-import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw } from "lucide-react";
+import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
 import { ListHeader, DataTable, Section } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
+
+function RoleForm({ record, onBack, onSaved }) {
+  const isEdit = !!record?.id;
+  const [f, setF] = useState({ 
+    role_code: record?.role_code || "",
+    name: record?.name || "", 
+    description: record?.description || "", 
+    status: record?.status || "Hoạt động" 
+  });
+  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  
+  const save = async () => {
+    if (!f.name) return toast.error("Vui lòng nhập tên vai trò");
+    try {
+      if (isEdit) await roles.update(record.id, f);
+      else await roles.create(f);
+      toast.success("Đã lưu vai trò thành công");
+      onSaved();
+    } catch (e) {
+      toast.error("Lỗi: " + e.message);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+        <h2 className="text-xl font-bold text-slate-800">{isEdit ? "Sửa vai trò" : "Thêm vai trò mới"}</h2>
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Hủy</button>
+          <button onClick={save} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"><Save size={16} /> Lưu</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Mã vai trò (tự sinh nếu để trống)</label>
+          <input className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm" value={f.role_code} onChange={(e) => set("role_code", e.target.value)} placeholder="VD: VT001..." disabled={isEdit} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Tên vai trò <span className="text-rose-500">*</span></label>
+          <input className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm" value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Nhập tên..." />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
+          <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm" value={f.status} onChange={(e) => set("status", e.target.value)}>
+            <option>Hoạt động</option>
+            <option>Không hoạt động</option>
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
+          <textarea className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm resize-none" rows="3" value={f.description} onChange={(e) => set("description", e.target.value)} placeholder="Mô tả vai trò này làm gì..."></textarea>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function RolesModule() {
   const [list, setList] = useState([]);
@@ -16,6 +72,9 @@ export default function RolesModule() {
 
   // Edit user custom permissions
   const [editingUser, setEditingUser] = useState(null);
+  
+  // Edit role info
+  const [editingRole, setEditingRole] = useState(null);
 
   const fetchRoles = async () => {
     try {
@@ -44,6 +103,17 @@ export default function RolesModule() {
   const handleRoleSelect = (role) => {
     setSelectedRole(role);
     setActiveTab("permissions");
+  };
+
+  const handleDeleteRole = async (r) => {
+    if (!confirm(`Bạn có chắc muốn xóa vai trò "${r.name}"?`)) return;
+    try {
+      await roles.remove(r.id);
+      toast.success("Đã xóa vai trò");
+      fetchRoles();
+    } catch (e) {
+      toast.error("Lỗi xóa vai trò: " + e.message);
+    }
   };
 
   const filteredRoles = list.filter(r => r.name.toLowerCase().includes(q.toLowerCase()) || r.role_code.toLowerCase().includes(q.toLowerCase()));
@@ -75,6 +145,14 @@ export default function RolesModule() {
     }
   };
 
+  if (editingRole) {
+    return (
+      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-3xl mx-auto mt-6">
+        <RoleForm record={editingRole.id ? editingRole : null} onBack={() => setEditingRole(null)} onSaved={() => { setEditingRole(null); fetchRoles(); }} />
+      </div>
+    );
+  }
+
   if (!selectedRole) {
     return (
       <div className="space-y-4">
@@ -85,7 +163,7 @@ export default function RolesModule() {
               <input type="text" placeholder="Tìm vai trò..." value={q} onChange={(e) => setQ(e.target.value)} className="pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 md:w-64" />
             </div>
             <button onClick={fetchRoles} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
-            <button onClick={() => toast.info("Thêm vai trò đang phát triển...")} className="btn-primary"><Plus size={16} /> Thêm mới</button>
+            <button onClick={() => setEditingRole({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>
           </>
         )} />
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
@@ -100,7 +178,11 @@ export default function RolesModule() {
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${r.status === 'Hoạt động' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{r.status}</span>
               )},
               { key: "_actions", label: "", align: "right", render: (r) => (
-                <button onClick={() => handleRoleSelect(r)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition">Cấu hình</button>
+                <div className="flex items-center justify-end gap-2">
+                  <button onClick={() => handleRoleSelect(r)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition">Cấu hình</button>
+                  <button onClick={() => setEditingRole(r)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition" title="Sửa vai trò"><Edit size={16} /></button>
+                  <button onClick={() => handleDeleteRole(r)} className="p-1.5 text-slate-400 hover:text-rose-600 transition" title="Xóa vai trò"><Trash2 size={16} /></button>
+                </div>
               )}
             ]}
           />
