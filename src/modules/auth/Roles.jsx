@@ -91,7 +91,7 @@ export default function RolesModule() {
   const fetchUsers = async () => {
     try {
       const res = await users.list();
-      setUserList(res.data || []);
+      setUserList(Array.isArray(res) ? res : res?.data || []);
     } catch (e) {}
   };
 
