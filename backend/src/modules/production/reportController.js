@@ -239,22 +239,24 @@ exports.employees = async (req, res) => {
   try {
     const { fromDate, toDate, stage, shift, team, orderCode } = req.query;
     const params = []; let i = 1;
+    // Người làm có thể được gán ở task hoặc ở lệnh sản xuất
     const where = [
-      `t.assigned_worker IS NOT NULL`,
-      `t.assigned_worker != ''`,
+      `COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL`,
+      `COALESCE(t.assigned_worker, po.assigned_worker) != ''`,
       `po.is_deleted = FALSE`,
     ];
-    if (fromDate)  { where.push(`COALESCE(t.planned_date, po.planned_date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)    { where.push(`COALESCE(t.planned_date, po.planned_date) <= $${i++}`); params.push(toDate); }
+    // Dùng po.created_at làm fallback khi planned_date = NULL tránh bỏ sót
+    if (fromDate)  { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)    { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
     if (stage)     { where.push(`t.stage = $${i++}`); params.push(stage); }
     if (shift)     { where.push(`t.shift = $${i++}`); params.push(shift); }
-    if (team)      { where.push(`t.assigned_team = $${i++}`); params.push(team); }
+    if (team)      { where.push(`COALESCE(t.assigned_team, po.assigned_team) = $${i++}`); params.push(team); }
     if (orderCode) { where.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
 
     const { rows } = await db.query(`
       SELECT
-        t.assigned_worker                                                             AS worker,
-        MAX(t.assigned_team)                                                          AS team,
+        COALESCE(t.assigned_worker, po.assigned_worker)                               AS worker,
+        COALESCE(MAX(t.assigned_team), MAX(po.assigned_team))                         AS team,
         COUNT(*)::int                                                                  AS tasks_count,
         COUNT(DISTINCT t.production_order_id)::int                                    AS orders_count,
         COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
@@ -272,7 +274,7 @@ exports.employees = async (req, res) => {
       FROM production_tasks t
       JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
       WHERE ${where.join(' AND ')}
-      GROUP BY t.assigned_worker
+      GROUP BY COALESCE(t.assigned_worker, po.assigned_worker)
       ORDER BY actual_qty DESC, planned_qty DESC
     `, params);
     res.json({ data: rows });
@@ -285,13 +287,15 @@ exports.employeeTasks = async (req, res) => {
     const worker = req.params.worker;
     const { fromDate, toDate, stage, shift, team } = req.query;
     const params = [worker]; let i = 2;
-    const where = [`t.assigned_worker = $1`, `po.is_deleted = FALSE`];
-    if (fromDate) { where.push(`COALESCE(t.planned_date, po.planned_date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)   { where.push(`COALESCE(t.planned_date, po.planned_date) <= $${i++}`); params.push(toDate); }
+    // Match task-level OR order-level assigned_worker
+    const where = [`COALESCE(t.assigned_worker, po.assigned_worker) = $1`, `po.is_deleted = FALSE`];
+    if (fromDate) { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)   { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
     if (stage)    { where.push(`t.stage = $${i++}`); params.push(stage); }
     if (shift)    { where.push(`t.shift = $${i++}`); params.push(shift); }
-    if (team)     { where.push(`t.assigned_team = $${i++}`); params.push(team); }
+    if (team)     { where.push(`COALESCE(t.assigned_team, po.assigned_team) = $${i++}`); params.push(team); }
     const ws = where.join(' AND ');
+
 
     const [tasksQ, dailyQ, stagesQ] = await Promise.all([
       db.query(`
