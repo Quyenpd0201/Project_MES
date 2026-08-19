@@ -80,24 +80,20 @@ const getModuleInfo = (key) => {
   return { category: "Khác", key, label: key, actions: ["view"] };
 };
 
-/* ─── 2. COMPONENT DRAWER (THÊM / SỬA QUYỀN) ─── */
-function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
+/* ─── 2. COMPONENT EDITOR (THÊM / SỬA QUYỀN TRÊN MÀN HÌNH RIÊNG) ─── */
+function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
   const [selectedModule, setSelectedModule] = useState(null);
   
-  // local state cho quyền đang chỉnh sửa trong drawer:
+  // local state cho quyền đang chỉnh sửa:
   // Format: { [moduleKey]: { [actionKey]: { status: 'ALLOW', scope: 'ALL', scopeValue: '' } } }
   const [draft, setDraft] = useState({});
 
-  // Reset draft khi mở lại
+  // Reset draft khi mount
   useEffect(() => {
-    if (isOpen) {
-      setDraft(initialPerms || {});
-      // Tự động chọn module đầu tiên
-      setSelectedModule(PERM_TREE[0].modules[0]);
-    }
-  }, [isOpen, initialPerms]);
-
-  if (!isOpen) return null;
+    setDraft(initialPerms || {});
+    // Tự động chọn module đầu tiên
+    setSelectedModule(PERM_TREE[0].modules[0]);
+  }, [initialPerms]);
 
   // Xử lý tick chọn 1 thao tác
   const toggleAction = (modKey, actKey, currentVal) => {
@@ -132,16 +128,15 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
   const modDraft = draft[selectedModule?.key] || {};
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-900/40 backdrop-blur-sm transition-all">
-      <div className="w-[85%] max-w-6xl bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
-        {/* Header Drawer */}
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[calc(100vh-120px)] animate-in fade-in">
+      {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
           <div>
             <h2 className="text-xl font-bold text-slate-800">Cấu hình phân quyền</h2>
             <p className="text-sm text-slate-500 mt-0.5">Vai trò: <span className="font-semibold text-indigo-600">{roleName}</span></p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="btn-ghost text-slate-500 hover:text-slate-700">Hủy bỏ</button>
+            <button onClick={onCancel} className="btn-ghost text-slate-500 hover:text-slate-700">Hủy bỏ</button>
             <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> Lưu quyền</button>
           </div>
         </div>
@@ -291,7 +286,6 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
           </div>
         </div>
       </div>
-    </div>
   );
 }
 
@@ -304,15 +298,15 @@ export default function PermissionsModule() {
   const [perms, setPerms] = useState({});
   const [effectivePerms, setEffectivePerms] = useState({});
   
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchRoles = useCallback(async () => {
     try {
-      const r = await roles.list();
-      setRoleList(r);
-      if (r.length > 0 && !roleId) {
-        selectRole(r[0].id, r);
+      const res = await roles.list();
+      setRoleList(res.data || []);
+      if (res.data?.length > 0 && !roleId) {
+        selectRole(res.data[0].id, res.data);
       }
     } catch (e) {
       console.error(e);
@@ -412,12 +406,12 @@ export default function PermissionsModule() {
     return Array.from(map.values());
   }, [flatTableData]);
 
-  // Handle Save from Drawer
+  // Handle Save from Editor
   const handleSavePerms = async (newPerms) => {
     try {
       await roles.savePermissions(roleId, newPerms, parentId || null);
       toast.success("Đã lưu phân quyền!");
-      setIsDrawerOpen(false);
+      setIsEditMode(false);
       // Reload current role
       selectRole(roleId);
     } catch (e) {
@@ -446,6 +440,20 @@ export default function PermissionsModule() {
   const statConstrained = flatTableData.filter(d => d.scope !== "ALL").length;
   const statFull = statTotal - statConstrained;
 
+  if (isEditMode) {
+    return (
+      <div className="space-y-6">
+        <ListHeader title={`Cấu hình quyền: ${activeRole?.name}`} subtitle="Chỉnh sửa chi tiết quyền và phạm vi dữ liệu cho vai trò này" />
+        <PermissionEditor 
+          roleName={activeRole?.name}
+          initialPerms={perms}
+          onSave={handleSavePerms}
+          onCancel={() => setIsEditMode(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <ListHeader title="Phân quyền hệ thống" subtitle="Quản lý quyền truy cập và phạm vi dữ liệu theo vai trò" />
@@ -470,8 +478,8 @@ export default function PermissionsModule() {
             </select>
           </div>
           <div>
-            <button onClick={() => setIsDrawerOpen(true)} disabled={!roleId} className="btn-primary h-[38px] flex items-center gap-2">
-              <Plus size={16} /> Thêm / Sửa quyền
+            <button onClick={() => setIsEditMode(true)} disabled={!roleId} className="btn-primary h-[38px] flex items-center gap-2 shadow-sm shadow-indigo-200">
+              <Edit size={16} /> Cấu hình quyền
             </button>
           </div>
         </div>
@@ -588,15 +596,6 @@ export default function PermissionsModule() {
           </div>
         </>
       )}
-
-      {/* Drawer */}
-      <PermissionDrawer 
-        isOpen={isDrawerOpen} 
-        onClose={() => setIsDrawerOpen(false)} 
-        roleName={activeRole?.name}
-        initialPerms={perms}
-        onSave={handleSavePerms}
-      />
     </div>
   );
 }
