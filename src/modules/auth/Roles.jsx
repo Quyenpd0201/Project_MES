@@ -81,19 +81,19 @@ export default function RolesModule() {
         <ListHeader title="Vai trò & Phân quyền" icon={Shield} onAdd={() => toast.info("Thêm vai trò đang phát triển...")} onRefresh={fetchRoles} search={q} onSearch={setQ} />
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <DataTable
-            data={filteredRoles}
-            loading={loading}
+            rows={filteredRoles}
+            rowKey={(r) => r.id}
             columns={[
               { key: "role_code", label: "Mã VT" },
-              { key: "name", label: "Tên vai trò", render: (_, r) => <div className="font-semibold text-slate-800">{r.name}</div> },
+              { key: "name", label: "Tên vai trò", render: (r) => <div className="font-semibold text-slate-800">{r.name}</div> },
               { key: "description", label: "Mô tả" },
-              { key: "status", label: "Trạng thái", render: (_, r) => (
+              { key: "status", label: "Trạng thái", render: (r) => (
                 <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${r.status === 'Hoạt động' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{r.status}</span>
+              )},
+              { key: "_actions", label: "", align: "right", render: (r) => (
+                <button onClick={() => handleRoleSelect(r)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition">Cấu hình</button>
               )}
             ]}
-            actions={(r) => (
-              <button onClick={() => handleRoleSelect(r)} className="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition">Cấu hình</button>
-            )}
           />
         </div>
       </div>
@@ -130,16 +130,17 @@ export default function RolesModule() {
                 <button onClick={() => toast.info("Gắn tài khoản vào vai trò đang phát triển...")} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-medium flex items-center gap-1"><Plus size={16}/> Thêm tài khoản</button>
               </div>
               <DataTable
-                data={roleUsers}
+                rows={roleUsers}
+                rowKey={(u) => u.id}
                 columns={[
-                  { key: "username", label: "Tài khoản", render: (_, u) => <span className="font-medium text-slate-800">{u.username}</span> },
+                  { key: "username", label: "Tài khoản", render: (u) => <span className="font-medium text-slate-800">{u.username}</span> },
                   { key: "full_name", label: "Họ tên" },
                   { key: "team", label: "Tổ/Đội" },
-                  { key: "status", label: "Trạng thái" }
+                  { key: "status", label: "Trạng thái" },
+                  { key: "_actions", label: "", align: "right", render: (u) => (
+                    <button onClick={() => setEditingUser(u)} className="px-3 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded text-sm font-medium">Quyền riêng</button>
+                  )}
                 ]}
-                actions={(u) => (
-                  <button onClick={() => setEditingUser(u)} className="px-3 py-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded text-sm font-medium">Quyền riêng</button>
-                )}
               />
             </div>
           )}
