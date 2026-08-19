@@ -239,25 +239,39 @@ exports.employees = async (req, res) => {
   try {
     const { fromDate, toDate, stage, shift, team, orderCode } = req.query;
     const params = []; let i = 1;
-    // Người làm có thể được gán ở task hoặc ở lệnh sản xuất
-    const where = [
-      `COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL`,
-      `COALESCE(t.assigned_worker, po.assigned_worker) != ''`,
-      `po.is_deleted = FALSE`,
-    ];
-    // Dùng po.created_at làm fallback khi planned_date = NULL tránh bỏ sót
-    if (fromDate)  { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)    { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
-    if (stage)     { where.push(`t.stage = $${i++}`); params.push(stage); }
-    if (shift)     { where.push(`t.shift = $${i++}`); params.push(shift); }
-    if (team)      { where.push(`COALESCE(t.assigned_team, po.assigned_team) = $${i++}`); params.push(team); }
-    if (orderCode) { where.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
+    
+    // 1. Điều kiện cho tasks
+    const taskWhere = [];
+    if (fromDate)  { taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)    { taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
+    if (stage)     { taskWhere.push(`t.stage = $${i++}`); params.push(stage); }
+    if (shift)     { taskWhere.push(`t.shift = $${i++}`); params.push(shift); }
+    if (orderCode) { taskWhere.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
+    
+    const taskWhereClause = taskWhere.length ? `AND ${taskWhere.join(' AND ')}` : '';
+
+    // 2. Điều kiện cho nhân viên
+    const empWhere = [`e.is_deleted = FALSE`];
+    if (team) {
+      empWhere.push(`e.factory = $${i++}`);
+      params.push(team);
+    }
 
     const { rows } = await db.query(`
+      WITH filtered_tasks AS (
+        SELECT t.*,
+               COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
+               po.order_code
+        FROM production_tasks t
+        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        WHERE COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL
+          AND COALESCE(t.assigned_worker, po.assigned_worker) != ''
+          ${taskWhereClause}
+      )
       SELECT
-        COALESCE(t.assigned_worker, po.assigned_worker)                               AS worker,
-        COALESCE(MAX(t.assigned_team), MAX(po.assigned_team))                         AS team,
-        COUNT(*)::int                                                                  AS tasks_count,
+        e.name                                                                        AS worker,
+        e.factory                                                                     AS team,
+        COUNT(t.id)::int                                                              AS tasks_count,
         COUNT(DISTINCT t.production_order_id)::int                                    AS orders_count,
         COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
         COALESCE(SUM(CASE WHEN t.status = 'Hoàn thành'
@@ -265,17 +279,17 @@ exports.employees = async (req, res) => {
         COALESCE(SUM(t.scrap_qty), 0)::numeric                                        AS scrap_qty,
         COUNT(DISTINCT t.planned_date)::int                                           AS work_days,
         COUNT(DISTINCT CONCAT(t.planned_date::text,'||',COALESCE(t.shift,''))) * 8   AS work_hours,
-        COUNT(*) FILTER (WHERE t.status = 'Hoàn thành')::int                          AS done_count,
-        COUNT(*) FILTER (WHERE t.status IN ('Đang sản xuất','Chờ'))::int              AS active_count,
-        COUNT(*) FILTER (WHERE t.status = 'Dừng sản xuất')::int                      AS paused_count,
+        COUNT(t.id) FILTER (WHERE t.status = 'Hoàn thành')::int                       AS done_count,
+        COUNT(t.id) FILTER (WHERE t.status IN ('Đang sản xuất','Chờ'))::int           AS active_count,
+        COUNT(t.id) FILTER (WHERE t.status = 'Dừng sản xuất')::int                   AS paused_count,
         STRING_AGG(DISTINCT t.stage, ', ' ORDER BY t.stage)                           AS stages,
         STRING_AGG(DISTINCT t.shift, ', ')
-          FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                         AS shifts
-      FROM production_tasks t
-      JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
-      WHERE ${where.join(' AND ')}
-      GROUP BY COALESCE(t.assigned_worker, po.assigned_worker)
-      ORDER BY actual_qty DESC, planned_qty DESC
+          FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                        AS shifts
+      FROM employees e
+      LEFT JOIN filtered_tasks t ON t.final_worker = e.name
+      WHERE ${empWhere.join(' AND ')}
+      GROUP BY e.id, e.name, e.factory
+      ORDER BY actual_qty DESC, planned_qty DESC, e.name
     `, params);
     res.json({ data: rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy báo cáo nhân viên' }); }
