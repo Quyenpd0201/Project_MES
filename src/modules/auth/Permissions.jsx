@@ -193,37 +193,55 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
                   <p className="text-slate-500 text-sm mt-1">Cấu hình các thao tác được phép và giới hạn phạm vi truy cập dữ liệu.</p>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {selectedModule.actions.map(actKey => {
                     const val = modDraft[actKey];
                     const isChecked = val?.status === "ALLOW" || val === true; // Tương thích dữ liệu cũ
                     
                     return (
-                      <div key={actKey} className={`p-5 rounded-xl border transition-colors ${isChecked ? "border-indigo-200 bg-indigo-50/30" : "border-slate-200 bg-white"}`}>
-                        <label className="flex items-start gap-3 cursor-pointer">
-                          <div className="mt-0.5">
-                            <input type="checkbox" className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                              checked={isChecked}
-                              onChange={() => toggleAction(selectedModule.key, actKey, val)}
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <span className="font-semibold text-slate-800 text-base">{ACTION_LABELS[actKey] || actKey}</span>
-                            
-                            {/* Cấu hình Scope (chỉ hiện khi được tick) */}
-                            {isChecked && (
-                              <div className="mt-4 p-4 bg-white rounded-lg border border-slate-200 shadow-sm space-y-3 cursor-default" onClick={e => e.preventDefault()}>
-                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Phạm vi truy cập dữ liệu</p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div key={actKey} className={`rounded-xl border transition-all overflow-hidden ${isChecked ? "border-indigo-300 shadow-md ring-1 ring-indigo-100" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                        {/* Toggle header row */}
+                        <div 
+                           className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isChecked ? "bg-indigo-50/50" : "bg-white"}`}
+                           onClick={() => toggleAction(selectedModule.key, actKey, val)}
+                        >
+                           <div className="flex items-center gap-4">
+                             <div className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${isChecked ? "bg-indigo-600 text-white shadow-inner" : "bg-slate-100 text-slate-400"}`}>
+                               <ShieldCheck size={20} />
+                             </div>
+                             <div>
+                               <div className={`font-bold text-base ${isChecked ? "text-indigo-900" : "text-slate-700"}`}>
+                                 {ACTION_LABELS[actKey] || actKey}
+                               </div>
+                               {!isChecked && <div className="text-xs text-slate-400 mt-0.5 font-medium">Quyền này đang bị vô hiệu hóa</div>}
+                             </div>
+                           </div>
+                           
+                           {/* Custom Toggle Switch */}
+                           <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isChecked ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isChecked ? 'translate-x-6' : 'translate-x-1'}`} />
+                           </div>
+                        </div>
+                        
+                        {/* Scope configuration body */}
+                        {isChecked && (
+                           <div className="p-5 border-t border-indigo-100 bg-white">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                  <Filter size={14} /> Phạm vi truy cập dữ liệu
+                                </p>
+                                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                                   {["ALL", "FACTORY", "WAREHOUSE", "CUSTOM"].map(scopeCode => {
-                                    const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Theo Nhà máy", WAREHOUSE: "Theo Kho", CUSTOM: "Tùy chỉnh" };
+                                    const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
                                     return (
-                                      <label key={scopeCode} className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${val?.scope === scopeCode ? "bg-indigo-50 border-indigo-200 text-indigo-700" : "border-slate-200 hover:bg-slate-50 text-slate-600"}`}>
-                                        <input type="radio" name={`scope_${actKey}`} className="text-indigo-600 focus:ring-indigo-500"
+                                      <label key={scopeCode} className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${val?.scope === scopeCode ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200" : "border-slate-200 hover:bg-slate-50 text-slate-600"}`}>
+                                        <input type="radio" name={`scope_${actKey}`} className="hidden"
                                           checked={val?.scope === scopeCode}
                                           onChange={() => changeScope(selectedModule.key, actKey, "scope", scopeCode)}
                                         />
-                                        <span className="text-sm font-medium">{scopeLabels[scopeCode]}</span>
+                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${val?.scope === scopeCode ? "border-white" : "border-slate-300"}`}>
+                                          {val?.scope === scopeCode && <div className="w-2 h-2 rounded-full bg-white" />}
+                                        </div>
+                                        <span className="text-sm font-semibold">{scopeLabels[scopeCode]}</span>
                                       </label>
                                     );
                                   })}
@@ -231,9 +249,9 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
 
                                 {/* Form phụ thuộc Scope */}
                                 {val?.scope === "FACTORY" && (
-                                  <div className="mt-3">
-                                    <label className="block text-xs text-slate-500 mb-1">Chọn Nhà máy</label>
-                                    <select className="w-full text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy cho phép truy cập</label>
+                                    <select className="w-full text-sm border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                                       value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
                                       <option value="">-- Tất cả nhà máy --</option>
                                       <option value="Nhà máy thổi">Nhà máy thổi</option>
@@ -243,9 +261,9 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
                                   </div>
                                 )}
                                 {val?.scope === "WAREHOUSE" && (
-                                  <div className="mt-3">
-                                    <label className="block text-xs text-slate-500 mb-1">Chọn Kho</label>
-                                    <select className="w-full text-sm border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+                                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Kho cho phép truy cập</label>
+                                    <select className="w-full text-sm border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                                       value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
                                       <option value="">-- Tất cả kho --</option>
                                       <option value="Kho Nguyên vật liệu">Kho Nguyên vật liệu</option>
@@ -255,14 +273,13 @@ function PermissionDrawer({ isOpen, onClose, roleName, initialPerms, onSave }) {
                                   </div>
                                 )}
                                 {val?.scope === "CUSTOM" && (
-                                  <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-700 text-sm flex items-center gap-2">
-                                    <Settings size={16} /> Giao diện Rule Builder nâng cao đang được phát triển.
+                                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm flex items-center gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm">
+                                    <Settings size={20} className="text-amber-500" />
+                                    <span className="font-medium">Giao diện Rule Builder nâng cao đang được phát triển.</span>
                                   </div>
                                 )}
-                              </div>
-                            )}
-                          </div>
-                        </label>
+                           </div>
+                        )}
                       </div>
                     );
                   })}
