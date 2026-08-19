@@ -78,7 +78,16 @@ export default function RolesModule() {
   if (!selectedRole) {
     return (
       <div className="space-y-4">
-        <ListHeader title="Vai trò & Phân quyền" icon={Shield} onAdd={() => toast.info("Thêm vai trò đang phát triển...")} onRefresh={fetchRoles} search={q} onSearch={setQ} />
+        <ListHeader title="Vai trò & Phân quyền" actions={(
+          <>
+            <div className="relative mr-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input type="text" placeholder="Tìm vai trò..." value={q} onChange={(e) => setQ(e.target.value)} className="pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 md:w-64" />
+            </div>
+            <button onClick={fetchRoles} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+            <button onClick={() => toast.info("Thêm vai trò đang phát triển...")} className="btn-primary"><Plus size={16} /> Thêm mới</button>
+          </>
+        )} />
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <DataTable
             rows={filteredRoles}
