@@ -304,9 +304,9 @@ export default function PermissionsModule() {
   const fetchRoles = useCallback(async () => {
     try {
       const res = await roles.list();
-      setRoleList(res.data || []);
-      if (res.data?.length > 0 && !roleId) {
-        selectRole(res.data[0].id, res.data);
+      setRoleList(res || []);
+      if (res?.length > 0 && !roleId) {
+        selectRole(res[0].id, res);
       }
     } catch (e) {
       console.error(e);
