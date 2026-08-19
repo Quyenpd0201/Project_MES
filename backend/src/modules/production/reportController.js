@@ -233,3 +233,107 @@ exports.machines = async (req, res) => {
     res.status(500).json({ message: 'Lỗi khi lấy dữ liệu máy móc' });
   }
 };
+
+// GET /reports/employees — tổng hợp hiệu suất từng nhân viên
+exports.employees = async (req, res) => {
+  try {
+    const { fromDate, toDate, stage, shift, team, orderCode } = req.query;
+    const params = []; let i = 1;
+    const where = [
+      `t.assigned_worker IS NOT NULL`,
+      `t.assigned_worker != ''`,
+      `po.is_deleted = FALSE`,
+    ];
+    if (fromDate)  { where.push(`COALESCE(t.planned_date, po.planned_date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)    { where.push(`COALESCE(t.planned_date, po.planned_date) <= $${i++}`); params.push(toDate); }
+    if (stage)     { where.push(`t.stage = $${i++}`); params.push(stage); }
+    if (shift)     { where.push(`t.shift = $${i++}`); params.push(shift); }
+    if (team)      { where.push(`t.assigned_team = $${i++}`); params.push(team); }
+    if (orderCode) { where.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
+
+    const { rows } = await db.query(`
+      SELECT
+        t.assigned_worker                                                             AS worker,
+        MAX(t.assigned_team)                                                          AS team,
+        COUNT(*)::int                                                                  AS tasks_count,
+        COUNT(DISTINCT t.production_order_id)::int                                    AS orders_count,
+        COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
+        COALESCE(SUM(CASE WHEN t.status = 'Hoàn thành'
+          THEN COALESCE(t.actual_qty, t.quantity) ELSE 0 END), 0)::numeric            AS actual_qty,
+        COALESCE(SUM(t.scrap_qty), 0)::numeric                                        AS scrap_qty,
+        COUNT(DISTINCT t.planned_date)::int                                           AS work_days,
+        COUNT(DISTINCT CONCAT(t.planned_date::text,'||',COALESCE(t.shift,''))) * 8   AS work_hours,
+        COUNT(*) FILTER (WHERE t.status = 'Hoàn thành')::int                          AS done_count,
+        COUNT(*) FILTER (WHERE t.status IN ('Đang sản xuất','Chờ'))::int              AS active_count,
+        COUNT(*) FILTER (WHERE t.status = 'Dừng sản xuất')::int                      AS paused_count,
+        STRING_AGG(DISTINCT t.stage, ', ' ORDER BY t.stage)                           AS stages,
+        STRING_AGG(DISTINCT t.shift, ', ')
+          FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                         AS shifts
+      FROM production_tasks t
+      JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+      WHERE ${where.join(' AND ')}
+      GROUP BY t.assigned_worker
+      ORDER BY actual_qty DESC, planned_qty DESC
+    `, params);
+    res.json({ data: rows });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy báo cáo nhân viên' }); }
+};
+
+// GET /reports/employees/:worker/tasks — chi tiết lệnh + phân tích theo ngày & công đoạn
+exports.employeeTasks = async (req, res) => {
+  try {
+    const worker = req.params.worker;
+    const { fromDate, toDate, stage, shift, team } = req.query;
+    const params = [worker]; let i = 2;
+    const where = [`t.assigned_worker = $1`, `po.is_deleted = FALSE`];
+    if (fromDate) { where.push(`COALESCE(t.planned_date, po.planned_date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)   { where.push(`COALESCE(t.planned_date, po.planned_date) <= $${i++}`); params.push(toDate); }
+    if (stage)    { where.push(`t.stage = $${i++}`); params.push(stage); }
+    if (shift)    { where.push(`t.shift = $${i++}`); params.push(shift); }
+    if (team)     { where.push(`t.assigned_team = $${i++}`); params.push(team); }
+    const ws = where.join(' AND ');
+
+    const [tasksQ, dailyQ, stagesQ] = await Promise.all([
+      db.query(`
+        SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty,
+               t.status, t.planned_date, t.shift, t.assigned_team,
+               po.id AS order_id, po.order_code, po.unit,
+               so.order_code AS sales_order_code,
+               p.product_name, p.product_code, c.name AS customer_name
+        FROM production_tasks t
+        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        JOIN products p ON p.id = po.product_id
+        LEFT JOIN sales_orders so ON so.id = po.sales_order_id
+        LEFT JOIN customers c ON c.id = po.customer_id
+        WHERE ${ws}
+        ORDER BY t.planned_date DESC NULLS LAST, po.order_code
+      `, params),
+      db.query(`
+        SELECT t.planned_date,
+               to_char(t.planned_date, 'DD/MM') AS date_label,
+               COALESCE(SUM(CASE WHEN t.status='Hoàn thành'
+                 THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(t.quantity),0)::numeric AS planned_qty
+        FROM production_tasks t
+        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        WHERE ${ws} AND t.planned_date IS NOT NULL
+        GROUP BY t.planned_date
+        ORDER BY t.planned_date
+      `, params),
+      db.query(`
+        SELECT t.stage,
+               COALESCE(SUM(CASE WHEN t.status='Hoàn thành'
+                 THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(t.quantity),0)::numeric AS planned_qty,
+               COUNT(*)::int AS tasks_count
+        FROM production_tasks t
+        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        WHERE ${ws}
+        GROUP BY t.stage
+        ORDER BY actual_qty DESC
+      `, params),
+    ]);
+    res.json({ tasks: tasksQ.rows, daily: dailyQ.rows, stages: stagesQ.rows });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết nhân viên' }); }
+};
+

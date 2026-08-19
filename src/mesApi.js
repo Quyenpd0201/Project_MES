@@ -129,4 +129,12 @@ export const reports = {
     return http(`/reports/detailed?${q.toString()}`).then(r => r);
   },
   machines: () => http(`/reports/machines`),
+  employees: (params = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+    return http(`/reports/employees?${q.toString()}`).then(r => r.data || []);
+  },
+  employeeTasks: (worker, params = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null));
+    return http(`/reports/employees/${encodeURIComponent(worker)}/tasks?${q.toString()}`);
+  },
 };
