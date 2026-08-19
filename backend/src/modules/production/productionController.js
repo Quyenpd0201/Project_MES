@@ -66,7 +66,12 @@ const SELECT_JOIN = `
            NULLIF((SELECT STRING_AGG(DISTINCT t4.shift, ', ') FROM production_tasks t4
             WHERE t4.production_order_id = po.id AND t4.shift IS NOT NULL AND t4.shift != ''), ''),
            po.shift
-         ) AS shift_display
+         ) AS shift_display,
+         COALESCE(
+           NULLIF((SELECT STRING_AGG(DISTINCT t5.assigned_team, ', ') FROM production_tasks t5
+            WHERE t5.production_order_id = po.id AND t5.assigned_team IS NOT NULL AND t5.assigned_team != ''), ''),
+           po.assigned_team
+         ) AS assigned_team_display
   FROM production_orders po
   JOIN products p   ON p.id = po.product_id
   LEFT JOIN customers c ON c.id = po.customer_id

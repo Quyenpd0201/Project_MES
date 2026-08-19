@@ -54,16 +54,16 @@ export default function OutputReport({ lookups }) {
 
   // Filter by date range and product
   const filtered = rows.filter(r => {
-    const date = (r.start_date || r.planned_date || r.created_at || "").slice(0, 10);
+    const date = (r.start_date || r.planned_date_display || r.planned_date || r.created_at || "").slice(0, 10);
     const inRange = (!from || date >= from) && (!to || date <= to);
     const matchP = !productFilter || (r.product_name || "").toLowerCase().includes(productFilter.toLowerCase()) || (r.product_code || "").toLowerCase().includes(productFilter.toLowerCase());
-    const matchT = !teamFilter || (r.assigned_team || "").toLowerCase().includes(teamFilter.toLowerCase());
+    const matchT = !teamFilter || (r.assigned_team_display || r.assigned_team || "").toLowerCase().includes(teamFilter.toLowerCase());
     return inRange && matchP && matchT;
   });
 
   // KPI aggregations
   const totalPlanned = filtered.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-  const totalActual = filtered.reduce((s, r) => s + (Number(r.actual_qty) || 0), 0);
+  const totalActual = filtered.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
   const totalScrap = filtered.reduce((s, r) => s + (Number(r.scrap_qty) || 0), 0);
   const doneCount = filtered.filter(r => r.status === "Hoàn thành").length;
   const achieveRate = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0;
@@ -75,7 +75,7 @@ export default function OutputReport({ lookups }) {
       key: "product_code", label: "Mã SP", filter: "text", tdClass: "text-slate-600",
       render: (r) => <span>{r.product_code}<span className="block text-xs text-slate-400">{r.product_name}</span></span>
     },
-    { key: "planned_date", label: "Ngày KH", filter: "date", tdClass: "text-slate-500", render: (r) => fmtDate(r.planned_date) || "—" },
+    { key: "planned_date", label: "Ngày KH", filter: "date", tdClass: "text-slate-500", render: (r) => fmtDate(r.planned_date_display || r.planned_date) || "—" },
     {
       key: "quantity", label: "KH", align: "right",
       render: (r) => <span className="text-slate-700 font-medium">{fmt(r.quantity)} <span className="text-xs text-slate-400">{r.unit}</span></span>
@@ -83,11 +83,12 @@ export default function OutputReport({ lookups }) {
     {
       key: "actual_qty", label: "Thực tế", align: "right",
       render: (r) => {
-        const pct = r.quantity > 0 ? Math.round((Number(r.actual_qty) || 0) / r.quantity * 100) : 0;
+        const actual = Number(r.produced_qty) || 0;
+        const pct = r.quantity > 0 ? Math.round(actual / r.quantity * 100) : 0;
         const color = pct >= 100 ? "text-emerald-600" : pct >= 80 ? "text-amber-600" : "text-rose-600";
         return (
           <span className={`font-bold ${color}`}>
-            {fmt(r.actual_qty || 0)}
+            {fmt(actual)}
             <span className="ml-1 text-xs font-normal">({pct}%)</span>
           </span>
         );
@@ -103,7 +104,7 @@ export default function OutputReport({ lookups }) {
       key: "status", label: "Trạng thái", filter: "select",
       render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span>
     },
-    { key: "assigned_team", label: "Đội SX", filter: "select", tdClass: "text-slate-600", render: (r) => r.assigned_team || "—" },
+    { key: "assigned_team", label: "Đội SX", filter: "select", tdClass: "text-slate-600", render: (r) => r.assigned_team_display || r.assigned_team || "—" },
   ];
 
   const exportExcel = () => {
@@ -111,13 +112,13 @@ export default function OutputReport({ lookups }) {
       "Mã lệnh SX": r.order_code,
       "Mã SP": r.product_code,
       "Tên sản phẩm": r.product_name,
-      "Ngày kế hoạch": fmtDate(r.planned_date) || "",
+      "Ngày kế hoạch": fmtDate(r.planned_date_display || r.planned_date) || "",
       "SL kế hoạch": Number(r.quantity) || 0,
-      "SL thực tế": Number(r.actual_qty) || 0,
-      "Tỷ lệ (%)": r.quantity > 0 ? Math.round((Number(r.actual_qty) || 0) / r.quantity * 100) : 0,
+      "SL thực tế": Number(r.produced_qty) || 0,
+      "Tỷ lệ (%)": r.quantity > 0 ? Math.round((Number(r.produced_qty) || 0) / r.quantity * 100) : 0,
       "Phế phẩm": Number(r.scrap_qty) || 0,
       "Trạng thái": r.status,
-      "Đội SX": r.assigned_team || "",
+      "Đội SX": r.assigned_team_display || r.assigned_team || "",
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
