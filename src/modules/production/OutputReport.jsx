@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Activity, Download, RefreshCcw, TrendingUp, Package, CheckCircle2, AlertTriangle } from "lucide-react";
+import {
+  Activity, Download, RefreshCcw, TrendingUp, Package, CheckCircle2, AlertTriangle,
+  X, User, Users, CalendarDays, Factory, ShoppingCart, Tag, ClipboardList, Layers,
+  ChevronRight, AlertCircle,
+} from "lucide-react";
 import { ListHeader, DataTable, PageHeader } from "../../components.jsx";
 import { production } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast } from "../../ui.js";
@@ -8,19 +12,18 @@ import * as XLSX from "xlsx";
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
+/* ─── KPI card ─── */
 function KpiCard({ label, value, sub, icon: Icon, color = "blue" }) {
   const colors = {
-    blue: { bg: "bg-blue-50", icon: "text-blue-500", val: "text-blue-700" },
+    blue:  { bg: "bg-blue-50",    icon: "text-blue-500",    val: "text-blue-700"    },
     green: { bg: "bg-emerald-50", icon: "text-emerald-500", val: "text-emerald-700" },
-    amber: { bg: "bg-amber-50", icon: "text-amber-500", val: "text-amber-700" },
-    rose: { bg: "bg-rose-50", icon: "text-rose-500", val: "text-rose-700" },
+    amber: { bg: "bg-amber-50",   icon: "text-amber-500",   val: "text-amber-700"   },
+    rose:  { bg: "bg-rose-50",    icon: "text-rose-500",    val: "text-rose-700"    },
   };
   const c = colors[color] || colors.blue;
   return (
-    <div className={`rounded-xl border border-slate-200 bg-white p-5 flex items-start gap-4`}>
-      <div className={`${c.bg} rounded-lg p-3 shrink-0`}>
-        <Icon size={22} className={c.icon} />
-      </div>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 flex items-start gap-4">
+      <div className={`${c.bg} rounded-lg p-3 shrink-0`}><Icon size={22} className={c.icon} /></div>
       <div className="min-w-0">
         <div className="text-sm text-slate-500 font-medium mb-0.5">{label}</div>
         <div className={`text-2xl font-bold ${c.val}`}>{value}</div>
@@ -30,13 +33,206 @@ function KpiCard({ label, value, sub, icon: Icon, color = "blue" }) {
   );
 }
 
+/* ─── Info row inside drawer ─── */
+function InfoRow({ icon: Icon, label, value, valueClass = "" }) {
+  if (!value && value !== 0) return null;
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-slate-100 last:border-0">
+      <div className="mt-0.5 shrink-0 text-slate-400"><Icon size={15} /></div>
+      <div className="flex-1 min-w-0">
+        <div className="text-xs text-slate-400 mb-0.5">{label}</div>
+        <div className={`text-sm font-medium text-slate-800 ${valueClass}`}>{value}</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Detail drawer / slide-over ─── */
+function OrderDetailDrawer({ order, onClose }) {
+  const [tasks, setTasks] = useState([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
+
+  useEffect(() => {
+    if (!order) return;
+    setLoadingTasks(true);
+    production.getTasks(order.id)
+      .then(data => setTasks(Array.isArray(data) ? data : []))
+      .catch(() => setTasks([]))
+      .finally(() => setLoadingTasks(false));
+  }, [order?.id]);
+
+  if (!order) return null;
+
+  const actual   = Number(order.produced_qty) || 0;
+  const planned  = Number(order.quantity) || 0;
+  const scrap    = Number(order.scrap_qty)  || 0;
+  const pct      = planned > 0 ? Math.round(actual / planned * 100) : 0;
+  const pctColor = pct >= 100 ? "text-emerald-600" : pct >= 80 ? "text-amber-600" : "text-rose-600";
+  const barColor = pct >= 100 ? "bg-emerald-500" : pct >= 80 ? "bg-amber-400" : "bg-rose-400";
+
+  // Gộp danh sách công nhân từ các phân công
+  const workers = [...new Set(
+    tasks.map(t => t.assigned_worker).filter(Boolean)
+  )];
+  const teams = [...new Set(
+    tasks.map(t => t.assigned_team).filter(Boolean)
+  )];
+
+  return (
+    <>
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40 transition-opacity"
+        onClick={onClose}
+      />
+
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-full max-w-[520px] bg-white shadow-2xl z-50 flex flex-col"
+        style={{ animation: "slideInRight 0.22s ease" }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">
+          <div>
+            <div className="text-xs font-medium opacity-80 mb-0.5">Chi tiết lệnh sản xuất</div>
+            <div className="text-lg font-bold tracking-wide">{order.order_code}</div>
+          </div>
+          <button onClick={onClose}
+            className="p-2 rounded-lg hover:bg-white/20 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Trạng thái + tiến độ */}
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <div className="flex items-center justify-between mb-3">
+              <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${statusClass(order.status)}`}>
+                {order.status}
+              </span>
+              <span className={`text-xl font-bold ${pctColor}`}>{pct}%</span>
+            </div>
+            <div className="h-2.5 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${barColor}`}
+                style={{ width: `${Math.min(pct, 100)}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-slate-500 mt-2">
+              <span>Thực tế: <span className="font-semibold text-slate-700">{fmt(actual)} {order.unit}</span></span>
+              <span>Kế hoạch: <span className="font-semibold text-slate-700">{fmt(planned)} {order.unit}</span></span>
+            </div>
+            {scrap > 0 && (
+              <div className="mt-2 text-xs flex items-center gap-1 text-rose-500">
+                <AlertCircle size={12} />
+                Phế phẩm: <span className="font-semibold">{fmt(scrap)} {order.unit}</span>
+                &nbsp;({(scrap / (actual + scrap) * 100).toFixed(1)}%)
+              </div>
+            )}
+          </div>
+
+          {/* Thông tin cơ bản */}
+          <div className="bg-white rounded-xl border border-slate-200 px-4 divide-y-0">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider pt-2 pb-1">Thông tin lệnh</div>
+            <InfoRow icon={Tag}          label="Sản phẩm"       value={`${order.product_code} · ${order.product_name}`} />
+            <InfoRow icon={ShoppingCart} label="Đơn hàng bán"   value={order.sales_order_code || "—"} />
+            <InfoRow icon={User}         label="Khách hàng"      value={order.customer_name || "—"} />
+            <InfoRow icon={CalendarDays} label="Ngày kế hoạch"   value={fmtDate(order.planned_date_display || order.planned_date) || "—"} />
+            <InfoRow icon={CalendarDays} label="Deadline giao"   value={fmtDate(order.due_date) || "—"} />
+            <InfoRow icon={Factory}      label="Máy sản xuất"    value={order.machine_name_display || order.machine_name || "—"} />
+            <InfoRow icon={Layers}       label="Ca sản xuất"     value={order.shift_display || order.shift || "—"} />
+          </div>
+
+          {/* Nhân sự */}
+          <div className="bg-white rounded-xl border border-slate-200 px-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider pt-2 pb-1">Nhân sự thực hiện</div>
+            <InfoRow icon={Users} label="Đội sản xuất"  value={teams.length > 0 ? teams.join(", ") : (order.assigned_team_display || order.assigned_team || "—")} />
+            <InfoRow icon={User}  label="Công nhân"     value={workers.length > 0 ? workers.join(", ") : (order.assigned_worker || "—")} />
+          </div>
+
+          {/* Phân công chi tiết */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Phân công ({tasks.length} lô)
+              </span>
+              {loadingTasks && <RefreshCcw size={13} className="animate-spin text-slate-400" />}
+            </div>
+            {tasks.length === 0 && !loadingTasks ? (
+              <div className="px-4 py-4 text-sm text-slate-400 text-center">Chưa có phân công</div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {tasks.map((t, i) => {
+                  const tActual  = Number(t.actual_qty) ?? Number(t.quantity) ?? 0;
+                  const tPlanned = Number(t.quantity) || 0;
+                  const tPct     = tPlanned > 0 ? Math.round(tActual / tPlanned * 100) : 0;
+                  const tColor   = tPct >= 100 ? "text-emerald-600" : tPct >= 80 ? "text-amber-600" : "text-rose-600";
+                  return (
+                    <div key={t.id || i} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-slate-400">#{i + 1}</span>
+                          <span className="text-sm font-medium text-slate-700">{t.stage}</span>
+                          {t.machine_name && (
+                            <span className="text-xs text-slate-400">· {t.machine_name}</span>
+                          )}
+                        </div>
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(t.status)}`}>
+                          {t.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
+                        <span>KH: <b className="text-slate-700">{fmt(tPlanned)}</b></span>
+                        <span>TT: <b className={tColor}>{fmt(tActual)} ({tPct}%)</b></span>
+                        {t.scrap_qty > 0 && <span className="text-rose-500">Phế: {fmt(t.scrap_qty)}</span>}
+                        {t.planned_date && <span className="flex items-center gap-1"><CalendarDays size={11} />{fmtDate(t.planned_date)}</span>}
+                        {t.assigned_team && <span className="flex items-center gap-1"><Users size={11} />{t.assigned_team}</span>}
+                        {t.assigned_worker && <span className="flex items-center gap-1"><User size={11} />{t.assigned_worker}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Ghi chú */}
+          {order.note && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <div className="text-xs font-semibold text-amber-600 mb-1">Ghi chú</div>
+              <div className="text-sm text-amber-800">{order.note}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-slate-200 bg-slate-50 shrink-0">
+          <div className="text-xs text-slate-400 text-center">
+            Lệnh tạo: {fmtDate(order.created_at) || "—"} &nbsp;·&nbsp; {order.task_done || 0}/{order.task_count || 0} công đoạn hoàn thành
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
+        }
+      `}</style>
+    </>
+  );
+}
+
+/* ─── Main component ─── */
 export default function OutputReport({ lookups }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(today());
+  const [rows, setRows]               = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [from, setFrom]               = useState(monthStart());
+  const [to, setTo]                   = useState(today());
   const [productFilter, setProductFilter] = useState("");
-  const [teamFilter, setTeamFilter] = useState("");
+  const [teamFilter, setTeamFilter]   = useState("");
+  const [selected, setSelected]       = useState(null); // order được chọn để xem chi tiết
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -52,86 +248,104 @@ export default function OutputReport({ lookups }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Filter by date range and product
+  // Filter
   const filtered = rows.filter(r => {
     const date = (r.start_date || r.planned_date_display || r.planned_date || r.created_at || "").slice(0, 10);
     const inRange = (!from || date >= from) && (!to || date <= to);
-    const matchP = !productFilter || (r.product_name || "").toLowerCase().includes(productFilter.toLowerCase()) || (r.product_code || "").toLowerCase().includes(productFilter.toLowerCase());
-    const matchT = !teamFilter || (r.assigned_team_display || r.assigned_team || "").toLowerCase().includes(teamFilter.toLowerCase());
+    const matchP  = !productFilter || (r.product_name || "").toLowerCase().includes(productFilter.toLowerCase())
+                                   || (r.product_code || "").toLowerCase().includes(productFilter.toLowerCase());
+    const matchT  = !teamFilter || (r.assigned_team_display || r.assigned_team || "").toLowerCase().includes(teamFilter.toLowerCase());
     return inRange && matchP && matchT;
   });
 
-  // KPI aggregations
+  // KPI
   const totalPlanned = filtered.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
-  const totalActual = filtered.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
-  const totalScrap = filtered.reduce((s, r) => s + (Number(r.scrap_qty) || 0), 0);
-  const doneCount = filtered.filter(r => r.status === "Hoàn thành").length;
-  const achieveRate = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0;
-  const scrapRate = (totalActual + totalScrap) > 0 ? ((totalScrap / (totalActual + totalScrap)) * 100).toFixed(1) : "0.0";
+  const totalActual  = filtered.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
+  const totalScrap   = filtered.reduce((s, r) => s + (Number(r.scrap_qty)  || 0), 0);
+  const doneCount    = filtered.filter(r => r.status === "Hoàn thành").length;
+  const achieveRate  = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0;
+  const scrapRate    = (totalActual + totalScrap) > 0
+    ? ((totalScrap / (totalActual + totalScrap)) * 100).toFixed(1) : "0.0";
 
   const columns = [
-    { key: "order_code", label: "Mã lệnh SX", filter: "text", tdClass: "font-medium text-blue-600" },
+    {
+      key: "order_code", label: "Mã lệnh SX", filter: "text",
+      render: (r) => (
+        <button
+          className="font-semibold text-blue-600 hover:text-blue-800 hover:underline text-left flex items-center gap-1 transition-colors"
+          onClick={() => setSelected(r)}
+        >
+          {r.order_code}
+          <ChevronRight size={13} className="opacity-50" />
+        </button>
+      ),
+    },
     {
       key: "product_code", label: "Mã SP", filter: "text", tdClass: "text-slate-600",
-      render: (r) => <span>{r.product_code}<span className="block text-xs text-slate-400">{r.product_name}</span></span>
+      render: (r) => <span>{r.product_code}<span className="block text-xs text-slate-400">{r.product_name}</span></span>,
     },
-    { key: "planned_date", label: "Ngày KH", filter: "date", tdClass: "text-slate-500", render: (r) => fmtDate(r.planned_date_display || r.planned_date) || "—" },
+    {
+      key: "planned_date", label: "Ngày KH", filter: "date", tdClass: "text-slate-500",
+      render: (r) => fmtDate(r.planned_date_display || r.planned_date) || "—",
+    },
     {
       key: "quantity", label: "KH", align: "right",
-      render: (r) => <span className="text-slate-700 font-medium">{fmt(r.quantity)} <span className="text-xs text-slate-400">{r.unit}</span></span>
+      render: (r) => <span className="text-slate-700 font-medium">{fmt(r.quantity)} <span className="text-xs text-slate-400">{r.unit}</span></span>,
     },
     {
       key: "actual_qty", label: "Thực tế", align: "right",
       render: (r) => {
         const actual = Number(r.produced_qty) || 0;
-        const pct = r.quantity > 0 ? Math.round(actual / r.quantity * 100) : 0;
-        const color = pct >= 100 ? "text-emerald-600" : pct >= 80 ? "text-amber-600" : "text-rose-600";
+        const pct    = r.quantity > 0 ? Math.round(actual / r.quantity * 100) : 0;
+        const color  = pct >= 100 ? "text-emerald-600" : pct >= 80 ? "text-amber-600" : "text-rose-600";
         return (
           <span className={`font-bold ${color}`}>
             {fmt(actual)}
             <span className="ml-1 text-xs font-normal">({pct}%)</span>
           </span>
         );
-      }
+      },
     },
     {
       key: "scrap_qty", label: "Phế phẩm", align: "right",
       render: (r) => r.scrap_qty > 0
         ? <span className="text-rose-500 font-medium">{fmt(r.scrap_qty)}</span>
-        : <span className="text-slate-300">—</span>
+        : <span className="text-slate-300">—</span>,
     },
     {
       key: "status", label: "Trạng thái", filter: "select",
-      render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span>
+      render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span>,
     },
-    { key: "assigned_team", label: "Đội SX", filter: "select", tdClass: "text-slate-600", render: (r) => r.assigned_team_display || r.assigned_team || "—" },
+    {
+      key: "assigned_team", label: "Đội SX", filter: "select", tdClass: "text-slate-600",
+      render: (r) => r.assigned_team_display || r.assigned_team || "—",
+    },
   ];
 
   const exportExcel = () => {
     const exportData = filtered.map(r => ({
-      "Mã lệnh SX": r.order_code,
-      "Mã SP": r.product_code,
+      "Mã lệnh SX":   r.order_code,
+      "Mã SP":         r.product_code,
       "Tên sản phẩm": r.product_name,
+      "Khách hàng":   r.customer_name || "",
+      "Đơn hàng bán": r.sales_order_code || "",
       "Ngày kế hoạch": fmtDate(r.planned_date_display || r.planned_date) || "",
-      "SL kế hoạch": Number(r.quantity) || 0,
-      "SL thực tế": Number(r.produced_qty) || 0,
-      "Tỷ lệ (%)": r.quantity > 0 ? Math.round((Number(r.produced_qty) || 0) / r.quantity * 100) : 0,
-      "Phế phẩm": Number(r.scrap_qty) || 0,
-      "Trạng thái": r.status,
-      "Đội SX": r.assigned_team_display || r.assigned_team || "",
+      "SL kế hoạch":  Number(r.quantity) || 0,
+      "SL thực tế":   Number(r.produced_qty) || 0,
+      "Tỷ lệ (%)":    r.quantity > 0 ? Math.round((Number(r.produced_qty) || 0) / r.quantity * 100) : 0,
+      "Phế phẩm":     Number(r.scrap_qty) || 0,
+      "Trạng thái":   r.status,
+      "Đội SX":       r.assigned_team_display || r.assigned_team || "",
     }));
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    const wb = XLSX.utils.book_new();
+    const ws  = XLSX.utils.json_to_sheet(exportData);
+    const wb  = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sản lượng");
-    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    const blob = new Blob([wbout], { type: 'application/octet-stream' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `san-luong-${from}-${to}.xlsx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob  = new Blob([wbout], { type: "application/octet-stream" });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement("a");
+    a.href = url; a.download = `san-luong-${from}-${to}.xlsx`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
@@ -178,16 +392,19 @@ export default function OutputReport({ lookups }) {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="SL kế hoạch" value={fmt(totalPlanned)} sub={`${filtered.length} lệnh SX`} icon={Package} color="blue" />
-        <KpiCard label="SL thực tế" value={fmt(totalActual)} sub={`Đạt ${achieveRate}% kế hoạch`} icon={TrendingUp} color="green" />
-        <KpiCard label="Hoàn thành" value={doneCount} sub={`/ ${filtered.length} lệnh`} icon={CheckCircle2} color="green" />
-        <KpiCard label="Phế phẩm" value={fmt(totalScrap)} sub={`Tỷ lệ ${scrapRate}%`} icon={AlertTriangle} color={Number(scrapRate) > 5 ? "rose" : "amber"} />
+        <KpiCard label="SL kế hoạch" value={fmt(totalPlanned)} sub={`${filtered.length} lệnh SX`}        icon={Package}      color="blue"  />
+        <KpiCard label="SL thực tế"  value={fmt(totalActual)}  sub={`Đạt ${achieveRate}% kế hoạch`}       icon={TrendingUp}   color="green" />
+        <KpiCard label="Hoàn thành"  value={doneCount}          sub={`/ ${filtered.length} lệnh`}          icon={CheckCircle2} color="green" />
+        <KpiCard label="Phế phẩm"    value={fmt(totalScrap)}    sub={`Tỷ lệ ${scrapRate}%`}                icon={AlertTriangle} color={Number(scrapRate) > 5 ? "rose" : "amber"} />
       </div>
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-800">Chi tiết sản lượng</h3>
+          <div>
+            <h3 className="font-semibold text-slate-800">Chi tiết sản lượng</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Nhấn vào mã lệnh SX để xem chi tiết</p>
+          </div>
           <span className="text-sm text-slate-500">{filtered.length} lệnh sản xuất</span>
         </div>
         <div className="p-4">
@@ -200,6 +417,11 @@ export default function OutputReport({ lookups }) {
           />
         </div>
       </div>
+
+      {/* Detail drawer */}
+      {selected && (
+        <OrderDetailDrawer order={selected} onClose={() => setSelected(null)} />
+      )}
     </div>
   );
 }
