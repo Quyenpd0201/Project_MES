@@ -1320,6 +1320,7 @@ export default function MesApp() {
           <Route path="/inventory/transfer" element={lookups ? <TransferModule lookups={lookups} /> : loadingEl} />
           <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
           <Route path="/traceability/lot" element={<TraceabilityLot />} />
+          <Route path="/master-data/roles" element={<RolesModule />} />
           <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
           <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
           <Route path="/qrlabels" element={<QrLabelsModule />} />
