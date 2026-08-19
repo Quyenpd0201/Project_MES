@@ -11,6 +11,7 @@ import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nex
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/auth/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
+import { fmt, fmtDate, statusClass, dueTone } from "./src/ui.js";
 import PermissionsModule from "./src/modules/auth/PermissionEditor.jsx";
 import RolesModule from "./src/modules/auth/Roles.jsx";
 import ProductionModule from "./src/modules/production/Production.jsx";
