@@ -162,12 +162,12 @@ function WorkOrdersTable({ tasks }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-              <th className="text-left py-2.5 px-3 whitespace-nowrap">Đơn hàng</th>
+              <th className="text-left py-2.5 px-3 whitespace-nowrap">Đơn hàng (Khách)</th>
               <th className="text-left py-2.5 px-3 whitespace-nowrap">Mã LSX</th>
               <th className="text-left py-2.5 px-3 whitespace-nowrap">Sản phẩm</th>
               <th className="text-left py-2.5 px-3">Công đoạn</th>
-              <th className="text-right py-2.5 px-3">KH</th>
-              <th className="text-right py-2.5 px-3">TT</th>
+              <th className="text-right py-2.5 px-3" title="Sản lượng kế hoạch">Kế hoạch</th>
+              <th className="text-right py-2.5 px-3" title="Sản lượng đã làm">Thực tế</th>
               <th className="text-center py-2.5 px-3 min-w-[100px]">Tiến độ</th>
               <th className="text-left py-2.5 px-3">Ca</th>
               <th className="text-left py-2.5 px-3 whitespace-nowrap">Ngày</th>
@@ -181,7 +181,10 @@ function WorkOrdersTable({ tasks }) {
               const p       = pct(actual, planned);
               return (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="py-2.5 px-3 text-slate-400">{t.sales_order_code || "—"}</td>
+                  <td className="py-2.5 px-3">
+                    <div className="font-medium text-slate-700">{t.sales_order_code || "—"}</div>
+                    {t.customer_name && <div className="text-xs text-slate-400 truncate max-w-[120px]" title={t.customer_name}>{t.customer_name}</div>}
+                  </td>
                   <td className="py-2.5 px-3 font-semibold text-blue-600">{t.order_code}</td>
                   <td className="py-2.5 px-3">
                     <span className="font-medium text-slate-700">{t.product_code}</span>
