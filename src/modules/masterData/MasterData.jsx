@@ -434,17 +434,6 @@ function buildConfigs(lookups) {
         { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Không hoạt động"], default: "Hoạt động" },
       ],
     },
-    roles: {
-      title: "Vai trò", resource: "roles",
-      columns: [
-        { key: "role_code", label: "Mã VT" }, { key: "name", label: "Tên vai trò" },
-        { key: "description", label: "Mô tả" }, { key: "status", label: "Trạng thái", badge: true },
-      ],
-      fields: [
-        { key: "name", label: "Tên vai trò", required: true, full: true },
-        { key: "description", label: "Mô tả", full: true },
-        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Không hoạt động"], default: "Hoạt động" },
-      ],
     },
   };
 }

@@ -18,6 +18,7 @@ module.exports = async function requireAuth(req, res, next) {
   try {
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.full_name, u.status, u.team,
+              COALESCE(u.user_permissions, '{}'::jsonb) AS user_permissions,
               r.id AS role_id, r.name AS role_name,
               COALESCE(r.is_admin, FALSE) AS is_admin,
               COALESCE(r.permissions, '{}'::jsonb) AS permissions
@@ -29,10 +30,23 @@ module.exports = async function requireAuth(req, res, next) {
 
     req.userId = userId;
     req.user   = rows[0];
+    
     // Tính quyền hiệu lực (gộp cả kế thừa từ role cha)
+    let effective = {};
     if (req.user.role_id) {
-      req.user.permissions = await calculateEffectivePermissions(req.user.role_id);
+      effective = await calculateEffectivePermissions(req.user.role_id);
     }
+    
+    // Gộp quyền riêng lẻ (user_permissions)
+    const indPerms = req.user.user_permissions;
+    for (const [modKey, actions] of Object.entries(indPerms)) {
+      if (!effective[modKey]) effective[modKey] = {};
+      for (const [actKey, val] of Object.entries(actions)) {
+         effective[modKey][actKey] = val; // ghi đè/cộng dồn
+      }
+    }
+    
+    req.user.permissions = effective;
     next();
   } catch (err) {
     console.error('[requireAuth]', err);

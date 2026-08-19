@@ -4,13 +4,20 @@ import { ListHeader, DataTable, PageHeader, Section } from "../../components.jsx
 import { users, roles } from "../../mesApi.js";
 import {  inputCls, statusClass , toast } from "../../ui.js";
 
+import { PermissionEditor } from "./PermissionEditor.jsx";
+
 const F = ({ label, required, children }) => (
   <div><label className="block text-sm font-medium text-slate-600 mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>{children}</div>
 );
 
 function UserForm({ record, roleList, teams, onBack, onSaved }) {
   const isEdit = !!record?.id;
-  const [f, setF] = useState({ username: record?.username || "", password: "", full_name: record?.full_name || "", role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "" });
+  const [activeTab, setActiveTab] = useState("info");
+  const [f, setF] = useState({ 
+    username: record?.username || "", password: "", full_name: record?.full_name || "", 
+    role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "",
+    user_permissions: record?.user_permissions || {}
+  });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const save = async () => {
     if (!f.username) return toast.error("Nhập tài khoản");
@@ -22,30 +29,64 @@ function UserForm({ record, roleList, teams, onBack, onSaved }) {
     <div className="space-y-5">
       <PageHeader title={isEdit ? "Sửa tài khoản" : "Thêm tài khoản"} onBack={onBack}
         actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>} />
-      <Section title="Thông tin tài khoản">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-          <F label="Tài khoản" required><input className={inputCls} value={f.username} onChange={(e) => set("username", e.target.value)} placeholder="tên đăng nhập" /></F>
-          <F label={isEdit ? "Mật khẩu mới (để trống nếu không đổi)" : "Mật khẩu"} required={!isEdit}>
-            <input type="password" className={inputCls} value={f.password} onChange={(e) => set("password", e.target.value)} placeholder={isEdit ? "••••••" : ""} />
-          </F>
-          <F label="Họ và tên"><input className={inputCls} value={f.full_name} onChange={(e) => set("full_name", e.target.value)} /></F>
-          <F label="Vai trò">
-            <select className={inputCls} value={f.role_id} onChange={(e) => set("role_id", e.target.value)}>
-              <option value="">-- Chọn --</option>
-              {roleList.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </F>
-          <F label="Trạng thái">
-            <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></select>
-          </F>
-          <F label="Đội (giới hạn xem ở màn Thực thi)">
-            <select className={inputCls} value={f.team} onChange={(e) => set("team", e.target.value)}>
-              <option value="">-- Không giới hạn (xem tất cả) --</option>
-              {(teams || []).map((t) => <option key={t}>{t}</option>)}
-            </select>
-          </F>
+        
+      <div className="flex gap-6 border-b border-slate-200">
+        <button onClick={() => setActiveTab("info")}
+          className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "info" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          Thông tin chung
+        </button>
+        {isEdit && (
+          <button onClick={() => setActiveTab("permissions")}
+            className={`py-3 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === "permissions" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+            Quyền mở rộng
+          </button>
+        )}
+      </div>
+
+      {activeTab === "info" && (
+        <Section title="Thông tin tài khoản">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+            <F label="Tài khoản" required><input className={inputCls} value={f.username} onChange={(e) => set("username", e.target.value)} placeholder="tên đăng nhập" disabled={isEdit} /></F>
+            <F label={isEdit ? "Mật khẩu mới (để trống nếu không đổi)" : "Mật khẩu"} required={!isEdit}>
+              <input type="password" className={inputCls} value={f.password} onChange={(e) => set("password", e.target.value)} placeholder={isEdit ? "••••••" : ""} />
+            </F>
+            <F label="Họ và tên"><input className={inputCls} value={f.full_name} onChange={(e) => set("full_name", e.target.value)} /></F>
+            <F label="Vai trò chính">
+              <select className={inputCls} value={f.role_id} onChange={(e) => set("role_id", e.target.value)}>
+                <option value="">-- Chọn --</option>
+                {roleList.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+              </select>
+            </F>
+            <F label="Trạng thái">
+              <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></select>
+            </F>
+            <F label="Đội (giới hạn xem ở màn Thực thi)">
+              <select className={inputCls} value={f.team} onChange={(e) => set("team", e.target.value)}>
+                <option value="">-- Không giới hạn (xem tất cả) --</option>
+                {(teams || []).map((t) => <option key={t}>{t}</option>)}
+              </select>
+            </F>
+          </div>
+        </Section>
+      )}
+
+      {activeTab === "permissions" && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+           <div className="p-4 bg-amber-50 border-b border-amber-100 flex items-start gap-3">
+             <div className="text-amber-600 mt-0.5"><RotateCcw size={18} /></div>
+             <div>
+               <p className="text-sm text-amber-800 font-medium">Lưu ý về Quyền mở rộng</p>
+               <p className="text-xs text-amber-700 mt-1">Các quyền thiết lập tại đây sẽ được <strong>cộng dồn</strong> với quyền hạn từ Vai trò chính của tài khoản này.</p>
+             </div>
+           </div>
+           <PermissionEditor 
+             roleName={`Mở rộng: ${f.username}`} 
+             initialPerms={f.user_permissions} 
+             onSave={(draft) => set("user_permissions", draft)} 
+             compact={true} 
+           />
         </div>
-      </Section>
+      )}
     </div>
   );
 }
