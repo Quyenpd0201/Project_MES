@@ -3,6 +3,7 @@ const db = require('../../core/db');
 const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/specs');
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete } = require('../../core/lib/deleteGuard');
+const { getDataScope } = require('../../core/dataScope');
 
 // Công đoạn cuối của 1 lệnh: 'Cắt' nếu có task Cắt, ngược lại 'Thổi'
 const FINAL_STAGE = `(CASE WHEN EXISTS (SELECT 1 FROM production_tasks tf WHERE tf.production_order_id = po.id AND tf.stage = 'Cắt') THEN 'Cắt' ELSE 'Thổi' END)`;
@@ -227,6 +228,11 @@ exports.list = async (req, res) => {
     if (customer_id) { where.push(`po.customer_id = $${i++}`); params.push(customer_id); }
     if (planned_date){ where.push(`po.planned_date = $${i++}`); params.push(planned_date); }
     if (q)           { where.push(`(po.order_code ILIKE $${i} OR p.product_name ILIKE $${i})`); params.push(`%${q}%`); i++; }
+    
+    // Áp dụng Data Scope
+    const scopeCond = getDataScope(req, 'production', 'view', { factoryCol: 'po.assigned_team' });
+    where.push(`(${scopeCond})`);
+
     const sql = `${SELECT_JOIN} WHERE ${where.join(' AND ')} ORDER BY po.created_at DESC`;
     const { rows } = await db.query(sql, params);
     res.json({ data: rows });

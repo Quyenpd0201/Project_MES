@@ -2,6 +2,7 @@
 const db = require('../../core/db');
 const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/specs');
 const { upUnit } = require('../../core/lib/units');
+const { getDataScope } = require('../../core/dataScope');
 
 // GET /api/inventory/tree — tồn kho gom 3 cấp:
 //   Sản phẩm  ->  Nhóm thông số kỹ thuật giống nhau (spec_key)  ->  các lô sản xuất
@@ -12,6 +13,10 @@ exports.tree = async (req, res) => {
     const { product_id, q } = req.query;
     if (product_id) { where.push(`s.product_id = $${i++}`); params.push(product_id); }
     if (q)          { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
+    
+    const scopeCond = getDataScope(req, 'inventory', 'view', { warehouseCol: 'w.name' });
+    where.push(`(${scopeCond})`);
+
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = await db.query(`
       SELECT s.id, s.product_id, p.product_code, p.product_name, p.product_type, p.min_quantity, p.warehouse_limits,
@@ -64,6 +69,10 @@ exports.list = async (req, res) => {
     if (product_id)   { where.push(`s.product_id = $${i++}`); params.push(product_id); }
     if (warehouse_id) { where.push(`l.warehouse_id = $${i++}`); params.push(warehouse_id); }
     if (q)            { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
+    
+    const scopeCond = getDataScope(req, 'inventory', 'view', { warehouseCol: 'w.name' });
+    where.push(`(${scopeCond})`);
+
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = await db.query(`
       SELECT p.id AS product_id, p.product_code, p.product_name, p.product_type,
