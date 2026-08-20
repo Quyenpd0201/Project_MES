@@ -508,6 +508,7 @@ function ExcelImportModal({ onClose, onDone }) {
                   <thead className="bg-slate-50 text-slate-600 text-xs uppercase sticky top-0 shadow-sm z-10">
                     <tr>
                       <th className="px-3 py-2">TT</th>
+                      <th className="px-3 py-2">Sheet</th>
                       <th className="px-3 py-2">Khách hàng</th>
                       <th className="px-3 py-2">Ngày đặt</th>
                       <th className="px-3 py-2">Kích thước</th>
@@ -518,10 +519,11 @@ function ExcelImportModal({ onClose, onDone }) {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {previewData.length === 0 ? (
-                      <tr><td colSpan="7" className="text-center py-8 text-slate-500 italic">Không có dữ liệu</td></tr>
+                      <tr><td colSpan="8" className="text-center py-8 text-slate-500 italic">Không có dữ liệu</td></tr>
                     ) : previewData.map((row, i) => (
                       <tr key={i} className={!row.isValid ? "bg-rose-50/50" : (row.warnings?.length > 0 ? "bg-amber-50/50" : "hover:bg-slate-50")}>
                         <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                        <td className="px-3 py-2 text-slate-500 font-medium text-xs">{row.sheetName}</td>
                         <td className="px-3 py-2 font-medium">{row.customerName || <span className="text-rose-500 italic">Trống</span>}</td>
                         <td className="px-3 py-2">{fmtDate(row.orderDate)}</td>
                         <td className="px-3 py-2">{row.dimStr}</td>

@@ -143,9 +143,16 @@ exports.previewOrders = async (req, res) => {
     return res.status(400).json({ message: 'File không đúng định dạng Excel' });
   }
 
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  const rows = rawData.filter((r) => r[0] !== '' && r[0] !== 'Ngày đặt hàng');
+  let rows = [];
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    // Bỏ qua header hoặc dòng trống
+    const sheetRows = rawData.filter((r) => r[0] !== '' && r[0] !== 'Ngày đặt hàng' && r[1]);
+    // Gắn thêm tên sheet vào phần tử cuối của mảng để debug nếu cần
+    sheetRows.forEach(r => { r.sheetName = sheetName; });
+    rows = rows.concat(sheetRows);
+  }
 
   const client = await db.pool.connect();
   const previewData = [];
@@ -154,6 +161,7 @@ exports.previewOrders = async (req, res) => {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu] = row;
+      const sheetName = row.sheetName || '';
       
       const orderDate = excelDateToISO(dateSerial) || new Date().toISOString().slice(0, 10);
       const dim       = parseDimensions(dimStr);
@@ -166,6 +174,7 @@ exports.previewOrders = async (req, res) => {
 
       const item = {
         _id: i + 1,
+        sheetName,
         dateSerial,
         orderDate,
         customerName: cName,
