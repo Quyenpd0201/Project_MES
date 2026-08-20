@@ -134,24 +134,9 @@ async function importRow(client, row, idx, productId) {
 }
 
 exports.previewOrders = async (req, res) => {
-  if (!req.file) return res.status(400).json({ message: 'Vui lòng upload file Excel (.xlsx)' });
-
-  let wb;
-  try {
-    wb = XLSX.read(req.file.buffer, { type: 'buffer' });
-  } catch {
-    return res.status(400).json({ message: 'File không đúng định dạng Excel' });
-  }
-
-  let rows = [];
-  for (const sheetName of wb.SheetNames) {
-    const ws = wb.Sheets[sheetName];
-    const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-    // Bỏ qua header hoặc dòng trống
-    const sheetRows = rawData.filter((r) => r[0] !== '' && r[0] !== 'Ngày đặt hàng' && r[1]);
-    // Gắn thêm tên sheet vào phần tử cuối của mảng để debug nếu cần
-    sheetRows.forEach(r => { r.sheetName = sheetName; });
-    rows = rows.concat(sheetRows);
+  const { rows } = req.body;
+  if (!rows || !Array.isArray(rows)) {
+    return res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
   }
 
   const client = await db.pool.connect();

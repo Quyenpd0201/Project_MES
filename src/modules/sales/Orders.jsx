@@ -5,6 +5,7 @@ import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../../ui.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
+import * as XLSX from "xlsx";
 
 const ordersApi = resource("sales-orders");
 const STATUSES = [
@@ -406,8 +407,26 @@ function ExcelImportModal({ onClose, onDone }) {
     if (!file) return;
     setLoading(true);
     try {
-      const res = await salesOrdersApi.previewExcel(file);
-      setPreviewData(res.preview || []);
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      let allRows = [];
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const sheetRows = rawData.filter((r) => r[0] !== '' && r[0] !== 'Ngày đặt hàng' && r[1]);
+        sheetRows.forEach(r => { r.sheetName = sheetName; });
+        allRows = allRows.concat(sheetRows);
+      }
+      
+      let allPreview = [];
+      const chunkSize = 100;
+      for (let i = 0; i < allRows.length; i += chunkSize) {
+        const chunk = allRows.slice(i, i + chunkSize);
+        const res = await salesOrdersApi.previewExcel(chunk);
+        allPreview = allPreview.concat(res.preview || []);
+      }
+      
+      setPreviewData(allPreview);
       setStep(2);
     } catch (e) {
       toast.error('Lỗi đọc file: ' + e.message);
@@ -417,11 +436,29 @@ function ExcelImportModal({ onClose, onDone }) {
   };
 
   const handleConfirm = async () => {
-    if (previewData.length === 0) return;
+    const validRows = previewData.filter(d => d.isValid);
+    if (validRows.length === 0) return;
     setLoading(true);
+    let totalSuccess = 0;
+    let totalErrors = 0;
+    let allDetails = [];
     try {
-      const res = await salesOrdersApi.confirmExcel(previewData);
-      setResult(res);
+      const chunkSize = 50;
+      for (let i = 0; i < validRows.length; i += chunkSize) {
+        const chunk = validRows.slice(i, i + chunkSize);
+        const res = await salesOrdersApi.confirmExcel(chunk);
+        if (res.summary) {
+          totalSuccess += res.summary.success || 0;
+          totalErrors += res.summary.errors || 0;
+        }
+        if (res.details) {
+          allDetails = allDetails.concat(res.details);
+        }
+      }
+      setResult({
+        summary: { success: totalSuccess, errors: totalErrors },
+        details: allDetails
+      });
       setStep(3);
       onDone();
     } catch (e) {

@@ -141,22 +141,7 @@ export const reports = {
 
 export const salesOrders = {
   ...resource("sales-orders"),
-  previewExcel: (file) => {
-    const form = new FormData();
-    form.append('file', file);
-    return fetch(`${API_BASE}/api/import/orders/preview`, {
-      method: 'POST',
-      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
-      body: form,
-    }).then(async (res) => {
-      if (!res.ok) {
-        let msg = `HTTP ${res.status}`;
-        try { const j = await res.json(); if (j?.message) msg = j.message; } catch { /* ignore */ }
-        const err = new Error(msg); err.status = res.status; throw err;
-      }
-      return res.json();
-    });
-  },
+  previewExcel: (rows) => http(`/import/orders/preview`, body("POST", { rows })),
   confirmExcel: (rows) => http(`/import/orders/confirm`, body("POST", { rows })),
 };
 
