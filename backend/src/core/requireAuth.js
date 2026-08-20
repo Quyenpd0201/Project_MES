@@ -17,7 +17,7 @@ module.exports = async function requireAuth(req, res, next) {
 
   try {
     const { rows } = await db.query(
-      `SELECT u.id, u.username, u.full_name, u.status, u.team,
+      `SELECT u.id, u.username, u.full_name, u.status, u.team, u.linked_worker,
               COALESCE(u.permissions, '{}'::jsonb) AS user_permissions,
               r.id AS role_id, r.name AS role_name,
               COALESCE(r.is_admin, FALSE) AS is_admin

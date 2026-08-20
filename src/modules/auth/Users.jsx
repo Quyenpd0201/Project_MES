@@ -8,9 +8,9 @@ const F = ({ label, required, children }) => (
   <div><label className="block text-sm font-medium text-slate-600 mb-1.5">{label} {required && <span className="text-rose-500">*</span>}</label>{children}</div>
 );
 
-function UserForm({ record, roleList, teams, onBack, onSaved }) {
+function UserForm({ record, roleList, teams, employees, onBack, onSaved }) {
   const isEdit = !!record?.id;
-  const [f, setF] = useState({ username: record?.username || "", password: "", full_name: record?.full_name || "", role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "" });
+  const [f, setF] = useState({ username: record?.username || "", password: "", full_name: record?.full_name || "", role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "", linked_worker: record?.linked_worker || "" });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const save = async () => {
     if (!f.username) return toast.error("Nhập tài khoản");
@@ -44,6 +44,12 @@ function UserForm({ record, roleList, teams, onBack, onSaved }) {
               {(teams || []).map((t) => <option key={t}>{t}</option>)}
             </select>
           </F>
+          <F label="Liên kết với công nhân (Báo cáo)">
+            <select className={inputCls} value={f.linked_worker} onChange={(e) => set("linked_worker", e.target.value)}>
+              <option value="">-- Không giới hạn --</option>
+              {(employees || []).map((emp) => <option key={emp.name} value={emp.name}>{emp.name}</option>)}
+            </select>
+          </F>
         </div>
       </Section>
     </div>
@@ -71,7 +77,7 @@ export default function UsersModule({ lookups }) {
   ];
 
   if (editing)
-    return <UserForm record={editing.id ? editing : null} roleList={roleList} teams={teams}
+    return <UserForm record={editing.id ? editing : null} roleList={roleList} teams={teams} employees={lookups?.employees || []}
       onBack={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />;
 
   return (

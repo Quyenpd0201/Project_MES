@@ -248,6 +248,12 @@ exports.employees = async (req, res) => {
     if (shift)     { taskWhere.push(`t.shift = $${i++}`); params.push(shift); }
     if (orderCode) { taskWhere.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
     
+    // Nếu user bị gán cố định với 1 worker, chỉ được xem báo cáo của worker đó
+    if (req.user && req.user.linked_worker) {
+      taskWhere.push(`COALESCE(t.assigned_worker, po.assigned_worker) = $${i++}`);
+      params.push(req.user.linked_worker);
+    }
+    
     const taskWhereClause = taskWhere.length ? `AND ${taskWhere.join(' AND ')}` : '';
 
     // 2. Điều kiện cho nhân viên
@@ -299,6 +305,12 @@ exports.employees = async (req, res) => {
 exports.employeeTasks = async (req, res) => {
   try {
     const worker = req.params.worker;
+    
+    // Nếu user bị gán cố định với 1 worker, và yêu cầu truy cập chi tiết worker khác thì chặn
+    if (req.user && req.user.linked_worker && req.user.linked_worker !== worker) {
+      return res.status(403).json({ message: 'Bạn không có quyền xem báo cáo của nhân viên khác' });
+    }
+    
     const { fromDate, toDate, stage, shift, team } = req.query;
     const params = [worker]; let i = 2;
     // Match task-level OR order-level assigned_worker
