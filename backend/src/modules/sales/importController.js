@@ -17,11 +17,27 @@ function excelDateToISO(serial) {
   return `${y}-${m}-${day}`;
 }
 
+function parseLengthStr(val) {
+  if (!val) return '';
+  val = val.trim().toLowerCase();
+  if (val.includes('m')) {
+    const num = parseFloat(val.replace('m', '.'));
+    if (!isNaN(num)) return String(Math.round(num * 100));
+  }
+  return val;
+}
+
 function parseDimensions(str) {
   if (!str) return { length: '', width: '', thickness: '' };
-  const parts = String(str).split('*');
-  const raw = (i) => (parts[i] || '').trim().replace(/z$/i, '');
-  return { length: raw(0), width: raw(1), thickness: raw(2) };
+  const parts = String(str).split('*').map(p => p.trim().toLowerCase().replace(/z$/, ''));
+  if (parts.length === 2) {
+    return { length: '', width: parseLengthStr(parts[0]), thickness: parts[1] };
+  }
+  return { 
+    length: parseLengthStr(parts[0] || ''), 
+    width: parseLengthStr(parts[1] || ''), 
+    thickness: parts[2] || '' 
+  };
 }
 
 async function findOrCreateCustomer(client, name) {
