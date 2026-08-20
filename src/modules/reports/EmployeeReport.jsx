@@ -358,7 +358,6 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
           {(() => {
             const t = today();
             const todayTasks = tasks.filter(x => x.planned_date && x.planned_date.startsWith(t));
-            if (todayTasks.length === 0) return null;
             return (
               <div className="bg-white rounded-xl border border-indigo-200 shadow-sm overflow-hidden mb-6">
                 <div className="px-5 py-3.5 bg-indigo-50/50 border-b border-indigo-100 flex items-center justify-between">
@@ -372,7 +371,14 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
                     </div>
                   </div>
                 </div>
-                <WorkOrdersTable tasks={todayTasks} />
+                {todayTasks.length > 0 ? (
+                  <WorkOrdersTable tasks={todayTasks} />
+                ) : (
+                  <div className="py-8 text-center text-indigo-400 text-sm flex flex-col items-center gap-2 bg-indigo-50/10">
+                    <CalendarDays size={24} className="text-indigo-300" />
+                    Không có lệnh làm việc hôm nay
+                  </div>
+                )}
               </div>
             );
           })()}
