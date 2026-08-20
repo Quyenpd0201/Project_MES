@@ -81,9 +81,10 @@ async function getDefaultProduct(client) {
 }
 
 async function importRow(client, row, idx, productId) {
-  const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu] = row;
+  const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu, dueDateSerial] = row;
 
   const orderDate = excelDateToISO(dateSerial) || new Date().toISOString().slice(0, 10);
+  const dueDate   = excelDateToISO(dueDateSerial) || null;
   const dim       = parseDimensions(dimStr);
   const qtyPO     = parseNum(kgPO);
   const qtyCuon   = parseNum(kgCuon);
@@ -104,9 +105,9 @@ async function importRow(client, row, idx, productId) {
   const legacy  = legacyAttrs(specs);
 
   const soRes = await client.query(
-    `INSERT INTO sales_orders (customer_id, order_date, status, note)
-     VALUES ($1, $2, 'Hoàn thành', $3) RETURNING id`,
-    [customerId, orderDate, note]
+    `INSERT INTO sales_orders (customer_id, order_date, due_date, status, note)
+     VALUES ($1, $2, $3, 'Hoàn thành', $4) RETURNING id`,
+    [customerId, orderDate, dueDate, note]
   );
   const salesOrderId = soRes.rows[0].id;
 
@@ -120,9 +121,9 @@ async function importRow(client, row, idx, productId) {
   const poRes = await client.query(
     `INSERT INTO production_orders
        (sales_order_id, customer_id, product_id, quantity, unit,
-        attr_size, attr_thickness, attr_color, status, planned_date)
-     VALUES ($1,$2,$3,$4,'KG',$5,$6,'','Hoàn thành',$7) RETURNING id, order_code`,
-    [salesOrderId, customerId, productId, qtyPO, legacy.size, legacy.thickness, orderDate]
+        attr_size, attr_thickness, attr_color, status, planned_date, due_date)
+     VALUES ($1,$2,$3,$4,'KG',$5,$6,'','Hoàn thành',$7,$8) RETURNING id, order_code`,
+    [salesOrderId, customerId, productId, qtyPO, legacy.size, legacy.thickness, orderDate, dueDate]
   );
   const { id: poId, order_code: poCode } = poRes.rows[0];
 
@@ -164,10 +165,11 @@ exports.previewOrders = async (req, res) => {
   try {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
-      const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu] = row;
+      const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu, dueDateSerial] = row;
       const sheetName = row.sheetName || '';
       
       const orderDate = excelDateToISO(dateSerial) || new Date().toISOString().slice(0, 10);
+      const dueDate = excelDateToISO(dueDateSerial) || null;
       const dim       = parseDimensions(dimStr);
       const qtyPO     = parseNum(kgPO);
       const qtyCuon   = parseNum(kgCuon);
@@ -181,6 +183,7 @@ exports.previewOrders = async (req, res) => {
         sheetName,
         dateSerial,
         orderDate,
+        dueDate,
         customerName: cName,
         dimStr: String(dimStr || '').trim(),
         dim,
@@ -270,7 +273,8 @@ exports.confirmOrders = async (req, res) => {
           item.kgCuon,
           item.kgTui,
           item.phe,
-          item.ghiChu
+          item.ghiChu,
+          item.dueDate
         ];
         
         const result = await importRow(client, rowArray, i + 1, productId);

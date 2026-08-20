@@ -548,6 +548,7 @@ function ExcelImportModal({ onClose, onDone }) {
                       <th className="px-3 py-2">Sheet</th>
                       <th className="px-3 py-2">Khách hàng</th>
                       <th className="px-3 py-2">Ngày đặt</th>
+                      <th className="px-3 py-2">Ngày giao</th>
                       <th className="px-3 py-2">Kích thước</th>
                       <th className="px-3 py-2">SL (KG PO)</th>
                       <th className="px-3 py-2">Ghi chú</th>
@@ -564,6 +565,7 @@ function ExcelImportModal({ onClose, onDone }) {
                         <td className="px-3 py-2 text-slate-500 font-medium text-xs">{row.sheetName}</td>
                         <td className="px-3 py-2 font-medium">{row.customerName || <span className="text-rose-500 italic">Trống</span>}</td>
                         <td className="px-3 py-2">{fmtDate(row.orderDate)}</td>
+                        <td className="px-3 py-2 text-slate-500">{row.dueDate ? fmtDate(row.dueDate) : '_'}</td>
                         <td className="px-3 py-2">{row.dimStr}</td>
                         <td className="px-3 py-2 font-medium text-slate-700">{row.kgPO}</td>
                         <td className="px-3 py-2 max-w-[150px] truncate" title={row.ghiChu}>{row.ghiChu}</td>
