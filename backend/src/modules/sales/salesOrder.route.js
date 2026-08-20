@@ -15,6 +15,7 @@ router.put('/sales-orders/:id', requirePerm('sales:edit'), salesOrders.update);
 router.delete('/sales-orders/:id', requirePerm('sales:edit'), salesOrders.remove);
 
 // Upload Excel
-router.post('/import/orders', requirePerm('sales:edit'), upload.single('file'), importCtrl.importOrders);
+router.post('/import/orders/preview', requirePerm('sales:edit'), upload.single('file'), importCtrl.previewOrders);
+router.post('/import/orders/confirm', requirePerm('sales:edit'), importCtrl.confirmOrders);
 
 module.exports = router;

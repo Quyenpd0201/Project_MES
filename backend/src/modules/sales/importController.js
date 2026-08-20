@@ -117,7 +117,7 @@ async function importRow(client, row, idx, productId) {
   };
 }
 
-exports.importOrders = async (req, res) => {
+exports.previewOrders = async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Vui lòng upload file Excel (.xlsx)' });
 
   let wb;
@@ -129,39 +129,139 @@ exports.importOrders = async (req, res) => {
 
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-  // Bỏ header và dòng trống
   const rows = rawData.filter((r) => r[0] !== '' && r[0] !== 'Ngày đặt hàng');
 
   const client = await db.pool.connect();
+  const previewData = [];
+
+  try {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const [dateSerial, customerName, dimStr, kgPO, kgCuon, kgTui, phe, ghiChu] = row;
+      
+      const orderDate = excelDateToISO(dateSerial) || new Date().toISOString().slice(0, 10);
+      const dim       = parseDimensions(dimStr);
+      const qtyPO     = parseNum(kgPO);
+      const qtyCuon   = parseNum(kgCuon);
+      const qtyTui    = parseNum(kgTui);
+      const qtyPhe    = parseNum(phe);
+      const note      = ghiChu ? String(ghiChu).trim() : null;
+      const cName     = String(customerName || '').trim();
+
+      const item = {
+        _id: i + 1,
+        dateSerial,
+        orderDate,
+        customerName: cName,
+        dimStr: String(dimStr || '').trim(),
+        dim,
+        kgPO: qtyPO,
+        kgCuon: qtyCuon,
+        kgTui: qtyTui,
+        phe: qtyPhe,
+        ghiChu: note,
+        isValid: true,
+        errors: [],
+        warnings: []
+      };
+
+      if (!cName) {
+        item.isValid = false;
+        item.errors.push('Thiếu tên khách hàng');
+      }
+      if (qtyPO <= 0) {
+        item.isValid = false;
+        item.errors.push('Số KG PO phải lớn hơn 0');
+      }
+
+      // Check duplicate
+      if (cName && qtyPO > 0) {
+        // Find customer ID if exists
+        const custRes = await client.query(`SELECT id FROM customers WHERE LOWER(name) = LOWER($1) AND is_deleted = FALSE LIMIT 1`, [cName]);
+        if (custRes.rows.length > 0) {
+          const cId = custRes.rows[0].id;
+          // Check if order exists on the same date with the same quantity and dimensions
+          const dupRes = await client.query(`
+            SELECT so.id 
+            FROM sales_orders so
+            JOIN sales_order_items soi ON so.id = soi.sales_order_id
+            WHERE so.customer_id = $1 
+              AND so.order_date = $2
+              AND so.is_deleted = FALSE
+              AND soi.quantity = $3
+              AND COALESCE(soi.attr_size, '') = COALESCE($4, '')
+              AND COALESCE(soi.attr_thickness, '') = COALESCE($5, '')
+            LIMIT 1
+          `, [cId, orderDate, qtyPO, dim.length ? (dim.width ? `${dim.length} x ${dim.width}` : dim.length) : null, dim.thickness || null]);
+          
+          if (dupRes.rows.length > 0) {
+            item.isValid = false;
+            item.errors.push('Đơn hàng có thể đã tồn tại (trùng Khách, Ngày, SL, Kích thước)');
+          }
+        } else {
+          item.warnings.push('Khách hàng mới (sẽ được tạo tự động)');
+        }
+      }
+
+      previewData.push(item);
+    }
+
+    res.json({ preview: previewData });
+  } catch (e) {
+    console.error('[previewOrders]', e);
+    res.status(500).json({ message: 'Lỗi parse file: ' + e.message });
+  } finally {
+    client.release();
+  }
+};
+
+exports.confirmOrders = async (req, res) => {
+  const { rows } = req.body;
+  if (!rows || !Array.isArray(rows) || rows.length === 0) {
+    return res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
+  }
+
+  const client = await db.pool.connect();
   const results = [];
-  let successCount = 0, skippedCount = 0, errorCount = 0;
+  let successCount = 0, errorCount = 0;
 
   try {
     await client.query('BEGIN');
-
     const productId = await getDefaultProduct(client);
 
     for (let i = 0; i < rows.length; i++) {
+      const item = rows[i];
       try {
-        const result = await importRow(client, rows[i], i + 2, productId);
+        // Reconstruct the original row array format to pass to importRow
+        const rowArray = [
+          item.dateSerial,
+          item.customerName,
+          item.dimStr,
+          item.kgPO,
+          item.kgCuon,
+          item.kgTui,
+          item.phe,
+          item.ghiChu
+        ];
+        
+        const result = await importRow(client, rowArray, i + 1, productId);
         results.push(result);
-        if (result.skipped) skippedCount++;
-        else successCount++;
+        if (!result.skipped) successCount++;
       } catch (e) {
         errorCount++;
-        results.push({ error: true, row: i + 2, message: e.message });
+        results.push({ error: true, row: i + 1, message: e.message });
       }
     }
 
     await client.query('COMMIT');
     res.json({
-      message: `Import hoàn tất: ${successCount} thành công, ${skippedCount} bỏ qua, ${errorCount} lỗi`,
-      summary: { success: successCount, skipped: skippedCount, errors: errorCount, total: rows.length },
+      message: \`Import hoàn tất: \${successCount} thành công, \${errorCount} lỗi\`,
+      summary: { success: successCount, errors: errorCount, total: rows.length },
       details: results,
     });
   } catch (e) {
     await client.query('ROLLBACK');
-    console.error('[importController]', e);
+    console.error('[confirmOrders]', e);
     res.status(500).json({ message: 'Lỗi nghiêm trọng, đã rollback toàn bộ: ' + e.message });
   } finally {
     client.release();

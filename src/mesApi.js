@@ -141,10 +141,10 @@ export const reports = {
 
 export const salesOrders = {
   ...resource("sales-orders"),
-  importExcel: (file) => {
+  previewExcel: (file) => {
     const form = new FormData();
     form.append('file', file);
-    return fetch(`${API_BASE}/api/import/orders`, {
+    return fetch(`${API_BASE}/api/import/orders/preview`, {
       method: 'POST',
       headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
       body: form,
@@ -157,5 +157,6 @@ export const salesOrders = {
       return res.json();
     });
   },
+  confirmExcel: (rows) => http(`/import/orders/confirm`, body("POST", { rows })),
 };
 

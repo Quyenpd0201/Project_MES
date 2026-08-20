@@ -376,7 +376,6 @@ function OrderVoucher({ id, onBack }) {
             </tr>
           </tbody>
         </table>
-
         {o.note && <div className="text-sm mt-4"><span className="text-slate-500">Ghi chú:</span> {o.note}</div>}
 
         <div className="grid grid-cols-2 gap-4 mt-10 text-center text-sm">
@@ -399,14 +398,31 @@ function OrderVoucher({ id, onBack }) {
 function ExcelImportModal({ onClose, onDone }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(1); // 1: Select File, 2: Preview, 3: Result
+  const [previewData, setPreviewData] = useState([]);
   const [result, setResult] = useState(null);
 
-  const handleImport = async () => {
+  const handlePreview = async () => {
     if (!file) return;
     setLoading(true);
     try {
-      const res = await salesOrdersApi.importExcel(file);
+      const res = await salesOrdersApi.previewExcel(file);
+      setPreviewData(res.preview || []);
+      setStep(2);
+    } catch (e) {
+      toast.error('Lỗi đọc file: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (previewData.length === 0) return;
+    setLoading(true);
+    try {
+      const res = await salesOrdersApi.confirmExcel(previewData);
       setResult(res);
+      setStep(3);
       onDone();
     } catch (e) {
       toast.error('Lỗi import: ' + e.message);
@@ -415,24 +431,37 @@ function ExcelImportModal({ onClose, onDone }) {
     }
   };
 
+  const removeRow = (index) => {
+    setPreviewData(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeAllErrors = () => {
+    setPreviewData(prev => prev.filter(row => row.isValid));
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+      <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${step === 2 ? 'max-w-6xl' : 'max-w-lg'}`}>
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
               <Upload size={18} />
             </div>
             <div>
-              <p className="font-bold text-slate-800">Nhập đơn hàng từ Excel</p>
-              <p className="text-xs text-slate-400">Định dạng: Ngày, Khách, Kích thước, KG PO, KG cuộn, KG túi, Phế, Ghi chú</p>
+              <p className="font-bold text-slate-800">
+                {step === 1 && "Nhập đơn hàng từ Excel"}
+                {step === 2 && "Kiểm tra dữ liệu trước khi nhập"}
+                {step === 3 && "Kết quả nhập dữ liệu"}
+              </p>
+              {step === 1 && <p className="text-xs text-slate-400">Định dạng: Ngày, Khách, Kích thước, KG PO, KG cuộn, KG túi, Phế, Ghi chú</p>}
+              {step === 2 && <p className="text-xs text-slate-400">Vui lòng kiểm tra và loại bỏ các dòng bị lỗi</p>}
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
 
-        <div className="p-5 space-y-4">
-          {!result ? (
+        <div className="p-5 space-y-4 overflow-y-auto min-h-0">
+          {step === 1 && (
             <>
               <label className="block">
                 <div className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
@@ -452,37 +481,106 @@ function ExcelImportModal({ onClose, onDone }) {
               </label>
               <div className="flex gap-3 justify-end">
                 <button onClick={onClose} className="btn-ghost">Hủy</button>
-                <button onClick={handleImport} disabled={!file || loading} className="btn-primary disabled:opacity-50">
-                  {loading ? 'Đang nhập...' : <><Upload size={16} /> Nhập dữ liệu</>}
+                <button onClick={handlePreview} disabled={!file || loading} className="btn-primary disabled:opacity-50">
+                  {loading ? 'Đang đọc...' : 'Tiếp tục'}
                 </button>
               </div>
             </>
-          ) : (
+          )}
+
+          {step === 2 && (
+            <div className="flex flex-col h-full gap-4">
+              <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
+                <div className="text-sm font-medium text-slate-700">
+                  Tổng cộng: <span className="font-bold">{previewData.length}</span> dòng | 
+                  Hợp lệ: <span className="font-bold text-green-600 ml-1">{previewData.filter(d => d.isValid).length}</span> |
+                  Lỗi: <span className="font-bold text-rose-600 ml-1">{previewData.filter(d => !d.isValid).length}</span>
+                </div>
+                {previewData.filter(d => !d.isValid).length > 0 && (
+                  <button onClick={removeAllErrors} className="flex items-center gap-1.5 text-xs text-rose-600 bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg hover:bg-rose-100 transition">
+                    <Trash2 size={14} /> Xóa tất cả dòng lỗi
+                  </button>
+                )}
+              </div>
+              
+              <div className="border border-slate-200 rounded-lg overflow-hidden flex-1 relative min-h-[300px]">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 text-slate-600 text-xs uppercase sticky top-0 shadow-sm z-10">
+                    <tr>
+                      <th className="px-3 py-2">TT</th>
+                      <th className="px-3 py-2">Khách hàng</th>
+                      <th className="px-3 py-2">Ngày đặt</th>
+                      <th className="px-3 py-2">Kích thước</th>
+                      <th className="px-3 py-2">SL (KG PO)</th>
+                      <th className="px-3 py-2">Trạng thái</th>
+                      <th className="px-3 py-2 text-center w-12">Xóa</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {previewData.length === 0 ? (
+                      <tr><td colSpan="7" className="text-center py-8 text-slate-500 italic">Không có dữ liệu</td></tr>
+                    ) : previewData.map((row, i) => (
+                      <tr key={i} className={!row.isValid ? "bg-rose-50/50" : (row.warnings?.length > 0 ? "bg-amber-50/50" : "hover:bg-slate-50")}>
+                        <td className="px-3 py-2 text-slate-400">{i + 1}</td>
+                        <td className="px-3 py-2 font-medium">{row.customerName || <span className="text-rose-500 italic">Trống</span>}</td>
+                        <td className="px-3 py-2">{fmtDate(row.orderDate)}</td>
+                        <td className="px-3 py-2">{row.dimStr}</td>
+                        <td className="px-3 py-2 font-medium text-slate-700">{row.kgPO}</td>
+                        <td className="px-3 py-2 text-xs">
+                          {!row.isValid ? (
+                            <div className="text-rose-600 flex items-start gap-1">
+                              <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                              <ul className="list-disc pl-3">{row.errors.map((e, idx) => <li key={idx}>{e}</li>)}</ul>
+                            </div>
+                          ) : row.warnings?.length > 0 ? (
+                            <div className="text-amber-600">{row.warnings.join(', ')}</div>
+                          ) : (
+                            <div className="text-green-600 flex items-center gap-1"><CheckCircle size={14} /> Hợp lệ</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <button onClick={() => removeRow(i)} className="text-slate-400 hover:text-rose-500 p-1.5 rounded-md hover:bg-rose-50 transition" title="Xóa dòng này">
+                            <Trash2 size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button onClick={() => setStep(1)} className="btn-ghost" disabled={loading}>Quay lại</button>
+                <button onClick={handleConfirm} disabled={previewData.length === 0 || loading || previewData.some(d => !d.isValid)} className="btn-primary disabled:opacity-50">
+                  {loading ? 'Đang nhập...' : <><Save size={16} /> Xác nhận nhập ({previewData.length})</>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && result && (
             <>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="bg-green-50 rounded-xl p-3">
-                  <p className="text-2xl font-bold text-green-600">{result.summary?.success ?? 0}</p>
-                  <p className="text-xs text-green-600 mt-1">Thành công</p>
+              <div className="grid grid-cols-2 gap-3 text-center mb-6">
+                <div className="bg-green-50 rounded-xl p-4">
+                  <p className="text-3xl font-bold text-green-600">{result.summary?.success ?? 0}</p>
+                  <p className="text-sm font-medium text-green-700 mt-1">Thành công</p>
                 </div>
-                <div className="bg-amber-50 rounded-xl p-3">
-                  <p className="text-2xl font-bold text-amber-600">{result.summary?.skipped ?? 0}</p>
-                  <p className="text-xs text-amber-600 mt-1">Bỏ qua</p>
-                </div>
-                <div className="bg-rose-50 rounded-xl p-3">
-                  <p className="text-2xl font-bold text-rose-600">{result.summary?.errors ?? 0}</p>
-                  <p className="text-xs text-rose-600 mt-1">Lỗi</p>
+                <div className="bg-rose-50 rounded-xl p-4">
+                  <p className="text-3xl font-bold text-rose-600">{result.summary?.errors ?? 0}</p>
+                  <p className="text-sm font-medium text-rose-700 mt-1">Lỗi</p>
                 </div>
               </div>
-              {result.details?.filter(d => d.error || d.skipped).length > 0 && (
-                <div className="max-h-48 overflow-y-auto text-xs space-y-1">
-                  {result.details.filter(d => d.error || d.skipped).map((d, i) => (
-                    <div key={i} className={`flex items-start gap-2 p-2 rounded-lg ${
-                      d.error ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      {d.error ? <XCircle size={14} className="mt-0.5 shrink-0" /> : <AlertCircle size={14} className="mt-0.5 shrink-0" />}
-                      <span>Dòng {d.row}: {d.message || d.reason}</span>
-                    </div>
-                  ))}
+              
+              {result.details?.filter(d => d.error).length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-rose-700 mb-2 flex items-center gap-1.5"><AlertCircle size={16}/> Chi tiết lỗi:</h4>
+                  <div className="max-h-48 overflow-y-auto text-xs space-y-1 bg-rose-50/50 p-3 rounded-lg border border-rose-100">
+                    {result.details.filter(d => d.error).map((d, i) => (
+                      <div key={i} className="text-rose-700 font-medium">
+                        Dòng {d.row}: <span className="font-normal">{d.message}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               <button onClick={onClose} className="btn-primary w-full">Đóng</button>
