@@ -138,3 +138,24 @@ export const reports = {
     return http(`/reports/employees/${encodeURIComponent(worker)}/tasks?${q.toString()}`);
   },
 };
+
+export const salesOrders = {
+  ...resource("sales-orders"),
+  importExcel: (file) => {
+    const form = new FormData();
+    form.append('file', file);
+    return fetch(`${API_BASE}/api/import/orders`, {
+      method: 'POST',
+      headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      body: form,
+    }).then(async (res) => {
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); if (j?.message) msg = j.message; } catch { /* ignore */ }
+        const err = new Error(msg); err.status = res.status; throw err;
+      }
+      return res.json();
+    });
+  },
+};
+

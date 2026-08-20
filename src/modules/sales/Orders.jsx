@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy } from "lucide-react";
-import { resource } from "../../mesApi.js";
+import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { resource, salesOrders as salesOrdersApi } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../../ui.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
@@ -396,6 +396,104 @@ function OrderVoucher({ id, onBack }) {
 }
 
 /* ---- Module chính ---- */
+function ExcelImportModal({ onClose, onDone }) {
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleImport = async () => {
+    if (!file) return;
+    setLoading(true);
+    try {
+      const res = await salesOrdersApi.importExcel(file);
+      setResult(res);
+      onDone();
+    } catch (e) {
+      toast.error('Lỗi import: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+              <Upload size={18} />
+            </div>
+            <div>
+              <p className="font-bold text-slate-800">Nhập đơn hàng từ Excel</p>
+              <p className="text-xs text-slate-400">Định dạng: Ngày, Khách, Kích thước, KG PO, KG cuộn, KG túi, Phế, Ghi chú</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {!result ? (
+            <>
+              <label className="block">
+                <div className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors ${
+                  file ? 'border-green-400 bg-green-50' : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50'
+                }`}>
+                  <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+                  {file ? (
+                    <><CheckCircle className="mx-auto mb-2 text-green-500" size={28} />
+                    <p className="font-medium text-green-700">{file.name}</p>
+                    <p className="text-xs text-green-500 mt-1">{(file.size / 1024).toFixed(1)} KB</p></>
+                  ) : (
+                    <><Upload className="mx-auto mb-2 text-slate-400" size={28} />
+                    <p className="text-slate-500">Kéo thả hoặc click để chọn file Excel</p>
+                    <p className="text-xs text-slate-400 mt-1">.xlsx / .xls</p></>
+                  )}
+                </div>
+              </label>
+              <div className="flex gap-3 justify-end">
+                <button onClick={onClose} className="btn-ghost">Hủy</button>
+                <button onClick={handleImport} disabled={!file || loading} className="btn-primary disabled:opacity-50">
+                  {loading ? 'Đang nhập...' : <><Upload size={16} /> Nhập dữ liệu</>}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-green-50 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-green-600">{result.summary?.success ?? 0}</p>
+                  <p className="text-xs text-green-600 mt-1">Thành công</p>
+                </div>
+                <div className="bg-amber-50 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-amber-600">{result.summary?.skipped ?? 0}</p>
+                  <p className="text-xs text-amber-600 mt-1">Bỏ qua</p>
+                </div>
+                <div className="bg-rose-50 rounded-xl p-3">
+                  <p className="text-2xl font-bold text-rose-600">{result.summary?.errors ?? 0}</p>
+                  <p className="text-xs text-rose-600 mt-1">Lỗi</p>
+                </div>
+              </div>
+              {result.details?.filter(d => d.error || d.skipped).length > 0 && (
+                <div className="max-h-48 overflow-y-auto text-xs space-y-1">
+                  {result.details.filter(d => d.error || d.skipped).map((d, i) => (
+                    <div key={i} className={`flex items-start gap-2 p-2 rounded-lg ${
+                      d.error ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {d.error ? <XCircle size={14} className="mt-0.5 shrink-0" /> : <AlertCircle size={14} className="mt-0.5 shrink-0" />}
+                      <span>Dòng {d.row}: {d.message || d.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={onClose} className="btn-primary w-full">Đóng</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCreateDelivery }) {
   const { can } = usePerm();
   const [view, setView] = useState("list");
@@ -403,6 +501,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
   const [copyId, setCopyId] = useState(null);
   const [voucherId, setVoucherId] = useState(null);
   const [rows, setRows] = useState([]);
+  const [showImport, setShowImport] = useState(false);
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
   const load = useCallback(async () => {
@@ -445,8 +544,14 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
 
   return (
     <div className="space-y-5">
+      {showImport && <ExcelImportModal onClose={() => setShowImport(false)} onDone={() => { load(); }} />}
       <ListHeader title="Đơn hàng" actions={<>
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        {can("orders", "create") && (
+          <button onClick={() => setShowImport(true)} className="btn-ghost border border-green-300 text-green-700 hover:bg-green-50">
+            <Upload size={16} /> Nhập Excel
+          </button>
+        )}
         {can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>}
       </>} />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
