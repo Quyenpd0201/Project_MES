@@ -280,7 +280,7 @@ exports.confirmOrders = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({
-      message: \`Import hoàn tất: \${successCount} thành công, \${errorCount} lỗi\`,
+      message: `Import hoàn tất: ${successCount} thành công, ${errorCount} lỗi`,
       summary: { success: successCount, errors: errorCount, total: rows.length },
       details: results,
     });
