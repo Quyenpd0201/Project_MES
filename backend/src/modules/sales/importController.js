@@ -11,10 +11,29 @@ function parseNum(v) {
 }
 
 function excelDateToISO(serial) {
-  if (!serial || typeof serial !== 'number') return null;
-  const d = XLSX.SSF.parse_date_code(serial);
-  const y = d.y, m = String(d.m).padStart(2, '0'), day = String(d.d).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  if (!serial) return null;
+  if (typeof serial === 'number') {
+    const d = XLSX.SSF.parse_date_code(serial);
+    const y = d.y, m = String(d.m).padStart(2, '0'), day = String(d.d).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  if (typeof serial === 'string') {
+    const s = serial.trim();
+    // YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+    
+    // DD/MM/YYYY or DD-MM-YYYY
+    const parts = s.split(/[/\\-]/);
+    if (parts.length === 3) {
+      // Check if it's YYYY-MM-DD (already covered above, but just in case)
+      if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+      
+      let [d, m, y] = parts;
+      if (y.length === 2) y = '20' + y;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+  return null;
 }
 
 function parseLengthStr(val) {
