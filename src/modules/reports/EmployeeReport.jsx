@@ -354,11 +354,34 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
             </div>
           )}
 
+          {/* ── Today's Work orders ── */}
+          {(() => {
+            const t = today();
+            const todayTasks = tasks.filter(x => x.planned_date && x.planned_date.startsWith(t));
+            if (todayTasks.length === 0) return null;
+            return (
+              <div className="bg-white rounded-xl border border-indigo-200 shadow-sm overflow-hidden mb-6">
+                <div className="px-5 py-3.5 bg-indigo-50/50 border-b border-indigo-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                      <CalendarDays size={16} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-indigo-900 text-sm">Lệnh làm việc hôm nay ({fmtDate(t)})</p>
+                      <p className="text-xs text-indigo-600/70 mt-0.5">{todayTasks.length} lệnh cần thực hiện</p>
+                    </div>
+                  </div>
+                </div>
+                <WorkOrdersTable tasks={todayTasks} />
+              </div>
+            );
+          })()}
+
           {/* ── Work orders ── */}
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <p className="font-semibold text-slate-800 text-sm">Chi tiết lệnh làm việc</p>
+                <p className="font-semibold text-slate-800 text-sm">Chi tiết lệnh làm việc (Theo bộ lọc thời gian)</p>
                 <p className="text-xs text-slate-400 mt-0.5">{tasks.length} lệnh được phân công</p>
               </div>
             </div>
