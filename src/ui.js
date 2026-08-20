@@ -9,9 +9,26 @@ export const inputCls =
 
 export const fmt = (n) => (n == null || n === "" ? "—" : Number(n).toLocaleString("vi-VN"));
 
-export const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("vi-VN") : "—");
+// Parse ISO date string trực tiếp để tránh lệch múi giờ và phụ thuộc locale browser
+export const fmtDate = (d) => {
+  if (!d) return "—";
+  const s = String(d).slice(0, 10); // lấy phần "yyyy-MM-dd"
+  const parts = s.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`; // dd/MM/yyyy
+  return s;
+};
 
-export const fmtDateTime = (d) => (d ? new Date(d).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit", year: "numeric" }) : "—");
+export const fmtDateTime = (d) => {
+  if (!d) return "—";
+  const s = String(d);
+  const date = s.slice(0, 10).split('-');
+  const time = s.slice(11, 16); // HH:mm
+  if (date.length === 3) {
+    const dd = `${date[2]}/${date[1]}/${date[0]}`;
+    return time ? `${dd} ${time}` : dd;
+  }
+  return s;
+};
 
 // Danh mục đơn vị tính dùng chung (chọn từ dropdown, không nhập tự do)
 export const UNITS = ["Kg", "Cái", "Chiếc", "Dem", "Gram", "Cuộn", "Thùng", "Cm"];
