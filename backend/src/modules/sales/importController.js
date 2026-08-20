@@ -206,8 +206,20 @@ exports.previewOrders = async (req, res) => {
         item.errors.push('Số KG PO phải lớn hơn 0');
       }
 
-      // Check duplicate
-      if (cName && qtyPO > 0) {
+      // Check duplicate in same batch
+      const dupInBatch = previewData.some(d => 
+        d.customerName.toLowerCase() === cName.toLowerCase() &&
+        d.orderDate === orderDate &&
+        d.kgPO === qtyPO &&
+        d.dim.length === dim.length &&
+        d.dim.width === dim.width &&
+        d.dim.thickness === dim.thickness
+      );
+
+      if (dupInBatch) {
+        item.isValid = false;
+        item.errors.push('Dòng dữ liệu bị trùng lặp trong chính file Excel này');
+      } else if (cName && qtyPO > 0) {
         // Find customer ID if exists
         const custRes = await client.query(`SELECT id FROM customers WHERE LOWER(name) = LOWER($1) AND is_deleted = FALSE LIMIT 1`, [cName]);
         if (custRes.rows.length > 0) {
@@ -216,13 +228,13 @@ exports.previewOrders = async (req, res) => {
           const dupRes = await client.query(`
             SELECT so.id 
             FROM sales_orders so
-            JOIN sales_order_items soi ON so.id = soi.sales_order_id
+            JOIN production_orders po ON so.id = po.sales_order_id
             WHERE so.customer_id = $1 
               AND so.order_date = $2
               AND so.is_deleted = FALSE
-              AND soi.quantity = $3
-              AND COALESCE(soi.attr_size, '') = COALESCE($4, '')
-              AND COALESCE(soi.attr_thickness, '') = COALESCE($5, '')
+              AND po.quantity = $3
+              AND COALESCE(po.attr_size, '') = COALESCE($4, '')
+              AND COALESCE(po.attr_thickness, '') = COALESCE($5, '')
             LIMIT 1
           `, [cId, orderDate, qtyPO, dim.length ? (dim.width ? `${dim.length} x ${dim.width}` : dim.length) : null, dim.thickness || null]);
           
