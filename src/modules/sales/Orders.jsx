@@ -550,6 +550,7 @@ function ExcelImportModal({ onClose, onDone }) {
                       <th className="px-3 py-2">Ngày đặt</th>
                       <th className="px-3 py-2">Kích thước</th>
                       <th className="px-3 py-2">SL (KG PO)</th>
+                      <th className="px-3 py-2">Ghi chú</th>
                       <th className="px-3 py-2">Trạng thái</th>
                       <th className="px-3 py-2 text-center w-12">Xóa</th>
                     </tr>
@@ -565,6 +566,7 @@ function ExcelImportModal({ onClose, onDone }) {
                         <td className="px-3 py-2">{fmtDate(row.orderDate)}</td>
                         <td className="px-3 py-2">{row.dimStr}</td>
                         <td className="px-3 py-2 font-medium text-slate-700">{row.kgPO}</td>
+                        <td className="px-3 py-2 max-w-[150px] truncate" title={row.ghiChu}>{row.ghiChu}</td>
                         <td className="px-3 py-2 text-xs">
                           {!row.isValid ? (
                             <div className="text-rose-600 flex items-start gap-1">
