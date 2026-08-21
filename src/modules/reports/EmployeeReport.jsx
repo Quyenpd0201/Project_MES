@@ -189,6 +189,15 @@ function WorkOrdersTable({ tasks }) {
                   <td className="py-2.5 px-3">
                     <span className="font-medium text-slate-700">{t.product_code}</span>
                     <span className="block text-slate-400">{t.product_name}</span>
+                    {t.material_type && (
+                      <span className={`inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${
+                        t.material_type === 'zin'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {t.material_type === 'zin' ? '✦ Hàng zin' : '⟳ Hàng pha'}
+                      </span>
+                    )}
                   </td>
                   <td className="py-2.5 px-3">
                     <span className="inline-flex px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium">

@@ -133,7 +133,7 @@ exports.generate = async (req, res) => {
 
     await client.query('BEGIN');
     const items = (await client.query(`
-      SELECT it.*, so.customer_id, so.due_date, so.id AS so_id
+      SELECT it.*, so.customer_id, so.due_date, so.id AS so_id, so.material_type
       FROM sales_order_items it JOIN sales_orders so ON so.id = it.sales_order_id
       WHERE it.id = ANY($1::uuid[])`, [ids])).rows;
 
@@ -151,12 +151,12 @@ exports.generate = async (req, res) => {
       const r = await client.query(`
         INSERT INTO production_orders
           (sales_order_id, sales_order_item_id, customer_id, product_id, quantity, unit,
-           specs, spec_key, attr_size, attr_thickness, attr_color, machine_id, planned_date, shift, assigned_team, group_key, due_date, status, assigned_worker)
-        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id, order_code`,
+           specs, spec_key, attr_size, attr_thickness, attr_color, machine_id, planned_date, shift, assigned_team, group_key, due_date, status, assigned_worker, material_type)
+        VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id, order_code`,
         [it.so_id, it.id, it.customer_id, it.product_id, q, it.unit,
          JSON.stringify(it.specs || {}), it.spec_key || '',
          it.attr_size, it.attr_thickness, it.attr_color, headMachine, planned_date || null,
-         shift || null, assigned_team || null, gk, it.due_date, status, assigned_worker || null]);
+         shift || null, assigned_team || null, gk, it.due_date, status, assigned_worker || null, it.material_type || null]);
       const po = r.rows[0];
       created.push(po.order_code);
       // Tạo sẵn công đoạn (production_tasks) theo phân bổ từng công đoạn — mỗi công đoạn làm đủ SL (nối tiếp)

@@ -139,7 +139,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const fdis = (k) => fperm("orders", k) !== "edit";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
-  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "" });
+  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null });
   const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]);
   const [seq, setSeq] = useState(2);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -147,7 +147,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const loadData = useCallback(() => {
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "" });
+      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [] })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
@@ -158,7 +158,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   useEffect(() => {
     if (editId || !copyId) return;
     ordersApi.get(copyId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "" });
+      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
@@ -222,6 +222,50 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         {!fhid("order_date") && <Field label="Ngày đặt"><input type="date" className={inputCls} disabled={fdis("order_date")} value={f.order_date} onChange={(e) => set("order_date", e.target.value)} /></Field>}
         {!fhid("due_date") && <Field label="Ngày giao"><input type="date" className={inputCls} disabled={fdis("due_date")} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} /></Field>}
         {!fhid("note") && <Field label="Ghi chú"><input className={inputCls} disabled={fdis("note")} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>}
+        </div>
+        {/* Loại nguyên liệu */}
+        <div className="mt-4 pt-4 border-t border-slate-100">
+          <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Loại nguyên liệu</p>
+          <div className="flex gap-4">
+            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+              f.material_type === 'zin'
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
+              <input type="checkbox" className="hidden" disabled={!editing}
+                checked={f.material_type === 'zin'}
+                onChange={() => set("material_type", f.material_type === 'zin' ? null : 'zin')} />
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                f.material_type === 'zin' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+              }`}>
+                {f.material_type === 'zin' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+              </span>
+              <span className="text-sm font-medium">Hàng zin</span>
+              <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
+            </label>
+            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+              f.material_type === 'pha'
+                ? 'border-amber-500 bg-amber-50 text-amber-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
+              <input type="checkbox" className="hidden" disabled={!editing}
+                checked={f.material_type === 'pha'}
+                onChange={() => set("material_type", f.material_type === 'pha' ? null : 'pha')} />
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                f.material_type === 'pha' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
+              }`}>
+                {f.material_type === 'pha' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+              </span>
+              <span className="text-sm font-medium">Hàng pha</span>
+              <span className="text-xs text-slate-400">(tái chế)</span>
+            </label>
+            {f.material_type && editing && (
+              <button type="button" onClick={() => set("material_type", null)}
+                className="text-xs text-slate-400 hover:text-slate-600 underline self-center">
+                Bỏ chọn
+              </button>
+            )}
+          </div>
         </div>
       </Section>
 

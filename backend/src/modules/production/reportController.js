@@ -327,7 +327,7 @@ exports.employeeTasks = async (req, res) => {
       db.query(`
         SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty,
                t.status, t.planned_date, t.shift, t.assigned_team,
-               po.id AS order_id, po.order_code, po.unit,
+               po.id AS order_id, po.order_code, po.unit, po.material_type,
                so.order_code AS sales_order_code,
                p.product_name, p.product_code, c.name AS customer_name
         FROM production_tasks t
