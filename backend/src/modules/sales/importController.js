@@ -72,12 +72,18 @@ async function findOrCreateCustomer(client, name) {
   return ins.rows[0].id;
 }
 
-async function getDefaultProduct(client) {
-  const r = await client.query(
-    `SELECT id FROM products WHERE is_deleted = FALSE ORDER BY created_at ASC LIMIT 1`
+async function findOrCreateProduct(client, productName) {
+  const code = productName === 'Bao Bì' ? 'SP-BAOBI' : 'SP-CUONPE';
+  const found = await client.query(
+    `SELECT id FROM products WHERE is_deleted = FALSE AND LOWER(product_name) = LOWER($1) LIMIT 1`,
+    [productName]
   );
-  if (!r.rows.length) throw new Error('Không có sản phẩm nào trong hệ thống');
-  return r.rows[0].id;
+  if (found.rows.length) return found.rows[0].id;
+  const ins = await client.query(
+    `INSERT INTO products (product_code, product_name, unit, status, product_type) VALUES ($1, $2, 'KG', 'Hoạt động', 'Thành phẩm') RETURNING id`,
+    [code, productName]
+  );
+  return ins.rows[0].id;
 }
 
 async function importRow(client, row, idx, productId) {
@@ -271,7 +277,8 @@ exports.confirmOrders = async (req, res) => {
 
   try {
     await client.query('BEGIN');
-    const productId = await getDefaultProduct(client);
+    const baoBiId = await findOrCreateProduct(client, 'Bao Bì');
+    const cuonPeId = await findOrCreateProduct(client, 'CUỘN PE');
 
     for (let i = 0; i < rows.length; i++) {
       const item = rows[i];
@@ -289,6 +296,8 @@ exports.confirmOrders = async (req, res) => {
           item.dueDate
         ];
         
+        const qtyTui = parseNum(item.kgTui);
+        const productId = qtyTui > 0 ? baoBiId : cuonPeId;
         const result = await importRow(client, rowArray, i + 1, productId);
         results.push(result);
         if (!result.skipped) successCount++;
