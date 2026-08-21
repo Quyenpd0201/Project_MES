@@ -73,10 +73,10 @@ async function findOrCreateCustomer(client, name) {
 }
 
 async function findOrCreateProduct(client, productName) {
-  const code = productName === 'Bao Bì' ? 'SP-BAOBI' : 'SP-CUONPE';
+  const code = productName === 'Bao Bì' ? 'SP00004' : 'SP00017';
   const found = await client.query(
-    `SELECT id FROM products WHERE is_deleted = FALSE AND LOWER(product_name) = LOWER($1) LIMIT 1`,
-    [productName]
+    `SELECT id FROM products WHERE is_deleted = FALSE AND product_code = $1 LIMIT 1`,
+    [code]
   );
   if (found.rows.length) return found.rows[0].id;
   const ins = await client.query(
