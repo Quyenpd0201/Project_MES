@@ -177,6 +177,10 @@ export default function InventoryReport({ lookups }) {
 
   /* ── B. Cơ cấu tồn theo loại sản phẩm (donut) ───────────────── */
   const typeMap = new Map();
+  typeMap.set("Thành phẩm", 0);
+  typeMap.set("Bán thành phẩm", 0);
+  typeMap.set("Nguyên vật liệu", 0);
+  
   filteredStock.forEach(p => {
     const t = p.product_type || "Khác";
     typeMap.set(t, (typeMap.get(t) || 0) + (Number(p.total) || 0));
