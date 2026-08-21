@@ -133,22 +133,21 @@ async function importRow(client, row, idx, productId) {
   );
   const { id: poId, order_code: poCode } = poRes.rows[0];
 
-  if (qtyCuon > 0) {
-    await client.query(
-      `INSERT INTO production_tasks
-         (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, status, planned_date, seq)
-       VALUES ($1,$2,'Thổi',$3,$3,0,'Hoàn thành',$4,1)`,
-      [poId, `${poCode}-1`, qtyCuon, orderDate]
-    );
-  }
-  if (qtyTui > 0) {
-    await client.query(
-      `INSERT INTO production_tasks
-         (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, status, planned_date, seq)
-       VALUES ($1,$2,'Cắt',$3,$3,$4,'Hoàn thành',$5,2)`,
-      [poId, `${poCode}-2`, qtyTui, qtyPhe, orderDate]
-    );
-  }
+  const cuonTaskQty = qtyCuon > 0 ? qtyCuon : qtyPO;
+  await client.query(
+    `INSERT INTO production_tasks
+       (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, status, planned_date, seq)
+     VALUES ($1,$2,'Thổi',$3,$3,0,'Hoàn thành',$4,1)`,
+    [poId, `${poCode}-1`, cuonTaskQty, orderDate]
+  );
+
+  const catTaskQty = qtyTui > 0 ? qtyTui : cuonTaskQty;
+  await client.query(
+    `INSERT INTO production_tasks
+       (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, status, planned_date, seq)
+     VALUES ($1,$2,'Cắt',$3,$3,$4,'Hoàn thành',$5,2)`,
+    [poId, `${poCode}-2`, catTaskQty, qtyPhe, orderDate]
+  );
 
   return {
     success: true,
