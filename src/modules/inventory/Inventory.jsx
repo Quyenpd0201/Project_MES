@@ -208,6 +208,25 @@ function TreeTab({ lookups }) {
   // Bước 3: Gom nhóm theo Location
   const buildTreeByLocation = (rows) => {
     const whs = new Map();
+    // 1. Dựng sẵn cây từ danh mục để hiển thị cả những Khu/Vị trí trống (0 tồn)
+    (lookups.warehouses || []).forEach(w => {
+      whs.set(w.id, { id: w.id, name: w.name, total: 0, zones: new Map() });
+    });
+    (lookups.zones || []).forEach(z => {
+      if (whs.has(z.warehouse_id)) {
+        whs.get(z.warehouse_id).zones.set(z.id, { id: z.id, name: z.name, total: 0, locs: new Map() });
+      }
+    });
+    (lookups.locations || []).forEach(l => {
+      if (whs.has(l.warehouse_id)) {
+        const W = whs.get(l.warehouse_id);
+        if (l.zone_id && W.zones.has(l.zone_id)) {
+          W.zones.get(l.zone_id).locs.set(l.id, { id: l.id, name: l.name, total: 0, prods: new Map() });
+        }
+      }
+    });
+
+    // 2. Lấp dữ liệu tồn kho vào cây
     for (const r of rows) {
       const whId = r.warehouse_id || "unknown";
       if (!whs.has(whId)) whs.set(whId, { id: whId, name: r.warehouse_name || "(Chưa phân kho)", total: 0, zones: new Map() });
@@ -235,6 +254,7 @@ function TreeTab({ lookups }) {
         unit: r.unit, expiry_date: r.expiry_date
       });
     }
+
     let arr = [...whs.values()].map(W => ({
       ...W, zones: [...W.zones.values()].map(Z => ({
         ...Z, locs: [...Z.locs.values()].map(L => ({
@@ -242,6 +262,24 @@ function TreeTab({ lookups }) {
         }))
       }))
     }));
+
+    // 3. Lọc theo giao diện (nếu user đang dùng filter hoặc search)
+    if (filterWh) arr = arr.filter(w => w.id === filterWh);
+    if (filterZone) {
+      arr.forEach(w => { w.zones = w.zones.filter(z => z.id === filterZone) });
+    }
+    
+    // Nếu đang tìm kiếm text (q) thì ẩn bớt các vị trí trống không khớp để đỡ rối
+    if (q) {
+      arr.forEach(w => {
+        w.zones.forEach(z => {
+          z.locs = z.locs.filter(l => l.prods.length > 0);
+        });
+        w.zones = w.zones.filter(z => z.locs.length > 0 || z.total > 0);
+      });
+      arr = arr.filter(w => w.zones.length > 0 || w.total > 0);
+    }
+
     return arr;
   };
 
