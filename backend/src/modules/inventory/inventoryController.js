@@ -13,7 +13,12 @@ exports.tree = async (req, res) => {
     if (product_id) { where.push(`s.product_id = $${i++}`); params.push(product_id); }
     if (q)          { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i} OR s.lot_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
     
-    const scopeCond = getDataScope(req, 'inventory', 'view', { warehouseCol: 'w.name' });
+    const invModules = ['inventory', 'rep_inv', 'inv_adjust', 'inv_inbound', 'inv_outbound', 'inv_transfer'];
+    let scopeCond = '1=0';
+    for (const mod of invModules) {
+      scopeCond = getDataScope(req, mod, 'view', { warehouseCol: 'w.name' });
+      if (scopeCond !== '1=0') break;
+    }
     where.push(`(${scopeCond})`);
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -47,7 +52,12 @@ exports.list = async (req, res) => {
     if (warehouse_id) { where.push(`l.warehouse_id = $${i++}`); params.push(warehouse_id); }
     if (q)            { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
     
-    const scopeCond = getDataScope(req, 'inventory', 'view', { warehouseCol: 'w.name' });
+    const invModules = ['inventory', 'rep_inv', 'inv_adjust', 'inv_inbound', 'inv_outbound', 'inv_transfer'];
+    let scopeCond = '1=0';
+    for (const mod of invModules) {
+      scopeCond = getDataScope(req, mod, 'view', { warehouseCol: 'w.name' });
+      if (scopeCond !== '1=0') break;
+    }
     where.push(`(${scopeCond})`);
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
