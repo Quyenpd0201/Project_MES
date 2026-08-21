@@ -4,15 +4,14 @@ const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/spe
 const { upUnit } = require('../../core/lib/units');
 const { getDataScope } = require('../../core/dataScope');
 
-// GET /api/inventory/tree — tồn kho gom 3 cấp:
-//   Sản phẩm  ->  Nhóm thông số kỹ thuật giống nhau (spec_key)  ->  các lô sản xuất
+// GET /api/inventory/tree — tồn kho (trả về dữ liệu phẳng để frontend tự nhóm)
 exports.tree = async (req, res) => {
   try {
     const where = [];
     const params = []; let i = 1;
     const { product_id, q } = req.query;
     if (product_id) { where.push(`s.product_id = $${i++}`); params.push(product_id); }
-    if (q)          { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
+    if (q)          { where.push(`(p.product_name ILIKE $${i} OR p.product_code ILIKE $${i} OR s.lot_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
     
     const scopeCond = getDataScope(req, 'inventory', 'view', { warehouseCol: 'w.name' });
     where.push(`(${scopeCond})`);
@@ -22,42 +21,20 @@ exports.tree = async (req, res) => {
       SELECT s.id, s.product_id, p.product_code, p.product_name, p.product_type, p.min_quantity, p.warehouse_limits,
              s.spec_key, s.specs, s.lot_code, s.prod_order_id, po.order_code AS lot_order_code,
              s.quantity, s.unit, s.expiry_date,
-             w.id AS warehouse_id, w.name AS warehouse_name, l.name AS location_name
+             w.id AS warehouse_id, w.name AS warehouse_name, 
+             z.id AS zone_id, z.name AS zone_name,
+             l.id AS location_id, l.name AS location_name
       FROM inventory_stock s
       JOIN products p ON p.id = s.product_id
       LEFT JOIN locations l ON l.id = s.location_id
+      LEFT JOIN zones z ON z.id = l.zone_id
       LEFT JOIN warehouses w ON w.id = l.warehouse_id
       LEFT JOIN production_orders po ON po.id = s.prod_order_id
       ${whereSql}
       ORDER BY p.product_code, s.spec_key, s.lot_code`, params);
 
-    const prods = new Map();
-    for (const r of rows) {
-      if (!prods.has(r.product_id)) {
-        prods.set(r.product_id, {
-          product_id: r.product_id, product_code: r.product_code, product_name: r.product_name,
-          product_type: r.product_type, min_quantity: r.min_quantity, warehouse_limits: r.warehouse_limits || [], unit: r.unit, total: 0, groups: new Map(), warehouse_totals: {},
-        });
-      }
-      const P = prods.get(r.product_id);
-      P.total += Number(r.quantity) || 0;
-      if (r.warehouse_id) {
-        P.warehouse_totals[r.warehouse_id] = (P.warehouse_totals[r.warehouse_id] || 0) + (Number(r.quantity) || 0);
-      }
-      if (!P.unit && r.unit) P.unit = r.unit;
-      const gkey = r.spec_key || '';
-      if (!P.groups.has(gkey)) P.groups.set(gkey, { spec_key: gkey, specs: r.specs || {}, total: 0, lots: [] });
-      const G = P.groups.get(gkey);
-      G.total += Number(r.quantity) || 0;
-      G.lots.push({
-        id: r.id, lot_code: r.lot_order_code || r.lot_code || '', quantity: Number(r.quantity) || 0,
-        unit: r.unit, warehouse_name: r.warehouse_name, location_name: r.location_name,
-        expiry_date: r.expiry_date, prod_order_id: r.prod_order_id,
-      });
-    }
-    const data = [...prods.values()].map((P) => ({ ...P, groups: [...P.groups.values()] }));
-    res.json({ data });
-  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy cây tồn kho' }); }
+    res.json({ data: rows });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy dữ liệu tồn kho' }); }
 };
 
 // GET /api/inventory — tồn kho GỘP theo sản phẩm + kho (mỗi (SP, kho) là 1 dòng)

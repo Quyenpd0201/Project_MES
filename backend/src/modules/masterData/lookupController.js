@@ -7,6 +7,7 @@ const CODE_MAP = {
   customers: ['customers', 'customer_code', 'KH', 5],
   machines: ['machines', 'machine_code', 'MC', 4],
   warehouses: ['warehouses', 'warehouse_code', 'K', 3],
+  zones: ['zones', 'zone_code', 'KV', 3],
   locations: ['locations', 'location_code', 'VT', 4],
   shifts: ['shifts', 'shift_code', 'CA', 2],
   employees: ['employees', 'employee_code', 'NV', 5],
@@ -30,7 +31,7 @@ exports.nextCode = async (req, res) => {
 
 exports.all = async (_req, res) => {
   try {
-    const [products, customers, machines, warehouses, locations, employees, shiftRows] = await Promise.all([
+    const [products, customers, machines, warehouses, zones, locations, employees, shiftRows] = await Promise.all([
       db.query(`SELECT id, product_code, product_name, product_type, product_types, unit FROM products WHERE is_deleted = FALSE ORDER BY product_code`),
       db.query(`SELECT id, customer_code, name FROM customers WHERE is_deleted = FALSE ORDER BY name`),
       db.query(`SELECT id, machine_code, name, factory, machine_type, status,
@@ -43,8 +44,12 @@ exports.all = async (_req, res) => {
                   THEN 'Đang sản xuất' ELSE 'Chờ sản xuất' END AS production_status
                 FROM machines WHERE is_deleted = FALSE ORDER BY factory, name`),
       db.query(`SELECT id, warehouse_code, name, warehouse_type FROM warehouses WHERE is_deleted = FALSE ORDER BY name`),
-      db.query(`SELECT l.id, l.location_code, l.name, l.warehouse_id, w.name AS warehouse_name
-                FROM locations l JOIN warehouses w ON w.id = l.warehouse_id WHERE l.is_deleted = FALSE ORDER BY w.name, l.name`),
+      db.query(`SELECT id, warehouse_id, zone_code, name FROM zones WHERE is_deleted = FALSE ORDER BY name`),
+      db.query(`SELECT l.id, l.location_code, l.name, l.warehouse_id, w.name AS warehouse_name, l.zone_id, z.name AS zone_name
+                FROM locations l 
+                JOIN warehouses w ON w.id = l.warehouse_id 
+                LEFT JOIN zones z ON z.id = l.zone_id
+                WHERE l.is_deleted = FALSE ORDER BY w.name, z.name, l.name`),
       db.query(`SELECT id, employee_code, name, factory, position, skill_level FROM employees WHERE is_deleted = FALSE ORDER BY factory, name`),
       db.query(`SELECT id, name FROM shifts WHERE is_deleted = FALSE ORDER BY shift_code`),
     ]);
@@ -60,6 +65,7 @@ exports.all = async (_req, res) => {
       customers: customers.rows,
       machines: machines.rows,
       warehouses: warehouses.rows,
+      zones: zones.rows,
       locations: locations.rows,
       employees: employees.rows,
       shiftList: shiftRows.rows, // [{id, name}] cho lịch làm việc

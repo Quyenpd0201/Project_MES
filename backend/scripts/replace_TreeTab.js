@@ -1,134 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, UnitSelect } from "../../components.jsx";
-import { inventory } from "../../mesApi.js";
-import { usePerm } from "../../perm.jsx";
-import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
-import { PRODUCT_SPECS, splitNU, specShort } from "../../specs.js";
+// backend/scripts/generate_TreeTab.js
+// Script to generate TreeTab replacement for Inventory.jsx
+const fs = require('fs');
+const path = require('path');
 
-const Field = ({ label, required, children }) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-600 mb-1.5">
-      {label} {required && <span className="text-rose-500">*</span>}
-    </label>
-    {children}
-  </div>
-);
-
-/* Bộ ô nhập thông số kỹ thuật (dùng ở Nhập/Xuất & thêm dòng tồn) */
-function SpecFields({ specs, onChange, disabled, cls = inputCls }) {
-  const get = (n) => specs?.[n] || "";
-  const setV = (n, v) => { const next = { ...specs }; if (v) next[n] = v; else delete next[n]; onChange(next); };
-  return (
-    <>
-      {PRODUCT_SPECS.map((spec) => {
-        const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.name}</span>;
-        if (spec.kind === "select") return (
-          <label key={spec.name}>{lbl}
-            <select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
-              <option value="">-- Chọn --</option>{spec.options.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </label>
-        );
-        if (spec.kind === "num") { const { num } = splitNU(get(spec.name)); return (
-          <label key={spec.name}>{lbl}
-            <div className="relative">
-              <input type="number" className={cls + " pr-10"} disabled={disabled} value={num} placeholder="0"
-                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${spec.unit}` : "")} />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">{spec.unit}</span>
-            </div>
-          </label>
-        ); }
-        if (spec.kind === "text") {
-          return (
-            <label key={spec.name}>{lbl}
-              <input type="text" className={cls} disabled={disabled} value={get(spec.name)} placeholder={spec.placeholder || ""}
-                onChange={(e) => setV(spec.name, e.target.value)} />
-            </label>
-          );
-        }
-        const { num, unit } = splitNU(get(spec.name)); const cu = unit || spec.units[0];
-        return (
-          <label key={spec.name}>{lbl}
-            <div className="flex gap-1.5">
-              <input type="number" className={cls + " flex-1"} disabled={disabled} value={num} placeholder="0"
-                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${cu}` : "")} />
-              <select className={cls + " w-20"} disabled={disabled} value={cu}
-                onChange={(e) => setV(spec.name, num ? `${num} ${e.target.value}` : "")}>
-                {spec.units.map((u) => <option key={u}>{u}</option>)}
-              </select>
-            </div>
-          </label>
-        );
-      })}
-    </>
-  );
-}
-
-function AdjustModal({ lookups, onClose, onSaved }) {
-  const [f, setF] = useState({ product_id: "", trx_type: "Nhập", quantity: "", unit: "", location_id: "", lot_code: "", note: "" });
-  const [specs, setSpecs] = useState({});
-  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const onProduct = (id) => {
-    const p = lookups.products.find((x) => x.id === id);
-    setF((s) => ({ ...s, product_id: id, unit: p?.unit || s.unit }));
-  };
-  const save = async () => {
-    if (!f.product_id) return toast.error("Chọn sản phẩm");
-    if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Nhập số lượng hợp lệ");
-    try { await inventory.adjust({ ...f, specs }); toast.success("Đã ghi nhận giao dịch thành công"); onSaved(); }
-    catch (e) { toast.error("Lỗi: " + e.message); }
-  };
-  return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-slate-800">Nhập / Xuất / Điều chỉnh tồn</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Field label="Sản phẩm" required>
-            <select className={inputCls} value={f.product_id} onChange={(e) => onProduct(e.target.value)}>
-              <option value="">-- Chọn --</option>
-              {lookups.products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-            </select>
-          </Field>
-          <Field label="Loại giao dịch" required>
-            <select className={inputCls} value={f.trx_type} onChange={(e) => set("trx_type", e.target.value)}>
-              <option>Nhập</option><option>Xuất</option><option>Điều chỉnh</option>
-            </select>
-          </Field>
-          <Field label="Số lượng" required>
-            <input type="number" min="0" className={inputCls} value={f.quantity} onChange={(e) => set("quantity", e.target.value)} />
-          </Field>
-          <Field label="Đơn vị">
-            <UnitSelect value={f.unit} onChange={(v) => set("unit", v)} />
-          </Field>
-          <Field label="Vị trí lưu trữ">
-            <select className={inputCls} value={f.location_id} onChange={(e) => set("location_id", e.target.value)}>
-              <option value="">-- Không xác định --</option>
-              {lookups.locations.map((l) => <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Lô sản xuất">
-            <input className={inputCls} value={f.lot_code} placeholder="VD: LSX00007 / Thủ công" onChange={(e) => set("lot_code", e.target.value)} />
-          </Field>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Thông số kỹ thuật</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <SpecFields specs={specs} onChange={setSpecs} />
-          </div>
-        </div>
-        <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
-        <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="btn-ghost">Hủy</button>
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- Tab Tồn kho: cây 3 cấp Sản phẩm → Nhóm thông số → Lô sản xuất ---- */
-
+const replacement = `
 /* ---- Tab Tồn kho: 2 chế độ xem (Theo sản phẩm / Theo vị trí) ---- */
 function TreeTab({ lookups }) {
   const { can } = usePerm();
@@ -264,18 +139,18 @@ function TreeTab({ lookups }) {
               <button onClick={() => toggle("P" + p.product_id)}
                 className="w-full grid grid-cols-12 px-4 py-3 items-center hover:bg-slate-50/70 text-left">
                 <div className="col-span-7 flex items-center gap-2 min-w-0">
-                  <ChevronRight size={16} className={`text-slate-400 transition-transform shrink-0 ${pOpen ? "rotate-90" : ""}`} />
+                  <ChevronRight size={16} className={\`text-slate-400 transition-transform shrink-0 \${pOpen ? "rotate-90" : ""}\`} />
                   <Boxes size={16} className="text-blue-500 shrink-0" />
                   <span className="font-semibold text-blue-600 shrink-0">{p.product_code}</span>
                   <span className="text-slate-700 truncate">{p.product_name}</span>
-                  <span className={`ml-1 inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium ${statusClass(p.product_type)}`}>{p.product_type}</span>
+                  <span className={\`ml-1 inline-flex px-2 py-0.5 rounded-full text-[11px] font-medium \${statusClass(p.product_type)}\`}>{p.product_type}</span>
                   {p.warehouse_limits && p.warehouse_limits.filter(w => {
                     const qty = p.warehouse_totals?.[w.warehouse_id] || 0;
                     return w.min_quantity != null && qty < Number(w.min_quantity);
                   }).map(w => {
                     const whName = lookups?.warehouses?.find(x => x.id === w.warehouse_id)?.name || "Kho";
                     return (
-                      <span key={w.warehouse_id} className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700" title={`Thiếu hàng tại ${whName} (Tối thiểu: ${fmt(w.min_quantity)}, Thực tế: ${fmt(p.warehouse_totals?.[w.warehouse_id] || 0)})`}>⚠ ${whName}</span>
+                      <span key={w.warehouse_id} className="ml-1 inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-700" title={\`Thiếu hàng tại \${whName} (Tối thiểu: \${fmt(w.min_quantity)}, Thực tế: \${fmt(p.warehouse_totals?.[w.warehouse_id] || 0)})\`}>⚠ \${whName}</span>
                     );
                   })}
                   <span className="text-xs text-slate-400">· {p.groups.length} nhóm</span>
@@ -293,7 +168,7 @@ function TreeTab({ lookups }) {
                     <button onClick={() => toggle(gkey)}
                       className="w-full grid grid-cols-12 px-4 py-2.5 items-center hover:bg-slate-100/60 text-left border-t border-slate-100">
                       <div className="col-span-7 flex items-center gap-2 pl-6 min-w-0">
-                        <ChevronRight size={14} className={`text-slate-400 transition-transform shrink-0 ${gOpen ? "rotate-90" : ""}`} />
+                        <ChevronRight size={14} className={\`text-slate-400 transition-transform shrink-0 \${gOpen ? "rotate-90" : ""}\`} />
                         <Layers size={14} className="text-violet-500 shrink-0" />
                         <span className="text-slate-700 text-sm truncate">{label}</span>
                         <span className="text-xs text-slate-400 shrink-0">· {g.lots.length} lô</span>
@@ -309,9 +184,9 @@ function TreeTab({ lookups }) {
                           {lot.expiry_date && <span className="text-xs text-slate-400">· HSD {fmtDate(lot.expiry_date)}</span>}
                         </div>
                         <div className="col-span-3 text-slate-500">
-                          {lot.warehouse_name ? `${lot.warehouse_name}${lot.zone_name ? " · " + lot.zone_name : ""}${lot.location_name ? " · " + lot.location_name : ""}` : "(chưa xác định)"}
+                          {lot.warehouse_name ? \`\${lot.warehouse_name}\${lot.zone_name ? " · " + lot.zone_name : ""}\${lot.location_name ? " · " + lot.location_name : ""}\` : "(chưa xác định)"}
                         </div>
-                        <div className={`col-span-2 text-right font-medium ${Number(lot.quantity) < 0 ? "text-rose-600" : "text-slate-700"}`}>{fmt(lot.quantity)} <span className="text-xs font-normal text-slate-400">{lot.unit || p.unit}</span></div>
+                        <div className={\`col-span-2 text-right font-medium \${Number(lot.quantity) < 0 ? "text-rose-600" : "text-slate-700"}\`}>{fmt(lot.quantity)} <span className="text-xs font-normal text-slate-400">{lot.unit || p.unit}</span></div>
                       </div>
                     ))}
                   </div>
@@ -341,7 +216,7 @@ function TreeTab({ lookups }) {
               <button onClick={() => toggle("W" + w.id)}
                 className="w-full grid grid-cols-12 px-4 py-3 items-center hover:bg-slate-50/70 text-left">
                 <div className="col-span-7 flex items-center gap-2 min-w-0">
-                  <ChevronRight size={16} className={`text-slate-400 transition-transform shrink-0 ${wOpen ? "rotate-90" : ""}`} />
+                  <ChevronRight size={16} className={\`text-slate-400 transition-transform shrink-0 \${wOpen ? "rotate-90" : ""}\`} />
                   <Warehouse size={16} className="text-indigo-500 shrink-0" />
                   <span className="font-semibold text-indigo-700 shrink-0">{w.name}</span>
                 </div>
@@ -355,7 +230,7 @@ function TreeTab({ lookups }) {
                     <button onClick={() => toggle("Z" + w.id + z.id)}
                       className="w-full grid grid-cols-12 px-4 py-2.5 items-center hover:bg-slate-100/60 text-left border-t border-slate-100">
                       <div className="col-span-7 flex items-center gap-2 pl-6 min-w-0">
-                        <ChevronRight size={14} className={`text-slate-400 transition-transform shrink-0 ${zOpen ? "rotate-90" : ""}`} />
+                        <ChevronRight size={14} className={\`text-slate-400 transition-transform shrink-0 \${zOpen ? "rotate-90" : ""}\`} />
                         <span className="font-semibold text-slate-700 text-sm truncate">{z.name}</span>
                       </div>
                       <div className="col-span-3 text-slate-400 text-sm">—</div>
@@ -368,7 +243,7 @@ function TreeTab({ lookups }) {
                           <button onClick={() => toggle("L" + w.id + z.id + l.id)}
                             className="w-full grid grid-cols-12 px-4 py-2 items-center hover:bg-slate-200/50 text-left border-t border-slate-100">
                             <div className="col-span-7 flex items-center gap-2 pl-10 min-w-0">
-                              <ChevronRight size={14} className={`text-slate-400 transition-transform shrink-0 ${lOpen ? "rotate-90" : ""}`} />
+                              <ChevronRight size={14} className={\`text-slate-400 transition-transform shrink-0 \${lOpen ? "rotate-90" : ""}\`} />
                               <span className="text-slate-600 font-medium text-sm truncate">{l.name}</span>
                             </div>
                             <div className="col-span-3 text-slate-400 text-sm">—</div>
@@ -385,7 +260,7 @@ function TreeTab({ lookups }) {
                                   <span className="text-slate-600 truncate">{label}</span>
                                 </div>
                                 <div className="col-span-3 text-slate-500">
-                                  {p.lots.length > 1 ? `${p.lots.length} lô` : (p.lots[0]?.lot_code || "(không lô)")}
+                                  {p.lots.length > 1 ? \`\${p.lots.length} lô\` : (p.lots[0]?.lot_code || "(không lô)")}
                                 </div>
                                 <div className="col-span-2 text-right font-medium text-slate-700">{fmt(p.total)} <span className="text-xs font-normal text-slate-400">{p.unit}</span></div>
                               </div>
@@ -408,24 +283,24 @@ function TreeTab({ lookups }) {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
         <div className="flex flex-wrap items-center gap-4 flex-1">
-          <input className={`${inputCls} max-w-[200px]`} placeholder="Tìm SP / Lô…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className={\`\${inputCls} max-w-[200px]\`} placeholder="Tìm SP / Lô…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-600">Kho</span>
-            <select className={`${inputCls} w-[150px]`} value={filterWh} onChange={e => { setFilterWh(e.target.value); setFilterZone(""); }}>
+            <select className={\`\${inputCls} w-[150px]\`} value={filterWh} onChange={e => { setFilterWh(e.target.value); setFilterZone(""); }}>
               <option value="">Tất cả</option>
               {(lookups.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-600">Khu</span>
-            <select className={`${inputCls} w-[150px]`} value={filterZone} onChange={e => setFilterZone(e.target.value)}>
+            <select className={\`\${inputCls} w-[150px]\`} value={filterZone} onChange={e => setFilterZone(e.target.value)}>
               <option value="">Tất cả</option>
               {zonesList.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
             </select>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-600">Loại</span>
-            <select className={`${inputCls} w-[150px]`} value={filterType} onChange={e => setFilterType(e.target.value)}>
+            <select className={\`\${inputCls} w-[150px]\`} value={filterType} onChange={e => setFilterType(e.target.value)}>
               <option value="">Tất cả</option>
               <option>Nguyên vật liệu</option>
               <option>Bán thành phẩm</option>
@@ -458,56 +333,16 @@ function TreeTab({ lookups }) {
     </div>
   );
 }
+`;
 
+const lines = fs.readFileSync('src/modules/inventory/Inventory.jsx', 'utf8').split('\n');
+const start = lines.findIndex(l => l.includes('function TreeTab({ lookups }) {'));
+const end = lines.findIndex(l => l.includes('/* ---- Tab: Lịch sử giao dịch kho ---- */')) - 1;
 
-/* ---- Tab: Lịch sử giao dịch kho ---- */
-const TRX_COLOR = { "Nhập": "bg-emerald-50 text-emerald-700", "Xuất": "bg-rose-50 text-rose-700", "Điều chỉnh": "bg-amber-50 text-amber-700" };
-function TransactionsTab() {
-  const [rows, setRows] = useState([]);
-  const load = useCallback(async () => {
-    try { setRows(await inventory.transactions({})); } catch (e) { toast.error("Lỗi tải lịch sử: " + e.message); }
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  const columns = [
-    { key: "created_at", label: "Thời gian", filter: "date", tdClass: "text-slate-500", render: (t) => new Date(t.created_at).toLocaleString("vi-VN") },
-    { key: "trx_type", label: "Loại", filter: "select", render: (t) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[t.trx_type] || ""}`}>{t.trx_type}</span> },
-    { key: "product_code", label: "Mã SP", filter: "text", tdClass: "font-medium text-blue-600" },
-    { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
-    { key: "_specs", label: "Thông số", filter: "text", tdClass: "text-slate-500",
-      filterValue: (t) => specShort(t.specs),
-      render: (t) => specShort(t.specs) || "—" },
-    { key: "lot_code", label: "Lô", filter: "text", tdClass: "text-slate-600", render: (t) => t.lot_code || "—" },
-    { key: "quantity", label: "Số lượng", align: "right", render: (t) => <span className={`font-semibold ${t.trx_type === "Xuất" ? "text-rose-600" : "text-emerald-600"}`}>{t.trx_type === "Xuất" ? "−" : "+"}{fmt(t.quantity)}</span> },
-    { key: "warehouse_name", label: "Kho/Vị trí", filter: "select", tdClass: "text-slate-600", render: (t) => t.warehouse_name ? `${t.warehouse_name} · ${t.location_name}` : "—" },
-    { key: "ref_code", label: "Chứng từ", filter: "text", tdClass: "text-slate-600", render: (t) => t.ref_code || "—" },
-    { key: "note", label: "Ghi chú", filter: "text", tdClass: "text-slate-400", render: (t) => t.note || "" },
-  ];
-
-  return <DataTable dense columns={columns} rows={rows} rowKey={(t) => t.id} emptyText="Chưa có giao dịch" />;
-}
-
-/* ---- Hub Kho ---- */
-export default function InventoryModule({ lookups }) {
-  const [tab, setTab] = useState("stock");
-  const tabs = [
-    { key: "stock", label: "Tồn kho", icon: Warehouse },
-    { key: "trx", label: "Lịch sử giao dịch", icon: History },
-  ];
-
-  return (
-    <div className="space-y-5">
-      <ListHeader title="Kho" />
-      <div className="flex gap-1 border-b border-slate-200">
-        {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition flex items-center gap-2 ${
-              tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
-            <t.icon size={16} /> {t.label}
-          </button>
-        ))}
-      </div>
-      {tab === "stock" ? <TreeTab lookups={lookups} /> : <TransactionsTab />}
-    </div>
-  );
+if (start !== -1 && end !== -1) {
+  lines.splice(start, end - start, replacement);
+  fs.writeFileSync('src/modules/inventory/Inventory.jsx', lines.join('\n'));
+  console.log('Replaced successfully');
+} else {
+  console.log('Could not find bounds');
 }

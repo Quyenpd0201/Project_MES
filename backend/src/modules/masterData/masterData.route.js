@@ -50,10 +50,17 @@ mountCrud('/warehouses', makeCrud({
   blockDeleteStatuses: ['Hoạt động', 'Đang kiểm đếm'],
 }));
 
+mountCrud('/zones', makeCrud({
+  table: 'zones',
+  columns: ['warehouse_id', 'name', 'description', 'status'],
+  searchCols: ['name', 'zone_code'], exactCols: ['warehouse_id', 'status'], codeCol: 'zone_code',
+  blockDeleteStatuses: ['Hoạt động'],
+}));
+
 mountCrud('/locations', makeCrud({
   table: 'locations',
-  columns: ['warehouse_id', 'name'],
-  searchCols: ['name', 'location_code'], exactCols: ['warehouse_id'], codeCol: 'location_code',
+  columns: ['warehouse_id', 'zone_id', 'name'],
+  searchCols: ['name', 'location_code'], exactCols: ['warehouse_id', 'zone_id'], codeCol: 'location_code',
 }));
 
 mountCrud('/shifts', makeCrud({

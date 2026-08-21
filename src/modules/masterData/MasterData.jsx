@@ -96,7 +96,7 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
                       ) : fl.type === "select" ? (
                         <select className={inputCls} value={f[fl.key] ?? ""} onChange={(e) => set(fl.key, e.target.value)}>
                           <option value="">-- Chọn --</option>
-                          {fl.options.map((o) =>
+                          {(typeof fl.options === 'function' ? fl.options(f) : fl.options).map((o) =>
                             typeof o === "string"
                               ? <option key={o} value={o}>{o}</option>
                               : <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -323,6 +323,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
 function buildConfigs(lookups) {
   const warehouseOptions = (lookups.warehouses || []).map((w) => ({ value: w.id, label: w.name }));
   const warehouseName = (id) => (lookups.warehouses || []).find((w) => w.id === id)?.name || "—";
+  const zoneName = (id) => (lookups.zones || []).find((z) => z.id === id)?.name || "—";
 
   return {
     customers: {
@@ -392,14 +393,30 @@ function buildConfigs(lookups) {
         { key: "description", label: "Mô tả / Ghi chú", full: true, group: "Cấu hình nâng cao" },
       ],
     },
+    zones: {
+      title: "Khu vực", resource: "zones",
+      columns: [
+        { key: "zone_code", label: "Mã khu" }, { key: "name", label: "Tên khu" },
+        { key: "warehouse_id", label: "Thuộc kho", filter: "select", filterValue: warehouseName, render: (r) => warehouseName(r.warehouse_id) },
+        { key: "status", label: "Trạng thái", badge: true },
+      ],
+      fields: [
+        { key: "warehouse_id", label: "Thuộc kho", type: "select", required: true, options: warehouseOptions },
+        { key: "name", label: "Tên khu vực", required: true, full: true },
+        { key: "description", label: "Mô tả / Ghi chú", full: true },
+        { key: "status", label: "Trạng thái", type: "select", options: ["Hoạt động", "Không hoạt động"], default: "Hoạt động" },
+      ],
+    },
     locations: {
       title: "Vị trí lưu trữ", resource: "locations",
       columns: [
         { key: "location_code", label: "Mã vị trí" }, { key: "name", label: "Tên vị trí" },
         { key: "warehouse_id", label: "Thuộc kho", render: (r) => warehouseName(r.warehouse_id) },
+        { key: "zone_id", label: "Thuộc khu", render: (r) => zoneName(r.zone_id) },
       ],
       fields: [
         { key: "warehouse_id", label: "Kho", type: "select", required: true, options: warehouseOptions },
+        { key: "zone_id", label: "Khu vực", type: "select", required: true, options: (f) => (lookups.zones || []).filter(z => z.warehouse_id === f.warehouse_id).map(z => ({ value: z.id, label: z.name })) },
         { key: "name", label: "Tên vị trí", required: true, full: true },
       ],
     },

@@ -192,6 +192,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "md:employees", label: "Nhân viên",          icon: Users,      path: "/master-data/employees", perm: "md_employees" },
         { key: "md:shifts",    label: "Ca làm việc",        icon: Clock,      path: "/master-data/shifts",    perm: "md_shifts" },
         { key: "md:warehouses",label: "Kho (danh mục)",    icon: Warehouse,  path: "/master-data/warehouses",perm: "md_warehouses" },
+        { key: "md:zones",     label: "Khu vực",           icon: MapPin,     path: "/master-data/zones",     perm: "md_zones" },
         { key: "md:locations", label: "Vị trí lưu trữ",    icon: MapPin,     path: "/master-data/locations", perm: "md_locations" },
         { key: "md:customers", label: "Khách hàng",         icon: Users,      path: "/master-data/customers", perm: "md_customers" },
       ]
