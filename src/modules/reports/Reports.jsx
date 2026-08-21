@@ -431,12 +431,24 @@ function DetailedReport() {
           {/* Order code */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Mã lệnh</label>
-            <select value={filters.orderCode}
-              onChange={e => setFilters({ ...filters, orderCode: e.target.value })}
-              className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-              <option value="">Chọn mã lệnh</option>
-              {orderCodes.map(code => <option key={code} value={code}>{code}</option>)}
-            </select>
+            <input 
+              list="order-codes-list"
+              value={filters.orderCode}
+              onChange={e => {
+                const val = e.target.value;
+                const matching = orderCodes.find(o => o.order_code === val);
+                if (matching) {
+                  setFilters({ ...filters, orderCode: val, productId: matching.product_id, status: matching.status });
+                } else {
+                  setFilters({ ...filters, orderCode: val });
+                }
+              }}
+              placeholder="Nhập mã lệnh..."
+              className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-44 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+            <datalist id="order-codes-list">
+              {orderCodes.map(o => <option key={o.order_code} value={o.order_code} />)}
+            </datalist>
           </div>
           {/* Product */}
           <div>

@@ -164,7 +164,7 @@ exports.detailed = async (req, res) => {
 
     // Order codes list for filter dropdown
     const orderCodesQuery = await db.query(`
-      SELECT order_code FROM production_orders
+      SELECT order_code, product_id, status FROM production_orders
       WHERE is_deleted = FALSE
       ORDER BY order_code DESC
     `);
@@ -178,7 +178,7 @@ exports.detailed = async (req, res) => {
       },
       data: detailedQuery.rows,
       products: productsQuery.rows,
-      orderCodes: orderCodesQuery.rows.map(r => r.order_code)
+      orderCodes: orderCodesQuery.rows
     });
   } catch (err) {
     console.error(err);
