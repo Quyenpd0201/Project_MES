@@ -141,7 +141,10 @@ function TaskCard({ t, canEdit, onSaved }) {
         <div className="flex items-start gap-2">
           <Package size={22} className="text-blue-500 mt-0.5 shrink-0" />
           <div className="min-w-0">
-            <div className="text-xl font-extrabold text-slate-900 leading-tight">{t.product_name}</div>
+            <div className="text-xl font-extrabold text-slate-900 leading-tight">
+              {t.product_name}
+              {t.material_type && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 align-middle mb-1">{t.material_type}</span>}
+            </div>
             <div className="text-xs text-slate-400">{t.product_code}</div>
           </div>
         </div>
@@ -151,14 +154,22 @@ function TaskCard({ t, canEdit, onSaved }) {
           <div className="text-xl font-extrabold text-blue-700 mt-1">SL: {fmt(t.quantity)} {t.unit || ""}</div>
         </div>
 
+        {/* Ghi chú sản xuất nổi bật cho công nhân */}
+        {(t.sales_order_note || t.order_note) && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-2.5 flex items-start gap-2">
+            <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm">
+              {t.sales_order_note && <div className="text-amber-900"><span className="font-semibold text-amber-700">Ghi chú Đơn hàng:</span> {t.sales_order_note}</div>}
+              {t.order_note && <div className="text-amber-900 mt-0.5"><span className="font-semibold text-amber-700">Ghi chú Lệnh SX:</span> {t.order_note}</div>}
+            </div>
+          </div>
+        )}
+
         {/* Khách hàng & đơn hàng để công nhân đọc */}
         <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 grid grid-cols-2 gap-x-3 gap-y-1">
           <div className="col-span-2"><span className="text-[11px] text-slate-400">Khách hàng: </span><span className="text-base font-bold text-slate-900">{t.customer_name || "—"}</span>{t.customer_phone && <span className="text-sm text-slate-500"> · {t.customer_phone}</span>}</div>
           <div><span className="text-[11px] text-slate-400">Đơn hàng: </span><span className="text-sm font-semibold text-slate-700">{t.sales_order_code || "—"}</span></div>
           <div><span className="text-[11px] text-slate-400">Lệnh SX: </span><span className="text-sm font-semibold text-slate-700">{t.order_code}</span></div>
-          {t.material_type && <div className="col-span-2"><span className="text-[11px] text-slate-400">Loại hàng: </span><span className="text-sm font-bold text-indigo-700">{t.material_type}</span></div>}
-          {t.sales_order_note && <div className="col-span-2"><span className="text-[11px] text-slate-400">Ghi chú đơn hàng: </span><span className="text-sm font-medium text-amber-700">{t.sales_order_note}</span></div>}
-          {t.order_note && <div className="col-span-2"><span className="text-[11px] text-slate-400">Ghi chú lệnh SX: </span><span className="text-sm text-slate-700">{t.order_note}</span></div>}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
