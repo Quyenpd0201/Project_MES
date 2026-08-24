@@ -427,7 +427,9 @@ exports.executionTasks = async (req, res) => {
              po.attr_color, po.attr_size, po.attr_thickness, po.specs,
              p.product_code, p.product_name,
              c.name AS customer_name, c.phone AS customer_phone,
-             so.order_code AS sales_order_code, po.note AS order_note
+             so.order_code AS sales_order_code, po.note AS order_note,
+             COALESCE(po.material_type, so.material_type) AS material_type,
+             so.note AS sales_order_note
       FROM production_tasks t
       JOIN production_orders po ON po.id = t.production_order_id
       JOIN products p ON p.id = po.product_id

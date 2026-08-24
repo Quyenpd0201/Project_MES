@@ -156,7 +156,9 @@ function TaskCard({ t, canEdit, onSaved }) {
           <div className="col-span-2"><span className="text-[11px] text-slate-400">Khách hàng: </span><span className="text-base font-bold text-slate-900">{t.customer_name || "—"}</span>{t.customer_phone && <span className="text-sm text-slate-500"> · {t.customer_phone}</span>}</div>
           <div><span className="text-[11px] text-slate-400">Đơn hàng: </span><span className="text-sm font-semibold text-slate-700">{t.sales_order_code || "—"}</span></div>
           <div><span className="text-[11px] text-slate-400">Lệnh SX: </span><span className="text-sm font-semibold text-slate-700">{t.order_code}</span></div>
-          {t.order_note && <div className="col-span-2"><span className="text-[11px] text-slate-400">Ghi chú: </span><span className="text-sm text-slate-700">{t.order_note}</span></div>}
+          {t.material_type && <div className="col-span-2"><span className="text-[11px] text-slate-400">Loại hàng: </span><span className="text-sm font-bold text-indigo-700">{t.material_type}</span></div>}
+          {t.sales_order_note && <div className="col-span-2"><span className="text-[11px] text-slate-400">Ghi chú đơn hàng: </span><span className="text-sm font-medium text-amber-700">{t.sales_order_note}</span></div>}
+          {t.order_note && <div className="col-span-2"><span className="text-[11px] text-slate-400">Ghi chú lệnh SX: </span><span className="text-sm text-slate-700">{t.order_note}</span></div>}
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
