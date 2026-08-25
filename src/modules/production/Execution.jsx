@@ -132,6 +132,7 @@ function TaskCard({ t, canEdit, onSaved }) {
           <span className="text-slate-300">·</span>
           <span className="font-medium text-slate-700">{t.stage}</span>
           {t.machine_name && <span className="text-slate-400 text-xs">({t.machine_name})</span>}
+          {t.priority === 'Cao' && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 ml-1 uppercase">Đơn gấp</span>}
         </div>
         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(t.status)}`}>{t.status}</span>
       </div>

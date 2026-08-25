@@ -139,7 +139,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const fdis = (k) => fperm("orders", k) !== "edit";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
-  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null });
+  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null, priority: "Trung bình" });
   const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]);
   const [seq, setSeq] = useState(2);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -147,7 +147,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const loadData = useCallback(() => {
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null });
+      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null, priority: d.priority || "Trung bình" });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [] })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
@@ -158,7 +158,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   useEffect(() => {
     if (editId || !copyId) return;
     ordersApi.get(copyId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null });
+      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null, priority: d.priority || "Trung bình" });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
@@ -218,6 +218,13 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         </Field>}
         {!fhid("status") && <Field label="Trạng thái">
           <select className={inputCls} disabled={fdis("status")} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+        </Field>}
+        {!fhid("priority") && <Field label="Độ ưu tiên">
+          <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+            <option value="Cao">Cao (Gấp)</option>
+            <option value="Trung bình">Trung bình</option>
+            <option value="Thấp">Thấp</option>
+          </select>
         </Field>}
         {!fhid("order_date") && <Field label="Ngày đặt"><input type="date" className={inputCls} disabled={fdis("order_date")} value={f.order_date} onChange={(e) => set("order_date", e.target.value)} /></Field>}
         {!fhid("due_date") && <Field label="Ngày giao"><input type="date" className={inputCls} disabled={fdis("due_date")} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} /></Field>}
@@ -718,6 +725,11 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
       } },
     { key: "item_count", label: "Số dòng", align: "center" },
     { key: "total_qty", label: "Tổng SL", align: "right", render: (r) => fmt(r.total_qty) },
+    { key: "priority", label: "Ưu tiên", filter: "select", render: (r) => {
+        if (r.priority === 'Cao') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>;
+        if (r.priority === 'Thấp') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span>;
+        return <span className="text-slate-500 text-sm whitespace-nowrap">Trung bình</span>;
+      } },
     { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "_act", label: "", align: "right", render: (r) => (<>
         <button onClick={() => { setVoucherId(r.id); setView("voucher"); }} title="Xem phiếu" className="text-slate-400 hover:text-emerald-600 p-1"><FileText size={15} /></button>

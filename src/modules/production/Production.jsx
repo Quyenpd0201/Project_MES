@@ -15,8 +15,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const fhid = (k) => fperm("production", k) === "hidden";
   const fdis = (k) => fperm("production", k) !== "edit";
   const [f, setF] = useState({
-    product_id: "", customer_id: "", quantity: "", unit: "",
-    attr_size: "", attr_thickness: "", attr_color: "", due_date: "", note: "",
+    attr_size: "", attr_thickness: "", attr_color: "", due_date: "", note: "", priority: "Trung bình"
   });
   const [finishing, setFinishing] = useState(
     (lookups.finishingOptions || []).map((name) => ({ name, checked: false }))
@@ -123,7 +122,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       setF({
         product_id: d.product_id, customer_id: d.customer_id || "", quantity: d.quantity, unit: d.unit || "",
         attr_size: d.attr_size || "", attr_thickness: d.attr_thickness || "", attr_color: d.attr_color || "",
-        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "",
+        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "", priority: d.priority || "Trung bình"
       });
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
@@ -157,7 +156,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       setF({
         product_id: d.product_id, customer_id: d.customer_id || "", quantity: d.quantity, unit: d.unit || "",
         attr_size: d.attr_size || "", attr_thickness: d.attr_thickness || "", attr_color: d.attr_color || "",
-        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "",
+        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "", priority: d.priority || "Trung bình"
       });
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
@@ -233,6 +232,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           <Field label="Ngày giao (deadline)">
             <input type="date" className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
           </Field>
+          {!fhid("priority") && <Field label="Độ ưu tiên">
+            <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+              <option value="Cao">Cao (Gấp)</option>
+              <option value="Trung bình">Trung bình</option>
+              <option value="Thấp">Thấp</option>
+            </select>
+          </Field>}
           <Field label="Ghi chú">
             <input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
@@ -585,6 +591,11 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
           <div className="text-[11px] text-slate-400 mt-0.5">{r.task_done}/{r.task_count} việc xong{Number(r.scrap_qty) > 0 && <span className="text-rose-500"> · phế {fmt(r.scrap_qty)}</span>}</div>
         </div>
       ) : <span className="text-slate-400 text-xs">Chưa phân công</span> },
+    { key: "priority", label: "Ưu tiên", filter: "select", render: (r) => {
+        if (r.priority === 'Cao') return <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>;
+        if (r.priority === 'Thấp') return <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span>;
+        return <span className="text-slate-500 text-xs whitespace-nowrap">Trung bình</span>;
+      } },
     { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "_act", label: "", align: "right", render: (r) => (<>
         <button onClick={() => setScheduling(r)} disabled={!can("production", "update")} className="text-slate-400 hover:text-blue-600 p-1" title="Lập lịch / xếp máy"><CalendarClock size={16} /></button>

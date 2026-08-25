@@ -141,9 +141,9 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: 'Đơn hàng cần ít nhất 1 dòng hàng hợp lệ' });
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `INSERT INTO sales_orders (customer_id, order_date, due_date, status, note, material_type)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [b.customer_id, b.order_date || new Date(), b.due_date || null, b.status || 'Mới', b.note || null, b.material_type || null]);
+      `INSERT INTO sales_orders (customer_id, order_date, due_date, status, note, material_type, priority)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [b.customer_id, b.order_date || new Date(), b.due_date || null, b.status || 'Mới', b.note || null, b.material_type || null, b.priority || 'Trung bình']);
     await saveItems(client, rows[0].id, b.items);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
@@ -156,7 +156,7 @@ exports.update = async (req, res) => {
   try {
     const b = req.body;
     await client.query('BEGIN');
-    const fields = ['customer_id', 'order_date', 'due_date', 'status', 'note', 'material_type'];
+    const fields = ['customer_id', 'order_date', 'due_date', 'status', 'note', 'material_type', 'priority'];
     const cols = [], vals = []; let i = 1;
     for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(b[f] === '' ? null : b[f]); }
     if (cols.length) {

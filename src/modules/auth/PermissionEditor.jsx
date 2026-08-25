@@ -12,7 +12,8 @@ import { toast, statusClass } from "../../ui.js";
 export const ACTION_LABELS = {
   view: "Xem", create: "Tạo mới", edit: "Sửa", delete: "Xóa",
   approve: "Duyệt", publish: "Phát hành", assign: "Phân công",
-  execute: "Thực thi", import: "Import", export: "Xuất Excel"
+  execute: "Thực thi", import: "Import", export: "Xuất Excel",
+  print: "In tem"
 };
 
 export const PERM_TREE = [
@@ -28,7 +29,9 @@ export const PERM_TREE = [
     icon: Calendar,
     modules: [
       { key: "orders", label: "Đơn hàng", actions: ["view", "create", "edit", "delete", "approve"] },
+      { key: "deliveries", label: "Phiếu giao hàng", actions: ["view", "create", "edit", "delete", "approve"] },
       { key: "planning", label: "Kế hoạch sản xuất", actions: ["view", "create", "edit", "publish"] },
+      { key: "workschedule", label: "Lịch sản xuất", actions: ["view", "create", "edit", "publish"] },
     ]
   },
   {
@@ -36,8 +39,10 @@ export const PERM_TREE = [
     icon: Factory,
     modules: [
       { key: "production", label: "Lệnh sản xuất", actions: ["view", "create", "edit", "delete", "publish", "assign", "export"] },
+      { key: "orderstatus", label: "Lệnh theo trạng thái", actions: ["view", "edit"] },
       { key: "execution", label: "Thực thi sản xuất", actions: ["view", "execute"] },
       { key: "prod_output", label: "Sản lượng", actions: ["view", "edit", "export"] },
+      { key: "qrlabels", label: "In tem xuất xứ", actions: ["view", "create", "print"] },
     ]
   },
   {
@@ -48,6 +53,15 @@ export const PERM_TREE = [
       { key: "inv_inbound", label: "Nhập kho", actions: ["view", "create", "edit", "delete", "approve"] },
       { key: "inv_outbound", label: "Xuất kho", actions: ["view", "create", "edit", "delete", "approve"] },
       { key: "inv_transfer", label: "Chuyển kho", actions: ["view", "create", "approve"] },
+      { key: "inv_adjust", label: "Điều chỉnh tồn kho", actions: ["view", "create", "approve"] },
+    ]
+  },
+  {
+    category: "Truy xuất",
+    icon: Search,
+    modules: [
+      { key: "qrscan", label: "Tra cứu xuất xứ", actions: ["view"] },
+      { key: "trace_lot", label: "Truy xuất lô", actions: ["view"] },
     ]
   },
   {
@@ -65,8 +79,14 @@ export const PERM_TREE = [
     modules: [
       { key: "products", label: "Sản phẩm", actions: ["view", "create", "edit", "delete"] },
       { key: "bom", label: "Định mức (BOM)", actions: ["view", "create", "edit", "delete"] },
-      { key: "md_employees", label: "Nhân viên", actions: ["view", "create", "edit"] },
+      { key: "process", label: "Quy trình công nghệ", actions: ["view", "create", "edit", "delete"] },
       { key: "md_machines", label: "Máy móc", actions: ["view", "create", "edit"] },
+      { key: "md_employees", label: "Nhân viên", actions: ["view", "create", "edit"] },
+      { key: "md_shifts", label: "Ca làm việc", actions: ["view", "create", "edit", "delete"] },
+      { key: "md_warehouses", label: "Kho (danh mục)", actions: ["view", "create", "edit", "delete"] },
+      { key: "md_zones", label: "Khu vực", actions: ["view", "create", "edit", "delete"] },
+      { key: "md_locations", label: "Vị trí lưu trữ", actions: ["view", "create", "edit", "delete"] },
+      { key: "md_customers", label: "Khách hàng", actions: ["view", "create", "edit", "delete"] },
       { key: "md_roles", label: "Vai trò", actions: ["view", "create", "edit", "delete"] },
     ]
   }

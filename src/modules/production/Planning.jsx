@@ -210,17 +210,24 @@ function batchWidth(b) {
 function computePriority(batches) {
   if (!batches || !batches.length) return { rankMap: {}, ordered: batches || [], anchorDays: null };
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const meta = batches.map((b) => ({ b, due: b.earliest_due ? new Date(b.earliest_due) : null, width: batchWidth(b) }));
+  const meta = batches.map((b) => ({ b, due: b.earliest_due ? new Date(b.earliest_due) : null, width: batchWidth(b), has_high_priority: b.has_high_priority }));
   const dueT = (m) => (m.due ? m.due.getTime() : Infinity);
-  const anchor = [...meta].sort((a, c) => dueT(a) - dueT(c))[0];
+  const anchor = [...meta].sort((a, c) => {
+    if (a.has_high_priority && !c.has_high_priority) return -1;
+    if (!a.has_high_priority && c.has_high_priority) return 1;
+    return dueT(a) - dueT(c);
+  })[0];
   const anchorDays = anchor.due ? Math.ceil((anchor.due - today) / 86400000) : null;
   const aw = anchor.width;
   const widthDist = (m) => (aw == null || m.width == null) ? Infinity : Math.abs(m.width - aw);
   const urgent = anchorDays != null && anchorDays <= 5;
-  const rest = meta.filter((m) => m !== anchor).sort((a, c) =>
-    urgent
+  const rest = meta.filter((m) => m !== anchor).sort((a, c) => {
+    if (a.has_high_priority && !c.has_high_priority) return -1;
+    if (!a.has_high_priority && c.has_high_priority) return 1;
+    return urgent
       ? (dueT(a) - dueT(c)) || (widthDist(a) - widthDist(c))   // gấp: ngày giao trước
-      : (widthDist(a) - widthDist(c)) || (dueT(a) - dueT(c))); // rộng thời gian: gom khổ trước
+      : (widthDist(a) - widthDist(c)) || (dueT(a) - dueT(c));  // rộng thời gian: gom khổ trước
+  });
   const orderedMeta = [anchor, ...rest];
   const rankMap = {};
   orderedMeta.slice(0, 5).forEach((m, i) => { rankMap[m.b.batch_key] = i + 1; });
@@ -287,7 +294,9 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
                 <span className="font-semibold text-slate-800">{b.product_name} · {b.attr_color || "—"} · {b.attr_size || "—"} · {b.attr_thickness || "—"}</span>
                 {overdueMode
                   ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold"><AlertTriangle size={12} /> Trễ {daysLate} ngày</span>
-                  : rank && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold"><Star size={12} className="fill-amber-500 text-amber-500" /> Ưu tiên #{rank}</span>}
+                  : b.has_high_priority 
+                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold whitespace-nowrap"><AlertTriangle size={12} /> Đơn gấp</span>
+                    : rank && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold whitespace-nowrap"><Star size={12} className="fill-amber-500 text-amber-500" /> Ưu tiên #{rank}</span>}
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-slate-500">{b.items.length} dòng</span>
@@ -298,13 +307,17 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
             </div>
             <table className="w-full text-sm">
               <thead className="text-slate-400 text-xs uppercase">
-                <tr>{["Đơn hàng", "Khách", "Đặt", "Còn lại", "Ngày giao"].map((h) => <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
+                <tr>{["Đơn hàng", "Khách", "Ưu tiên", "Đặt", "Còn lại", "Ngày giao"].map((h) => <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {b.items.map((it) => (
                   <tr key={it.item_id}>
                     <td className="px-4 py-2 font-medium text-blue-600">{it.order_code}</td>
                     <td className="px-4 py-2 text-slate-600">{it.customer_name || "—"}</td>
+                    <td className="px-4 py-2">
+                      {it.priority === 'Cao' ? <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>
+                       : (it.priority === 'Thấp' ? <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span> : "—")}
+                    </td>
                     <td className="px-4 py-2 text-slate-500">{fmt(it.quantity)} {it.unit}</td>
                     <td className="px-4 py-2 font-medium text-slate-800">{fmt(it.remaining ?? it.quantity)} {it.unit}</td>
                     <td className="px-4 py-2">{fmtDate(it.due_date)}</td>

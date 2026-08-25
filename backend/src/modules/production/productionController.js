@@ -233,7 +233,7 @@ exports.list = async (req, res) => {
     const scopeCond = getDataScope(req, 'production', 'view', { factoryCol: 'po.assigned_team' });
     where.push(`(${scopeCond})`);
 
-    const sql = `${SELECT_JOIN} WHERE ${where.join(' AND ')} ORDER BY po.created_at DESC`;
+    const sql = `${SELECT_JOIN} WHERE ${where.join(' AND ')} ORDER BY CASE WHEN po.priority = 'Cao' THEN 1 WHEN po.priority = 'Trung bình' THEN 2 ELSE 3 END, po.created_at DESC`;
     const { rows } = await db.query(sql, params);
     res.json({ data: rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy danh sách lệnh sản xuất' }); }
@@ -257,18 +257,24 @@ exports.create = async (req, res) => {
     const specs = specsFromBody(b);
     const a = legacyAttrs(specs);
     const group_key = [b.product_id, buildSpecKey(specs)].join('||');
+    let priority = b.priority || 'Trung bình';
+    if (!b.priority && b.sales_order_id) {
+       const so = (await db.query(`SELECT priority FROM sales_orders WHERE id = $1`, [b.sales_order_id])).rows[0];
+       if (so && so.priority) priority = so.priority;
+    }
+
     const { rows } = await db.query(
       `INSERT INTO production_orders
          (sales_order_id, customer_id, product_id, quantity, unit,
           specs, spec_key, attr_size, attr_thickness, attr_color, finishing,
-          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker, priority)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        RETURNING *`,
       [
         b.sales_order_id || null, b.customer_id || null, b.product_id, b.quantity, upUnit(b.unit),
         JSON.stringify(specs), buildSpecKey(specs), a.size || null, a.thickness || null, a.color || null, JSON.stringify(finishing),
         b.machine_id || null, b.planned_date || null, b.shift || null, b.assigned_team || null,
-        group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null,
+        group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority
       ]
     );
     res.status(201).json(rows[0]);
@@ -279,7 +285,7 @@ exports.update = async (req, res) => {
   try {
     const b = req.body;
     const fields = ['sales_order_id','customer_id','product_id','quantity','unit',
-      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note'];
+      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority'];
     const cols = [], vals = []; let i = 1;
     for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(f === 'unit' ? upUnit(b[f]) : (b[f] === '' ? null : b[f])); }
     if (b.finishing !== undefined) {
@@ -424,7 +430,7 @@ exports.executionTasks = async (req, res) => {
              t.planned_date, t.planned_end_date, t.assigned_team, t.assigned_worker,
              m.name AS machine_name,
              po.id AS production_order_id, po.order_code, po.due_date, po.unit,
-             po.attr_color, po.attr_size, po.attr_thickness, po.specs,
+             po.attr_color, po.attr_size, po.attr_thickness, po.specs, po.priority,
              p.product_code, p.product_name,
              c.name AS customer_name, c.phone AS customer_phone,
              so.order_code AS sales_order_code, po.note AS order_note,
@@ -437,7 +443,7 @@ exports.executionTasks = async (req, res) => {
       LEFT JOIN customers c ON c.id = po.customer_id
       LEFT JOIN sales_orders so ON so.id = po.sales_order_id
       WHERE ${where.join(' AND ')}
-      ORDER BY (t.status IN ('Hoàn thành','Đã hủy')) ASC, po.due_date NULLS LAST, t.planned_date NULLS LAST`, params);
+      ORDER BY (t.status IN ('Hoàn thành','Đã hủy')) ASC, CASE WHEN po.priority = 'Cao' THEN 1 WHEN po.priority = 'Trung bình' THEN 2 ELSE 3 END, po.due_date NULLS LAST, t.planned_date NULLS LAST`, params);
     res.json({ data: rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy công việc sản xuất' }); }
 };

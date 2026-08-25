@@ -21,7 +21,7 @@ exports.groups = async (req, res) => {
     const { rows } = await db.query(`
       SELECT po.id, po.order_code, po.quantity, po.unit, po.due_date, po.status,
              po.attr_color, po.attr_size, po.attr_thickness, po.group_key,
-             po.machine_id, po.planned_date, po.shift,
+             po.machine_id, po.planned_date, po.shift, po.priority,
              p.product_name, p.product_code, c.name AS customer_name, m.name AS machine_name,
              (SELECT COUNT(*)::int FROM production_tasks t WHERE t.production_order_id = po.id) AS task_count,
              COALESCE((SELECT MIN(t3.planned_date) FROM production_tasks t3 WHERE t3.production_order_id = po.id AND t3.planned_date IS NOT NULL), po.planned_date) AS planned_date_display,
@@ -35,7 +35,7 @@ exports.groups = async (req, res) => {
       LEFT JOIN customers c ON c.id = po.customer_id
       LEFT JOIN machines m ON m.id = po.machine_id
       WHERE po.is_deleted = FALSE ${statusFilter}
-      ORDER BY po.due_date NULLS LAST, po.created_at
+      ORDER BY CASE WHEN po.priority = 'Cao' THEN 1 WHEN po.priority = 'Trung bình' THEN 2 ELSE 3 END, po.due_date NULLS LAST, po.created_at
     `, params);
 
     const map = new Map();
@@ -44,7 +44,7 @@ exports.groups = async (req, res) => {
       if (!map.has(key)) {
         map.set(key, {
           group_key: key,
-          attr_color: r.attr_color, attr_size: r.attr_size,
+          attr_color: r.attr_color, attr_size: r.attr_size, has_high_priority: false,
           order_count: 0, total_quantity: 0, total_produced: 0, earliest_due: null, orders: [],
         });
       }
@@ -54,9 +54,12 @@ exports.groups = async (req, res) => {
       g.total_quantity += Number(r.quantity) || 0;
       g.total_produced += Number(r.produced_qty) || 0;
       if (r.due_date && (!g.earliest_due || r.due_date < g.earliest_due)) g.earliest_due = r.due_date;
+      if (r.priority === 'Cao') g.has_high_priority = true;
     }
-    // sắp nhóm theo ngày giao sớm nhất
+    // sắp nhóm theo độ ưu tiên rồi ngày giao sớm nhất
     const groups = [...map.values()].sort((a, b) => {
+      if (a.has_high_priority && !b.has_high_priority) return -1;
+      if (!a.has_high_priority && b.has_high_priority) return 1;
       if (!a.earliest_due) return 1; if (!b.earliest_due) return -1;
       return a.earliest_due < b.earliest_due ? -1 : 1;
     });
@@ -76,7 +79,7 @@ exports.fromOrders = async (_req, res) => {
       SELECT it.id AS item_id, it.product_id, it.quantity, it.planned_qty, it.unit,
              (it.quantity - it.planned_qty) AS remaining,
              it.specs, it.spec_key, it.attr_size, it.attr_thickness, it.attr_color,
-             so.id AS sales_order_id, so.order_code, so.due_date, so.customer_id,
+             so.id AS sales_order_id, so.order_code, so.due_date, so.customer_id, so.priority,
              c.name AS customer_name, p.product_name, p.product_code
       FROM sales_order_items it
       JOIN sales_orders so ON so.id = it.sales_order_id
@@ -84,7 +87,7 @@ exports.fromOrders = async (_req, res) => {
       LEFT JOIN customers c ON c.id = so.customer_id
       WHERE so.is_deleted = FALSE AND so.status IN ('Mới','Đang sản xuất')
         AND (it.quantity - it.planned_qty) > 0
-      ORDER BY so.due_date NULLS LAST, so.created_at
+      ORDER BY CASE WHEN so.priority = 'Cao' THEN 1 WHEN so.priority = 'Trung bình' THEN 2 ELSE 3 END, so.due_date NULLS LAST, so.created_at
     `);
 
     const map = new Map();
@@ -93,7 +96,7 @@ exports.fromOrders = async (_req, res) => {
       if (!map.has(key)) {
         map.set(key, {
           batch_key: key, product_id: r.product_id, product_name: r.product_name, product_code: r.product_code,
-          specs: r.specs || {}, spec_key: r.spec_key,
+          specs: r.specs || {}, spec_key: r.spec_key, has_high_priority: false,
           attr_color: r.attr_color, attr_size: r.attr_size, attr_thickness: r.attr_thickness,
           unit: r.unit, total_quantity: 0, earliest_due: null, items: [],
         });
@@ -102,8 +105,11 @@ exports.fromOrders = async (_req, res) => {
       g.items.push(r);
       g.total_quantity += Number(r.remaining) || 0;
       if (r.due_date && (!g.earliest_due || r.due_date < g.earliest_due)) g.earliest_due = r.due_date;
+      if (r.priority === 'Cao') g.has_high_priority = true;
     }
     const batches = [...map.values()].sort((a, b) => {
+      if (a.has_high_priority && !b.has_high_priority) return -1;
+      if (!a.has_high_priority && b.has_high_priority) return 1;
       if (!a.earliest_due) return 1; if (!b.earliest_due) return -1;
       return a.earliest_due < b.earliest_due ? -1 : 1;
     });
