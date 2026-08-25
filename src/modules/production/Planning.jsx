@@ -390,6 +390,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
               <div className="flex items-center gap-3">
                 <Layers size={18} className="text-blue-500" />
                 <span className="font-semibold text-slate-800">{g.attr_color || "(không màu)"} · {g.attr_size || "(không kích thước)"}</span>
+                {g.has_high_priority && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold whitespace-nowrap"><AlertTriangle size={12} /> Có đơn gấp</span>}
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-slate-500">{g.order_count} lệnh</span>
@@ -400,7 +401,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
             </div>
             <table className="w-full text-sm">
               <thead className="text-slate-400 text-xs uppercase">
-                <tr>{["Mã lệnh", "Sản phẩm", "Khách", "SL", "Tiến độ", "Máy", "Ngày SX", "Ngày giao", "Trạng thái", ""].map((h) =>
+                <tr>{["Mã lệnh", "Sản phẩm", "Khách", "Ưu tiên", "SL", "Tiến độ", "Máy", "Ngày SX", "Ngày giao", "Trạng thái", ""].map((h) =>
                   <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -409,6 +410,10 @@ function GroupingTab({ lookups, onOpenOrder }) {
                     <td className="px-4 py-2"><button onClick={() => onOpenOrder?.(o.id)} className="font-medium text-blue-600 hover:underline">{o.order_code}</button></td>
                     <td className="px-4 py-2">{o.product_name}</td>
                     <td className="px-4 py-2 text-slate-600">{o.customer_name || "—"}</td>
+                    <td className="px-4 py-2">
+                      {o.priority === 'Cao' ? <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>
+                       : (o.priority === 'Thấp' ? <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span> : "—")}
+                    </td>
                     <td className="px-4 py-2 text-right">{fmt(o.quantity)} {o.unit}</td>
                     <td className="px-4 py-2">{o.produced_qty > 0 ? <ProgressMini done={o.produced_qty} target={o.quantity} /> : <span className="text-slate-300 text-xs">—</span>}</td>
                     <td className="px-4 py-2">
