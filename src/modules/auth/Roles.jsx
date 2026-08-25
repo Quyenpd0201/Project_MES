@@ -124,7 +124,7 @@ export default function RolesModule() {
   const handleSaveRolePerms = async (newPerms) => {
     if (!selectedRole) return;
     try {
-      await roles.update(selectedRole.id, { permissions: newPerms });
+      await roles.savePermissions(selectedRole.id, newPerms, selectedRole.parent_id || null);
       toast.success("Cập nhật quyền vai trò thành công");
       fetchRoles();
       setSelectedRole({ ...selectedRole, permissions: newPerms });

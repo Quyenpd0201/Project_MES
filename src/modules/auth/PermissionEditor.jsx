@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ShieldCheck, Search, Plus, Filter, Edit, Trash2, X, ChevronRight,
-  Package, Factory, LayoutDashboard, Calendar, ClipboardList,
+  ShieldCheck, Search, Plus, Filter, Edit, Trash2, X, ChevronRight, ChevronDown, ChevronUp,
+  Package, Factory, LayoutDashboard, Calendar, ClipboardList, Check, Minus, ArrowLeft, RotateCcw,
   BarChart2, Settings, Save, Users
 } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
@@ -103,36 +103,77 @@ export const getModuleInfo = (key) => {
 
 /* ─── 2. COMPONENT EDITOR (THÊM / SỬA QUYỀN TRÊN MÀN HÌNH RIÊNG) ─── */
 export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
-  const [selectedModule, setSelectedModule] = useState(null);
-  
-  // local state cho quyền đang chỉnh sửa:
   // Format: { [moduleKey]: { [actionKey]: { status: 'ALLOW', scope: 'ALL', scopeValue: '' } } }
-  const [draft, setDraft] = useState({});
+  const [draft, setDraft] = useState(initialPerms || {});
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [appFilter, setAppFilter] = useState("ALL");
+  const [statusFilter, setStatusFilter] = useState("ALL"); // ALL, SELECTED, UNSELECTED
+  const [expandedCard, setExpandedCard] = useState(null); // module key mở rộng
 
-  // Reset draft khi mount
   useEffect(() => {
     setDraft(initialPerms || {});
-    // Tự động chọn module đầu tiên
-    setSelectedModule(PERM_TREE[0].modules[0]);
   }, [initialPerms]);
 
-  // Xử lý tick chọn 1 thao tác
-  const toggleAction = (modKey, actKey, currentVal) => {
+  // Tính trạng thái của một module: ALL, PARTIAL, NONE
+  const getModuleState = (modKey) => {
+    const modInfo = getModuleInfo(modKey);
+    const totalActions = modInfo.actions.length;
     const modDraft = draft[modKey] || {};
-    if (currentVal?.status === "ALLOW") {
-      // Bỏ tick
-      const newModDraft = { ...modDraft };
-      delete newModDraft[actKey];
-      setDraft({ ...draft, [modKey]: newModDraft });
+    const activeActions = Object.values(modDraft).filter(v => v.status === "ALLOW" || v === true).length;
+
+    if (activeActions === 0) return 'NONE';
+    if (activeActions === totalActions) return 'ALL';
+    return 'PARTIAL';
+  };
+
+  const totalModules = useMemo(() => PERM_TREE.reduce((sum, cat) => sum + cat.modules.length, 0), []);
+  const selectedModulesCount = useMemo(() => {
+    let count = 0;
+    PERM_TREE.forEach(cat => {
+      cat.modules.forEach(mod => {
+        if (getModuleState(mod.key) !== 'NONE') count++;
+      });
+    });
+    return count;
+  }, [draft]);
+
+  const toggleModule = (modKey) => {
+    const state = getModuleState(modKey);
+    const modInfo = getModuleInfo(modKey);
+    if (state === 'ALL' || state === 'PARTIAL') {
+      const newDraft = { ...draft };
+      delete newDraft[modKey];
+      setDraft(newDraft);
     } else {
-      // Tick -> mặc định Toàn bộ
-      setDraft({ ...draft, [modKey]: { ...modDraft, [actKey]: { status: "ALLOW", scope: "ALL", scopeValue: "" } } });
+      const newModDraft = {};
+      modInfo.actions.forEach(act => {
+        newModDraft[act] = { status: "ALLOW", scope: "ALL", scopeValue: "" };
+      });
+      setDraft({ ...draft, [modKey]: newModDraft });
     }
   };
 
-  // Xử lý đổi Data Scope
+  const toggleAction = (modKey, actKey) => {
+    const modDraft = { ...(draft[modKey] || {}) };
+    const current = modDraft[actKey];
+    if (current?.status === "ALLOW" || current === true) {
+      delete modDraft[actKey];
+    } else {
+      modDraft[actKey] = { status: "ALLOW", scope: "ALL", scopeValue: "" };
+    }
+    
+    if (Object.keys(modDraft).length === 0) {
+      const newDraft = { ...draft };
+      delete newDraft[modKey];
+      setDraft(newDraft);
+    } else {
+      setDraft({ ...draft, [modKey]: modDraft });
+    }
+  };
+
   const changeScope = (modKey, actKey, field, val) => {
-    const actDraft = draft[modKey]?.[actKey] || { status: "ALLOW", scope: "ALL", scopeValue: "" };
+    const actDraft = (draft[modKey] || {})[actKey] || { status: "ALLOW", scope: "ALL", scopeValue: "" };
     setDraft({
       ...draft,
       [modKey]: {
@@ -142,171 +183,265 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
     });
   };
 
-  const handleSave = () => {
-    onSave(draft);
+  const handleSelectAll = () => {
+    const newDraft = {};
+    PERM_TREE.forEach(cat => {
+      cat.modules.forEach(mod => {
+        newDraft[mod.key] = {};
+        mod.actions.forEach(act => {
+          newDraft[mod.key][act] = { status: "ALLOW", scope: "ALL", scopeValue: "" };
+        });
+      });
+    });
+    setDraft(newDraft);
   };
 
-  const modDraft = draft[selectedModule?.key] || {};
+  const handleClearAll = () => {
+    setDraft({});
+  };
+
+  const filteredTree = useMemo(() => {
+    return PERM_TREE.map(cat => {
+      if (appFilter !== "ALL" && cat.category !== appFilter) return null;
+      
+      const filteredModules = cat.modules.filter(mod => {
+        const state = getModuleState(mod.key);
+        const textMatch = mod.label.toLowerCase().includes(searchQuery.toLowerCase()) || mod.key.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!textMatch) return false;
+        if (statusFilter === "SELECTED" && state === 'NONE') return false;
+        if (statusFilter === "UNSELECTED" && state !== 'NONE') return false;
+        return true;
+      });
+
+      if (filteredModules.length === 0) return null;
+      return { ...cat, modules: filteredModules };
+    }).filter(Boolean);
+  }, [draft, searchQuery, appFilter, statusFilter]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col h-[calc(100vh-120px)] animate-in fade-in">
-      {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white">
+    <div className="bg-slate-50 flex flex-col h-[calc(100vh-80px)] overflow-hidden font-sans border border-slate-200 rounded-xl shadow-sm">
+      {/* Header Panel */}
+      <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10">
+        <div className="flex items-center gap-4">
+          <button onClick={onCancel} className="text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 transition-colors">
+            <ArrowLeft size={18} /> Danh sách quyền
+          </button>
+          <div className="h-6 w-px bg-slate-200"></div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800">Cấu hình phân quyền</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Vai trò: <span className="font-semibold text-indigo-600">{roleName}</span></p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button onClick={onCancel} className="btn-ghost text-slate-500 hover:text-slate-700">Hủy bỏ</button>
-            <button onClick={handleSave} className="btn-primary flex items-center gap-2"><Save size={16} /> Lưu quyền</button>
+            <div className="text-sm text-slate-500">Đang cấu hình cho vai trò</div>
+            <div className="font-bold text-slate-800">{roleName}</div>
           </div>
         </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setDraft(initialPerms || {})} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg flex items-center gap-2 transition-colors text-sm">
+             <RotateCcw size={16} /> Đặt lại
+          </button>
+          <button onClick={() => onSave(draft)} className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors shadow-md text-sm">
+            <Save size={16} /> Lưu cấu hình
+          </button>
+        </div>
+      </div>
 
-        {/* Body Drawer: 2 cột */}
-        <div className="flex-1 overflow-hidden flex">
-          {/* Cột trái: Cây Module */}
-          <div className="w-72 bg-slate-50 border-r border-slate-200 flex flex-col h-full">
-            <div className="p-4 border-b border-slate-200">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input placeholder="Tìm module..." className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+      {/* Main Content Scroll */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        
+        {/* Danh mục Tài nguyên */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          {/* Section Header */}
+          <div className="border-b border-slate-100 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="text-teal-500" size={24} />
+                <h3 className="font-bold text-slate-800 text-lg">Phân quyền Tài nguyên & Menu</h3>
+                <span className="bg-slate-100 text-slate-600 font-semibold px-2.5 py-1 rounded-md text-sm border border-slate-200">
+                  {selectedModulesCount} / {totalModules} đã chọn
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handleSelectAll} className="px-4 py-1.5 border border-slate-200 rounded-md text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Chọn tất cả ({totalModules})</button>
+                <button onClick={handleClearAll} className="px-4 py-1.5 border border-slate-200 rounded-md text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">Bỏ chọn tất cả</button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-3 space-y-4">
-              {PERM_TREE.map((cat) => (
-                <div key={cat.category}>
-                  <div className="flex items-center gap-2 px-2 mb-1">
-                    <cat.icon size={14} className="text-slate-400" />
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">{cat.category}</span>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap items-center gap-4 bg-slate-50 p-2 rounded-lg border border-slate-100">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Tìm kiếm tài nguyên theo tên, mã..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-teal-500 focus:border-teal-500 outline-none"
+                />
+              </div>
+              <div className="w-56">
+                <select 
+                  value={appFilter}
+                  onChange={e => setAppFilter(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-teal-500 outline-none text-slate-700 font-medium"
+                >
+                  <option value="ALL">Tất cả ứng dụng ({PERM_TREE.length})</option>
+                  {PERM_TREE.map(c => <option key={c.category} value={c.category}>{c.category}</option>)}
+                </select>
+              </div>
+              <div className="flex bg-white rounded-md border border-slate-300 overflow-hidden">
+                <button onClick={() => setStatusFilter('ALL')} className={`px-4 py-2 text-sm font-medium ${statusFilter==='ALL' ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-500' : 'text-slate-600 hover:bg-slate-50'}`}>Tất cả ({totalModules})</button>
+                <button onClick={() => setStatusFilter('SELECTED')} className={`px-4 py-2 text-sm font-medium border-l border-slate-300 ${statusFilter==='SELECTED' ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-500' : 'text-slate-600 hover:bg-slate-50'}`}>Đã chọn ({selectedModulesCount})</button>
+                <button onClick={() => setStatusFilter('UNSELECTED')} className={`px-4 py-2 text-sm font-medium border-l border-slate-300 ${statusFilter==='UNSELECTED' ? 'bg-teal-50 text-teal-700 border-b-2 border-teal-500' : 'text-slate-600 hover:bg-slate-50'}`}>Chưa chọn ({totalModules - selectedModulesCount})</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Categories & Cards */}
+          <div className="p-5 space-y-8">
+            {filteredTree.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">Không tìm thấy tài nguyên nào phù hợp.</div>
+            ) : filteredTree.map(cat => {
+              const catSelected = cat.modules.filter(m => getModuleState(m.key) !== 'NONE').length;
+              return (
+                <div key={cat.category} className="space-y-4">
+                  {/* Category Header */}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 shadow-sm border border-teal-100">
+                      <cat.icon size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-800">{cat.category}</h4>
+                      <div className="text-xs text-slate-500 uppercase tracking-wide">APP_{cat.category.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}</div>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                       <span className="text-sm font-semibold text-slate-500">{catSelected} / {cat.modules.length} đã chọn</span>
+                    </div>
                   </div>
-                  <div className="space-y-0.5">
+
+                  {/* Cards Grid */}
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 pl-11">
                     {cat.modules.map(mod => {
-                      const isSelected = selectedModule?.key === mod.key;
-                      // Tính số lượng quyền đã cấp cho module này
-                      const grantedCount = Object.keys(draft[mod.key] || {}).length;
+                      const state = getModuleState(mod.key);
+                      const isExpanded = expandedCard === mod.key;
+
                       return (
-                        <button key={mod.key} onClick={() => setSelectedModule(mod)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-colors ${
-                            isSelected ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-slate-600 hover:bg-slate-100"
-                          }`}>
-                          <span>{mod.label}</span>
-                          {grantedCount > 0 && <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">{grantedCount}</span>}
-                        </button>
+                        <div key={mod.key} className={`border rounded-xl bg-white transition-all overflow-hidden ${state !== 'NONE' ? 'border-teal-200 shadow-sm ring-1 ring-teal-50' : 'border-slate-200'}`}>
+                          {/* Card Header (Click to toggle expand) */}
+                          <div 
+                            className={`p-4 flex items-start gap-4 cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-slate-50/50' : ''}`}
+                            onClick={() => setExpandedCard(isExpanded ? null : mod.key)}
+                          >
+                            {/* Checkbox (Click to toggle module) */}
+                            <div 
+                              onClick={(e) => { e.stopPropagation(); toggleModule(mod.key); }}
+                              className={`mt-1 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer
+                                ${state === 'ALL' ? 'bg-teal-500 border-teal-500 text-white' : 
+                                  state === 'PARTIAL' ? 'bg-teal-500 border-teal-500 text-white' : 'border-slate-300 bg-white hover:border-teal-400'}`}
+                            >
+                              {state === 'ALL' && <Check size={12} strokeWidth={3} />}
+                              {state === 'PARTIAL' && <div className="w-2.5 h-0.5 bg-white rounded-full" />}
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="font-bold text-slate-800">{mod.label}</div>
+                                <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold uppercase border border-slate-200">MENU</span>
+                              </div>
+                              <div className="text-xs text-slate-500 font-mono bg-slate-50 inline-block px-1.5 py-0.5 rounded border border-slate-100 uppercase">MOD_{mod.key}</div>
+                            </div>
+
+                            <div className="mt-1 text-slate-400">
+                              <ChevronRight size={20} className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
+                            </div>
+                          </div>
+
+                          {/* Expanded Content (Fine-grained actions) */}
+                          {isExpanded && (
+                            <div className="border-t border-slate-100 p-4 bg-slate-50/50 space-y-3">
+                              <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cấu hình thao tác chi tiết</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {mod.actions.map(actKey => {
+                                  const actVal = (draft[mod.key] || {})[actKey];
+                                  const isChecked = actVal?.status === "ALLOW" || actVal === true;
+
+                                  return (
+                                    <div key={actKey} className={`border rounded-lg p-3 transition-colors ${isChecked ? 'bg-white border-teal-200 shadow-sm' : 'bg-transparent border-slate-200'}`}>
+                                      <label className="flex items-center gap-3 cursor-pointer select-none">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={isChecked} 
+                                          onChange={() => toggleAction(mod.key, actKey)}
+                                          className="w-4 h-4 text-teal-600 rounded border-slate-300 focus:ring-teal-500" 
+                                        />
+                                        <span className={`font-semibold text-sm ${isChecked ? 'text-teal-700' : 'text-slate-600'}`}>{ACTION_LABELS[actKey] || actKey}</span>
+                                      </label>
+
+                                      {/* Action Scopes */}
+                                      {isChecked && (
+                                        <div className="mt-3">
+                                          <div className="flex flex-wrap gap-2">
+                                            {["ALL", "FACTORY", "WAREHOUSE", "CUSTOM"].map(scopeCode => {
+                                              const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
+                                              const sChecked = (actVal?.scope || "ALL") === scopeCode;
+                                              return (
+                                                <label key={scopeCode} className={`flex items-center gap-1.5 px-2 py-1.5 rounded border cursor-pointer transition-all ${sChecked ? "bg-teal-50 border-teal-500 text-teal-700 font-medium" : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600 text-xs"}`}>
+                                                  <input 
+                                                    type="radio" 
+                                                    name={`scope_${mod.key}_${actKey}`} 
+                                                    className="hidden"
+                                                    checked={sChecked}
+                                                    onChange={() => changeScope(mod.key, actKey, "scope", scopeCode)}
+                                                  />
+                                                  <div className={`w-3 h-3 rounded-full border flex items-center justify-center ${sChecked ? "border-teal-500" : "border-slate-300"}`}>
+                                                    {sChecked && <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />}
+                                                  </div>
+                                                  <span className="text-[11px]">{scopeLabels[scopeCode]}</span>
+                                                </label>
+                                              );
+                                            })}
+                                          </div>
+
+                                          {/* Scope Selectors */}
+                                          {(actVal?.scope === "FACTORY" || actVal?.scope === "WAREHOUSE") && (
+                                            <div className="mt-2 p-2 bg-slate-50 rounded border border-slate-100">
+                                              <select 
+                                                className="w-full text-xs border-slate-300 rounded focus:ring-teal-500 focus:border-teal-500 py-1"
+                                                value={actVal?.scopeValue || ""} 
+                                                onChange={e => changeScope(mod.key, actKey, "scopeValue", e.target.value)}
+                                              >
+                                                <option value="">-- Chọn {actVal.scope === "FACTORY" ? "Nhà máy" : "Kho"} --</option>
+                                                {actVal.scope === "FACTORY" ? (
+                                                  <>
+                                                    <option value="Nhà máy thổi">Nhà máy thổi</option>
+                                                    <option value="Nhà máy cắt">Nhà máy cắt</option>
+                                                    <option value="Nhà máy in">Nhà máy in</option>
+                                                  </>
+                                                ) : (
+                                                  <>
+                                                    <option value="Kho Nguyên vật liệu">Kho Nguyên vật liệu</option>
+                                                    <option value="Kho Thành phẩm">Kho Thành phẩm</option>
+                                                    <option value="Kho Phế liệu">Kho Phế liệu</option>
+                                                  </>
+                                                )}
+                                              </select>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Cột phải: Cấu hình chi tiết */}
-          <div className="flex-1 bg-white overflow-y-auto p-8">
-            {selectedModule ? (
-              <div className="max-w-4xl mx-auto">
-                <div className="mb-6 pb-4 border-b border-slate-100">
-                  <h3 className="text-2xl font-bold text-slate-800">{selectedModule.label}</h3>
-                  <p className="text-slate-500 text-sm mt-1">Cấu hình các thao tác được phép và giới hạn phạm vi truy cập dữ liệu.</p>
-                </div>
-
-                <div className="space-y-4">
-                  {selectedModule.actions.map(actKey => {
-                    const val = modDraft[actKey];
-                    const isChecked = val?.status === "ALLOW" || val === true; // Tương thích dữ liệu cũ
-                    
-                    return (
-                      <div key={actKey} className={`rounded-xl border transition-all overflow-hidden ${isChecked ? "border-indigo-300 shadow-md ring-1 ring-indigo-100" : "border-slate-200 bg-white hover:border-slate-300"}`}>
-                        {/* Toggle header row */}
-                        <div 
-                           className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${isChecked ? "bg-indigo-50/50" : "bg-white"}`}
-                           onClick={() => toggleAction(selectedModule.key, actKey, val)}
-                        >
-                           <div className="flex items-center gap-4">
-                             <div className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${isChecked ? "bg-indigo-600 text-white shadow-inner" : "bg-slate-100 text-slate-400"}`}>
-                               <ShieldCheck size={20} />
-                             </div>
-                             <div>
-                               <div className={`font-bold text-base ${isChecked ? "text-indigo-900" : "text-slate-700"}`}>
-                                 {ACTION_LABELS[actKey] || actKey}
-                               </div>
-                               {!isChecked && <div className="text-xs text-slate-400 mt-0.5 font-medium">Quyền này đang bị vô hiệu hóa</div>}
-                             </div>
-                           </div>
-                           
-                           {/* Custom Toggle Switch */}
-                           <div className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isChecked ? 'bg-indigo-600' : 'bg-slate-200'}`}>
-                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isChecked ? 'translate-x-6' : 'translate-x-1'}`} />
-                           </div>
-                        </div>
-                        
-                        {/* Scope configuration body */}
-                        {isChecked && (
-                           <div className="p-5 border-t border-indigo-100 bg-white">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                  <Filter size={14} /> Phạm vi truy cập dữ liệu
-                                </p>
-                                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                                  {["ALL", "FACTORY", "WAREHOUSE", "CUSTOM"].map(scopeCode => {
-                                    const scopeLabels = { ALL: "Toàn bộ", FACTORY: "Nhà máy", WAREHOUSE: "Kho", CUSTOM: "Tùy chỉnh" };
-                                    return (
-                                      <label key={scopeCode} className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${val?.scope === scopeCode ? "bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200" : "border-slate-200 hover:bg-slate-50 text-slate-600"}`}>
-                                        <input type="radio" name={`scope_${actKey}`} className="hidden"
-                                          checked={val?.scope === scopeCode}
-                                          onChange={() => changeScope(selectedModule.key, actKey, "scope", scopeCode)}
-                                        />
-                                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors ${val?.scope === scopeCode ? "border-white" : "border-slate-300"}`}>
-                                          {val?.scope === scopeCode && <div className="w-2 h-2 rounded-full bg-white" />}
-                                        </div>
-                                        <span className="text-sm font-semibold">{scopeLabels[scopeCode]}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* Form phụ thuộc Scope */}
-                                {val?.scope === "FACTORY" && (
-                                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
-                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Nhà máy cho phép truy cập</label>
-                                    <select className="w-full text-sm border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-                                      value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
-                                      <option value="">-- Tất cả nhà máy --</option>
-                                      <option value="Nhà máy thổi">Nhà máy thổi</option>
-                                      <option value="Nhà máy cắt">Nhà máy cắt</option>
-                                      <option value="Nhà máy in">Nhà máy in</option>
-                                    </select>
-                                  </div>
-                                )}
-                                {val?.scope === "WAREHOUSE" && (
-                                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in slide-in-from-top-2">
-                                    <label className="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Chọn Kho cho phép truy cập</label>
-                                    <select className="w-full text-sm border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
-                                      value={val?.scopeValue || ""} onChange={e => changeScope(selectedModule.key, actKey, "scopeValue", e.target.value)}>
-                                      <option value="">-- Tất cả kho --</option>
-                                      <option value="Kho Nguyên vật liệu">Kho Nguyên vật liệu</option>
-                                      <option value="Kho Thành phẩm">Kho Thành phẩm</option>
-                                      <option value="Kho Phế liệu">Kho Phế liệu</option>
-                                    </select>
-                                  </div>
-                                )}
-                                {val?.scope === "CUSTOM" && (
-                                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-sm flex items-center gap-3 animate-in fade-in slide-in-from-top-2 shadow-sm">
-                                    <Settings size={20} className="text-amber-500" />
-                                    <span className="font-medium">Giao diện Rule Builder nâng cao đang được phát triển.</span>
-                                  </div>
-                                )}
-                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-slate-400">Chọn một module bên trái để cấu hình</div>
-            )}
+              );
+            })}
           </div>
         </div>
       </div>
+    </div>
   );
 }
 
