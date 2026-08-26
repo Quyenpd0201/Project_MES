@@ -210,29 +210,33 @@ function batchWidth(b) {
 function computePriority(batches) {
   if (!batches || !batches.length) return { rankMap: {}, ordered: batches || [], anchorDays: null };
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const meta = batches.map((b) => ({ b, due: b.earliest_due ? new Date(b.earliest_due) : null, width: batchWidth(b), has_high_priority: b.has_high_priority }));
-  const dueT = (m) => (m.due ? m.due.getTime() : Infinity);
-  const anchor = [...meta].sort((a, c) => {
-    if (a.has_high_priority && !c.has_high_priority) return -1;
-    if (!a.has_high_priority && c.has_high_priority) return 1;
-    return dueT(a) - dueT(c);
-  })[0];
-  const anchorDays = anchor.due ? Math.ceil((anchor.due - today) / 86400000) : null;
-  const aw = anchor.width;
-  const widthDist = (m) => (aw == null || m.width == null) ? Infinity : Math.abs(m.width - aw);
+  const dueT = (b) => (b.earliest_due ? new Date(b.earliest_due).getTime() : Infinity);
+  const bw = (b) => batchWidth(b);
+
+  // Tách nhóm ưu tiên Cao → luôn dẫn đầu (xếp theo ngày giao trong nội bộ nhóm)
+  const highGroup = batches.filter(b => b.has_high_priority).sort((a, c) => dueT(a) - dueT(c));
+  const normalGroup = batches.filter(b => !b.has_high_priority);
+
+  // Neo (anchor) cho nhóm thường: lô giao sớm nhất → gom theo chiều ngang gần anchor
+  const normalSorted = [...normalGroup].sort((a, c) => dueT(a) - dueT(c));
+  const anchor = normalSorted[0] || null;
+  const anchorDays = anchor?.earliest_due ? Math.ceil((new Date(anchor.earliest_due) - today) / 86400000) : null;
+  const aw = anchor ? bw(anchor) : null;
+  const widthDist = (b) => (aw == null || bw(b) == null) ? Infinity : Math.abs(bw(b) - aw);
   const urgent = anchorDays != null && anchorDays <= 5;
-  const rest = meta.filter((m) => m !== anchor).sort((a, c) => {
-    if (a.has_high_priority && !c.has_high_priority) return -1;
-    if (!a.has_high_priority && c.has_high_priority) return 1;
-    return urgent
+
+  const restNormal = (anchor ? normalSorted.slice(1) : normalSorted).sort((a, c) =>
+    urgent
       ? (dueT(a) - dueT(c)) || (widthDist(a) - widthDist(c))   // gấp: ngày giao trước
-      : (widthDist(a) - widthDist(c)) || (dueT(a) - dueT(c));  // rộng thời gian: gom khổ trước
-  });
-  const orderedMeta = [anchor, ...rest];
+      : (widthDist(a) - widthDist(c)) || (dueT(a) - dueT(c))   // rộng thời gian: gom khổ trước
+  );
+  const orderedAll = [...highGroup, ...(anchor ? [anchor, ...restNormal] : restNormal)];
+
   const rankMap = {};
-  orderedMeta.slice(0, 5).forEach((m, i) => { rankMap[m.b.batch_key] = i + 1; });
-  return { rankMap, ordered: orderedMeta.map((m) => m.b), anchorDays };
+  orderedAll.slice(0, 5).forEach((b, i) => { rankMap[b.batch_key] = i + 1; });
+  return { rankMap, ordered: orderedAll, anchorDays };
 }
+
 
 /* ====== Tab: Lập kế hoạch từ đơn hàng ====== */
 // Đầu ngày hôm nay (bỏ giờ) để so hạn giao
@@ -294,9 +298,20 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
                 <span className="font-semibold text-slate-800">{b.product_name} · {b.attr_color || "—"} · {b.attr_size || "—"} · {b.attr_thickness || "—"}</span>
                 {overdueMode
                   ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold"><AlertTriangle size={12} /> Trễ {daysLate} ngày</span>
-                  : b.has_high_priority 
-                    ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold whitespace-nowrap"><AlertTriangle size={12} /> Đơn gấp</span>
-                    : rank && <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold whitespace-nowrap"><Star size={12} className="fill-amber-500 text-amber-500" /> Ưu tiên #{rank}</span>}
+                  : rank
+                    ? (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        b.has_high_priority ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {b.has_high_priority ? <AlertTriangle size={12} /> : <Star size={12} className="fill-amber-500 text-amber-500" />}
+                        {b.has_high_priority ? `Ưu tiên #${rank} · Gấp` : `Ưu tiên #${rank}`}
+                      </span>
+                    )
+                    : b.has_high_priority && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold whitespace-nowrap">
+                        <AlertTriangle size={12} /> Đơn gấp
+                      </span>
+                    )}
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-slate-500">{b.items.length} dòng</span>
