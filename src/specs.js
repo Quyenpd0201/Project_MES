@@ -2,7 +2,7 @@
 // kind: "text" (nhập tự do) | "select" (chọn) | "num" (số + đơn vị cố định) | "numunit" (số + chọn đơn vị)
 export const PRODUCT_SPECS = [
   { name: "Số lớp", kind: "text", placeholder: "vd: 2 lớp" },
-  { name: "Chiều ngang", kind: "num", unit: "Cm" },
+  { name: "Chiều ngang (Rộng)", kind: "num", unit: "Cm" },
   { name: "Chiều dài", kind: "num", unit: "Cm" },
   { name: "Độ dày", kind: "numunit", units: ["dem", "cem", "zem"] },
   { name: "Màu sắc", kind: "text", placeholder: "vd: Trắng sữa" },

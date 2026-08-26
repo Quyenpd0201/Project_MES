@@ -1,13 +1,13 @@
 // backend/lib/specs.js — bộ thông số kỹ thuật chuẩn (đồng bộ với src/specs.js ở FE)
 // Thứ tự cố định để spec_key luôn nhất quán khi gom nhóm tồn kho.
-const SPEC_NAMES = ['Số lớp', 'Chiều dài', 'Chiều ngang', 'Độ dày', 'Màu sắc'];
+const SPEC_NAMES = ['Số lớp', 'Chiều dài', 'Chiều ngang (Rộng)', 'Độ dày', 'Màu sắc'];
 
 // Chỉ giữ các thông số có giá trị, chuẩn hoá chuỗi
 function cleanSpecs(specs) {
   const o = {};
   if (specs && typeof specs === 'object') {
     for (const n of SPEC_NAMES) {
-      const v = specs[n];
+      const v = specs[n] || specs[n.replace(' (Rộng)', '')]; // Hỗ trợ đọc DB cũ (nếu có key 'Chiều ngang')
       if (v != null && String(v).trim() !== '') o[n] = String(v).trim();
     }
   }
@@ -24,7 +24,7 @@ function buildSpecKey(specs) {
 function legacyAttrs(specs) {
   const s = cleanSpecs(specs);
   const dai = s['Chiều dài'] || '';
-  const ngang = s['Chiều ngang'] || '';
+  const ngang = s['Chiều ngang (Rộng)'] || s['Chiều ngang'] || '';
   const size = dai || ngang ? `${dai}${dai && ngang ? ' × ' : ''}${ngang}` : '';
   return { size, thickness: s['Độ dày'] || '', color: s['Màu sắc'] || '' };
 }
