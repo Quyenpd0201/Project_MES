@@ -267,14 +267,15 @@ exports.create = async (req, res) => {
       `INSERT INTO production_orders
          (sales_order_id, customer_id, product_id, quantity, unit,
           specs, spec_key, attr_size, attr_thickness, attr_color, finishing,
-          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker, priority)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker, priority, mix_ratio)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         b.sales_order_id || null, b.customer_id || null, b.product_id, b.quantity, upUnit(b.unit),
         JSON.stringify(specs), buildSpecKey(specs), a.size || null, a.thickness || null, a.color || null, JSON.stringify(finishing),
         b.machine_id || null, b.planned_date || null, b.shift || null, b.assigned_team || null,
-        group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority
+        group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority,
+        JSON.stringify(b.mix_ratio || [])
       ]
     );
     res.status(201).json(rows[0]);
@@ -285,9 +286,9 @@ exports.update = async (req, res) => {
   try {
     const b = req.body;
     const fields = ['sales_order_id','customer_id','product_id','quantity','unit',
-      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority'];
+      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority','mix_ratio'];
     const cols = [], vals = []; let i = 1;
-    for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(f === 'unit' ? upUnit(b[f]) : (b[f] === '' ? null : b[f])); }
+    for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(f === 'unit' ? upUnit(b[f]) : (b[f] === '' ? null : (f === 'mix_ratio' ? JSON.stringify(b[f]) : b[f]))); }
     if (b.finishing !== undefined) {
       const finishing = Array.isArray(b.finishing) ? b.finishing.filter(f => f && f.name).map(f => ({ name: f.name, checked: !!f.checked })) : [];
       cols.push(`finishing = $${i++}::jsonb`); vals.push(JSON.stringify(finishing));
@@ -435,7 +436,8 @@ exports.executionTasks = async (req, res) => {
              c.name AS customer_name, c.phone AS customer_phone,
              so.order_code AS sales_order_code, po.note AS order_note,
              COALESCE(po.material_type, so.material_type) AS material_type,
-             so.note AS sales_order_note
+             so.note AS sales_order_note,
+             COALESCE(po.mix_ratio, so.mix_ratio) AS mix_ratio
       FROM production_tasks t
       JOIN production_orders po ON po.id = t.production_order_id
       JOIN products p ON p.id = po.product_id

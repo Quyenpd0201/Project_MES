@@ -139,7 +139,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const fdis = (k) => fperm("orders", k) !== "edit";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
-  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null, priority: "Trung bình" });
+  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null, priority: "Trung bình", mix_ratio: [] });
   const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]);
   const [seq, setSeq] = useState(2);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
@@ -147,7 +147,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const loadData = useCallback(() => {
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null, priority: d.priority || "Trung bình" });
+      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null, priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [] })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
@@ -158,7 +158,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   useEffect(() => {
     if (editId || !copyId) return;
     ordersApi.get(copyId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null, priority: d.priority || "Trung bình" });
+      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null, priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
@@ -273,6 +273,95 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
               </button>
             )}
           </div>
+          {f.material_type === 'pha' && (
+            <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+              <table className="w-full text-left text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
+                    <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
+                    <th className="px-3 py-2.5 uppercase tracking-wider">Nguyên vật liệu</th>
+                    <th className="px-3 py-2.5 w-32 uppercase tracking-wider">Tỷ lệ (%)</th>
+                    {editing && <th className="px-3 py-2.5 w-10"></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(f.mix_ratio || []).map((r, i) => (
+                    <tr key={i} className="border-b border-slate-100 last:border-0 bg-white">
+                      <td className="px-3 py-2.5 text-center text-slate-500 font-medium">{i + 1}</td>
+                      <td className="px-3 py-2.5">
+                        {editing ? (
+                          <SearchSelect
+                            options={lookups.products.filter(p => p.product_type === 'Nguyên vật liệu').map(p => ({ value: p.id, label: p.product_name + (p.product_code ? ` (${p.product_code})` : '') }))}
+                            value={r.material_id}
+                            onChange={(v) => {
+                              const newArr = [...f.mix_ratio];
+                              newArr[i].material_id = v;
+                              set("mix_ratio", newArr);
+                            }}
+                            placeholder="Chọn..."
+                            className="w-full rounded border-slate-300 text-sm py-1.5 px-2"
+                          />
+                        ) : (
+                          <span className="font-medium text-slate-700">{lookups.products.find(p => p.id === r.material_id)?.product_name || "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {editing ? (
+                          <input
+                            type="number"
+                            className={inputCls}
+                            value={r.ratio}
+                            onChange={(e) => {
+                              const newArr = [...f.mix_ratio];
+                              newArr[i].ratio = e.target.value;
+                              set("mix_ratio", newArr);
+                            }}
+                            placeholder="%"
+                          />
+                        ) : (
+                          <span className="font-medium">{r.ratio}%</span>
+                        )}
+                      </td>
+                      {editing && (
+                        <td className="px-3 py-2.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newArr = [...f.mix_ratio];
+                              newArr.splice(i, 1);
+                              set("mix_ratio", newArr);
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {editing && (
+                <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => set("mix_ratio", [...(f.mix_ratio || []), { material_id: "", ratio: "" }])}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
+                  >
+                    <Plus size={14} /> THÊM NGUYÊN VẬT LIỆU
+                  </button>
+                  {(() => {
+                    const total = (f.mix_ratio || []).reduce((acc, curr) => acc + (Number(curr.ratio) || 0), 0);
+                    return total > 0 && total !== 100 ? (
+                      <span className="text-xs font-medium text-amber-600 flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded">
+                        <AlertCircle size={14} /> Tổng tỷ lệ đang là {total}% (khác 100%)
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </Section>
 

@@ -87,7 +87,7 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
 const TASK_STATUSES = ["Chờ", "Đang sản xuất", "Dừng sản xuất", "Hoàn thành", "Đã hủy"];
 
 /* ---- Thẻ 1 công việc (công nhân khai báo sản lượng) ---- */
-function TaskCard({ t, canEdit, onSaved }) {
+function TaskCard({ t, canEdit, onSaved, lookups }) {
   const [actual, setActual] = useState(t.actual_qty ?? "");
   const [scrap, setScrap] = useState(t.scrap_qty ?? "");
   const [saving, setSaving] = useState(false);
@@ -172,6 +172,30 @@ function TaskCard({ t, canEdit, onSaved }) {
           <div><span className="text-[11px] text-slate-400">Đơn hàng: </span><span className="text-sm font-semibold text-slate-700">{t.sales_order_code || "—"}</span></div>
           <div><span className="text-[11px] text-slate-400">Lệnh SX: </span><span className="text-sm font-semibold text-slate-700">{t.order_code}</span></div>
         </div>
+
+        {/* Tỷ lệ pha */}
+        {t.material_type === 'pha' && t.mix_ratio && t.mix_ratio.length > 0 && (
+          <div className="rounded-lg bg-indigo-50 border border-indigo-200 overflow-hidden">
+            <div className="px-3 py-2 bg-indigo-100/50 border-b border-indigo-200">
+              <span className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Tỷ lệ pha Nguyên vật liệu</span>
+            </div>
+            <div className="p-0">
+              <table className="w-full text-sm text-left">
+                <tbody>
+                  {t.mix_ratio.map((r, idx) => {
+                    const materialName = lookups?.products?.find(p => p.id === r.material_id)?.product_name || "Vật tư không xác định";
+                    return (
+                      <tr key={idx} className="border-b border-indigo-100 last:border-0">
+                        <td className="px-3 py-1.5 text-indigo-900 font-medium">{materialName}</td>
+                        <td className="px-3 py-1.5 text-indigo-700 text-right font-bold w-20">{r.ratio}%</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Info label="Ngày giao" value={fmtDate(t.due_date)} cls="text-rose-600" />
@@ -267,7 +291,7 @@ export default function ExecutionModule({ lookups }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {rows.map((t) => <TaskCard key={t.id} t={t} canEdit={canEdit} onSaved={load} />)}
+        {rows.map((t) => <TaskCard key={t.id} t={t} canEdit={canEdit} onSaved={load} lookups={lookups} />)}
       </div>
       {!rows.length && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">Không có công việc sản xuất nào. (Tạo lệnh SX + phân công ở mục Sản xuất)</div>}
     </div>
