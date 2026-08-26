@@ -415,18 +415,18 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       <Section title={<>Thông số đặc thù <span className="text-slate-400 font-normal">(kế thừa xuyên suốt)</span></>}>
         <fieldset disabled={fdis("attributes")}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Field label="Chiều dài (Cm)">
-            <input className={inputCls} list="sizes" value={(f.attr_size || "").split(/x|×/i)[0]?.trim() || ""} onChange={(e) => {
-              const r = (f.attr_size || "").split(/x|×/i)[1]?.trim() || "";
-              set("attr_size", e.target.value ? `${e.target.value} × ${r}` : (r ? ` × ${r}` : ""));
-            }} placeholder="vd: 30" />
-            <datalist id="sizes">{(lookups.sizes || []).map((s) => <option key={s} value={s.split(/x|×/i)[0]?.trim()} />)}</datalist>
-          </Field>
           <Field label="Chiều ngang (Rộng) (Cm)">
-            <input className={inputCls} value={(f.attr_size || "").split(/x|×/i)[1]?.trim() || ""} onChange={(e) => {
-              const d = (f.attr_size || "").split(/x|×/i)[0]?.trim() || "";
-              set("attr_size", e.target.value ? `${d} × ${e.target.value}` : (d ? `${d} × ` : ""));
+            <input className={inputCls} list="widths" value={(f.attr_size || "").split(/x|×/i)[0]?.trim() || ""} onChange={(e) => {
+              const d = (f.attr_size || "").split(/x|×/i)[1]?.trim() || "";
+              set("attr_size", e.target.value ? `${e.target.value} × ${d}` : (d ? ` × ${d}` : ""));
             }} placeholder="vd: 20" />
+            <datalist id="widths">{(lookups.sizes || []).map((s) => <option key={s} value={s.split(/x|×/i)[0]?.trim()} />)}</datalist>
+          </Field>
+          <Field label="Chiều dài (Cm)">
+            <input className={inputCls} value={(f.attr_size || "").split(/x|×/i)[1]?.trim() || ""} onChange={(e) => {
+              const r = (f.attr_size || "").split(/x|×/i)[0]?.trim() || "";
+              set("attr_size", e.target.value ? `${r} × ${e.target.value}` : (r ? `${r} × ` : ""));
+            }} placeholder="vd: 30" />
           </Field>
           <Field label="Độ dày">
             <input className={inputCls} list="thicknesses" value={f.attr_thickness} onChange={(e) => set("attr_thickness", e.target.value)} placeholder="vd: 20mic" />

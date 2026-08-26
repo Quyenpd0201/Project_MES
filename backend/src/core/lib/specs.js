@@ -25,7 +25,7 @@ function legacyAttrs(specs) {
   const s = cleanSpecs(specs);
   const dai = s['Chiều dài'] || '';
   const ngang = s['Chiều ngang (Rộng)'] || s['Chiều ngang'] || '';
-  const size = dai || ngang ? `${dai}${dai && ngang ? ' × ' : ''}${ngang}` : '';
+  const size = dai || ngang ? `${ngang}${ngang && dai ? ' × ' : ''}${dai}` : '';
   return { size, thickness: s['Độ dày'] || '', color: s['Màu sắc'] || '' };
 }
 
