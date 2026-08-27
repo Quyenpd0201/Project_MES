@@ -12,6 +12,7 @@ import { ListHeader } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { fmt, fmtDate, toast } from "../../ui.js";
 import * as XLSX from "xlsx";
+import { usePerm } from "../../perm.jsx";
 
 /* ─── Màu sắc ─────────────────────────────────────────────────── */
 const DONUT_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6"];
@@ -78,6 +79,10 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 /* ─── Main InventoryReport ─────────────────────────────────────── */
 export default function InventoryReport({ lookups }) {
+  const { can, isAdmin } = usePerm();
+  if (!isAdmin && !can('rep_inv', 'view') && !can('reports', 'view')) return (
+    <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem báo cáo kho.</div>
+  );
   const [stockData, setStockData]   = useState([]);
   const [txnData, setTxnData]       = useState([]);
   const [loading, setLoading]       = useState(true);

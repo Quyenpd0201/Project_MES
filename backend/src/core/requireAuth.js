@@ -80,7 +80,7 @@ module.exports.requirePerm = (permString) => {
     const appMap = {
       'engineering': ['products', 'bom', 'process'],
       'sales':       ['orders', 'deliveries'],
-      'production':  ['production', 'planning', 'workschedule', 'execution', 'orderstatus', 'prod_output'],
+      'production':  ['production', 'planning', 'workschedule', 'work_schedules', 'execution', 'orderstatus', 'prod_output'],
       'inventory':   ['inventory', 'inv_inbound', 'inv_outbound', 'inv_transfer', 'inv_adjust'],
       'trace':       ['qrscan', 'trace_lot'],
       'reports':     ['reports', 'rep_inv'],

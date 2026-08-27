@@ -8,6 +8,7 @@ import { ListHeader, DataTable, PageHeader } from "../../components.jsx";
 import { production } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast } from "../../ui.js";
 import * as XLSX from "xlsx";
+import { usePerm } from "../../perm.jsx";
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -226,6 +227,10 @@ function OrderDetailDrawer({ order, onClose }) {
 
 /* ─── Main component ─── */
 export default function OutputReport({ lookups }) {
+  const { can, isAdmin } = usePerm();
+  if (!isAdmin && !can('prod_output', 'view') && !can('production', 'view')) return (
+    <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem báo cáo sản xuất.</div>
+  );
   const [rows, setRows]               = useState([]);
   const [loading, setLoading]         = useState(false);
   const [from, setFrom]               = useState(monthStart());

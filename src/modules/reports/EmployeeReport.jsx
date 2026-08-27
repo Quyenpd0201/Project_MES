@@ -11,6 +11,7 @@ import {
 import { reports } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast } from "../../ui.js";
 import * as XLSX from "xlsx";
+import { usePerm } from "../../perm.jsx";
 
 /* ── helpers ── */
 const today      = () => new Date().toISOString().slice(0, 10);
@@ -414,6 +415,10 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
 const EMP_PER_PAGE = 12;
 
 export default function EmployeeReport() {
+  const { can, isAdmin } = usePerm();
+  if (!isAdmin && !can('reports', 'view')) return (
+    <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem báo cáo nhân viên.</div>
+  );
   const [workers, setWorkers]         = useState([]);
   const [loading, setLoading]         = useState(false);
   const [selected, setSelected]       = useState(null);

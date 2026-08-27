@@ -4,6 +4,7 @@ import { ListHeader, usePager, DataTable } from "../../components.jsx";
 import { planning, production, processes } from "../../mesApi.js";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { ScheduleModal } from "./Production.jsx";
+import { usePerm } from "../../perm.jsx";
 
 const Field = ({ label, children }) => (
   <div><label className="block text-sm font-medium text-slate-600 mb-1.5">{label}</label>{children}</div>
@@ -249,6 +250,8 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
   const [demandLines, setDemandLines] = useState(0);
   const [allocating, setAllocating] = useState(null);
   const today = useMemo(() => startOfToday(), []);
+  const { can } = usePerm();
+  const canEdit = can("planning", "edit");
 
   // Tách lô theo hạn giao: quá hạn (đưa sang màn riêng) vs chưa quá hạn
   const { list, priority } = useMemo(() => {
@@ -317,7 +320,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
                 <span className="text-slate-500">{b.items.length} dòng</span>
                 <span className="font-semibold text-slate-700">Σ {fmt(b.total_quantity)} {b.unit}</span>
                 {b.earliest_due && <span className="text-rose-600">Giao: {fmtDate(b.earliest_due)}</span>}
-                <button onClick={() => setAllocating(b)} className="btn-primary py-1.5"><CalendarClock size={15} /> Phân bổ & tạo lệnh</button>
+                {canEdit && <button onClick={() => setAllocating(b)} className="btn-primary py-1.5"><CalendarClock size={15} /> Phân bổ & tạo lệnh</button>}
               </div>
             </div>
             <table className="w-full text-sm">

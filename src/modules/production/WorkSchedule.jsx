@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, RotateCcw, Pencil, Check, X } from "lucide-r
 import { ListHeader } from "../../components.jsx";
 import { workSchedules } from "../../mesApi.js";
 import {  inputCls , toast } from "../../ui.js";
+import { usePerm } from "../../perm.jsx";
 
 const d = (ymd) => new Date(ymd + "T00:00:00");
 const toYMD = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -20,6 +21,8 @@ export default function WorkScheduleModule({ lookups }) {
   const [map, setMap] = useState({}); // `${emp}|${date}` -> shift_id
   const [isEditing, setIsEditing] = useState(false);
   const [pendingChanges, setPendingChanges] = useState({});
+  const { can } = usePerm();
+  const canEdit = can("workschedule", "edit");
   const employees = lookups.employees || [];
   const shiftList = lookups.shiftList || [];
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(anchor, i)), [anchor]);
@@ -108,7 +111,7 @@ export default function WorkScheduleModule({ lookups }) {
         <div className="w-px h-6 bg-slate-200 mx-2"></div>
         <button onClick={load} className="btn-ghost" disabled={isEditing}><RotateCcw size={16} /> Làm mới</button>
         <div className="w-px h-6 bg-slate-200 mx-1"></div>
-        {!isEditing ? (
+        {canEdit && (!isEditing ? (
           <button onClick={() => setIsEditing(true)} className="btn-primary flex items-center gap-2">
             <Pencil size={16} /> Sửa
           </button>
@@ -121,7 +124,7 @@ export default function WorkScheduleModule({ lookups }) {
               <Check size={16} /> Lưu
             </button>
           </div>
-        )}
+        ))}
       </>} />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">

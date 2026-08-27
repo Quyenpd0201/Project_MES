@@ -3,6 +3,7 @@ import { PageHeader, ListHeader, Section, Pagination, usePager } from '../../com
 import { reports } from '../../mesApi.js';
 import { Download, Activity, Factory, PieChart as PieChartIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { usePerm } from '../../perm.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, ComposedChart
@@ -13,6 +14,10 @@ const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'];
 
 export default function ReportsModule() {
   const [tab, setTab] = useState('kpi'); // kpi, detailed, machines
+  const { can, isAdmin } = usePerm();
+  if (!isAdmin && !can('reports', 'view')) return (
+    <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem môđun này.</div>
+  );
   
   return (
     <div className="space-y-5">
