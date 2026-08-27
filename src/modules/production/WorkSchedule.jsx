@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, RotateCcw, Pencil, Check, X } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { workSchedules } from "../../mesApi.js";
 import {  inputCls , toast } from "../../ui.js";
@@ -18,6 +18,8 @@ function mondayOf(date) {
 export default function WorkScheduleModule({ lookups }) {
   const [anchor, setAnchor] = useState(mondayOf(new Date()));
   const [map, setMap] = useState({}); // `${emp}|${date}` -> shift_id
+  const [isEditing, setIsEditing] = useState(false);
+  const [pendingChanges, setPendingChanges] = useState({});
   const employees = lookups.employees || [];
   const shiftList = lookups.shiftList || [];
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(anchor, i)), [anchor]);
@@ -37,10 +39,33 @@ export default function WorkScheduleModule({ lookups }) {
   }, [days]);
   useEffect(() => { load(); }, [load]);
 
-  const setCell = async (employee_id, work_date, shift_id, has_attendance) => {
-    setMap((m) => ({ ...m, [`${employee_id}|${work_date}`]: { shift_id: shift_id || undefined, has_attendance } }));
-    try { await workSchedules.upsert({ employee_id, work_date, shift_id: shift_id || null }); }
-    catch (e) { toast.error("Lỗi lưu: " + e.message); load(); }
+  const handleChange = (employee_id, work_date, shift_id) => {
+    setMap((m) => ({ ...m, [`${employee_id}|${work_date}`]: { ...m[`${employee_id}|${work_date}`], shift_id: shift_id || undefined } }));
+    setPendingChanges((p) => ({ ...p, [`${employee_id}|${work_date}`]: { employee_id, work_date, shift_id: shift_id || null } }));
+  };
+
+  const handleSave = async () => {
+    const changes = Object.values(pendingChanges);
+    if (changes.length === 0) {
+      setIsEditing(false);
+      return;
+    }
+    const toastId = toast.loading("Đang lưu lịch làm việc...");
+    try {
+      await workSchedules.bulkUpsert(changes);
+      toast.success("Đã lưu lịch làm việc", { id: toastId });
+      setPendingChanges({});
+      setIsEditing(false);
+      load();
+    } catch (e) {
+      toast.error("Lỗi lưu: " + (e.message || "Lỗi máy chủ"), { id: toastId });
+    }
+  };
+
+  const handleCancel = () => {
+    setPendingChanges({});
+    setIsEditing(false);
+    load();
   };
 
   // gom nhân viên theo đơn vị
@@ -81,7 +106,22 @@ export default function WorkScheduleModule({ lookups }) {
           </button>
         </div>
         <div className="w-px h-6 bg-slate-200 mx-2"></div>
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+        <button onClick={load} className="btn-ghost" disabled={isEditing}><RotateCcw size={16} /> Làm mới</button>
+        <div className="w-px h-6 bg-slate-200 mx-1"></div>
+        {!isEditing ? (
+          <button onClick={() => setIsEditing(true)} className="btn-primary flex items-center gap-2">
+            <Pencil size={16} /> Sửa
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button onClick={handleCancel} className="btn-ghost text-slate-500 hover:text-slate-700">
+              <X size={16} /> Hủy
+            </button>
+            <button onClick={handleSave} className="btn-primary flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 border-emerald-600">
+              <Check size={16} /> Lưu
+            </button>
+          </div>
+        )}
       </>} />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
@@ -119,9 +159,9 @@ export default function WorkScheduleModule({ lookups }) {
 
                       return (
                         <td key={dy} className="px-1.5 py-1.5 border-r border-slate-100">
-                          <select value={val} onChange={(ev) => setCell(e.id, dy, ev.target.value, cell.has_attendance)}
-                            disabled={isLocked}
-                            className={`${inputCls} px-1.5 py-1 text-xs ${val ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "text-slate-400"} ${isLocked ? "opacity-60 cursor-not-allowed bg-slate-100" : ""}`}>
+                          <select value={val} onChange={(ev) => handleChange(e.id, dy, ev.target.value)}
+                            disabled={!isEditing || isLocked}
+                            className={`${inputCls} px-1.5 py-1 text-xs ${val ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "text-slate-400"} ${(!isEditing || isLocked) ? "opacity-60 cursor-not-allowed bg-slate-100" : ""}`}>
                             <option value="">—</option>
                             {shiftList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                           </select>

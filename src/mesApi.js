@@ -54,6 +54,7 @@ export const machineOrders = (id) => http(`/machines/${id}/orders`).then((r) => 
 export const workSchedules = {
   list: (from, to) => http(`/work-schedules?from=${from}&to=${to}`).then((r) => r.data),
   upsert: (data) => http(`/work-schedules`, body("PUT", data)),
+  bulkUpsert: (data) => http(`/work-schedules/bulk`, body("PUT", data)),
 };
 
 export const roles = {

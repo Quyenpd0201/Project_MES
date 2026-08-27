@@ -60,3 +60,57 @@ exports.upsert = async (req, res) => {
     res.json(rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi lưu lịch làm việc' }); }
 };
+
+// PUT /api/work-schedules/bulk — cập nhật nhiều ca làm việc cùng lúc
+exports.bulkUpsert = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const data = req.body;
+    if (!Array.isArray(data)) return res.status(400).json({ message: 'Dữ liệu không hợp lệ' });
+
+    await client.query('BEGIN');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const item of data) {
+      const { employee_id, work_date, shift_id, note } = item;
+      if (!employee_id || !work_date) throw new Error('Thiếu nhân viên hoặc ngày');
+
+      const wDate = new Date(work_date);
+      wDate.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today - wDate) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays > 3) {
+        throw new Error(`Không thể thay đổi ca ngày ${work_date} (quá 3 ngày)`);
+      }
+
+      const { rows: existing } = await client.query(
+        `SELECT check_in_at, check_out_at FROM work_schedules WHERE employee_id = $1 AND work_date = $2`, 
+        [employee_id, work_date]
+      );
+      if (existing.length && (existing[0].check_in_at || existing[0].check_out_at)) {
+        throw new Error(`Không thể thay đổi ca ngày ${work_date} vì đã có dữ liệu chấm công`);
+      }
+
+      if (!shift_id) {
+        await client.query(`DELETE FROM work_schedules WHERE employee_id = $1 AND work_date = $2`, [employee_id, work_date]);
+      } else {
+        await client.query(`
+          INSERT INTO work_schedules (employee_id, work_date, shift_id, note)
+          VALUES ($1,$2,$3,$4)
+          ON CONFLICT (employee_id, work_date)
+          DO UPDATE SET shift_id = EXCLUDED.shift_id, note = EXCLUDED.note, updated_at = now()`, 
+          [employee_id, work_date, shift_id, note || null]);
+      }
+    }
+    
+    await client.query('COMMIT');
+    res.json({ message: 'Đã lưu lịch làm việc thành công' });
+  } catch (err) { 
+    await client.query('ROLLBACK');
+    console.error(err); 
+    res.status(400).json({ message: err.message || 'Lỗi khi lưu lịch làm việc' }); 
+  } finally {
+    client.release();
+  }
+};

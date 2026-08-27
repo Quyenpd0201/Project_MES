@@ -35,7 +35,7 @@ function SpecFields({ specs, onChange, disabled }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
       {PRODUCT_SPECS.map((spec) => {
-        const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.name}</span>;
+        const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.label || spec.name}</span>;
         if (spec.kind === "text") return (
           <label key={spec.name}>{lbl}
             <input className={cls} disabled={disabled} value={get(spec.name)} placeholder={spec.placeholder || ""}
