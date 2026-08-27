@@ -1,4 +1,4 @@
-// backend/scripts/migrate.js — nạp schema.sql vào database (thay cho psql)
+// backend/scripts/migrate.js — Nạp schema vào database (schema_consolidated.sql)
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
 require('dotenv').config({ path: path.join(ROOT, '.env') });
@@ -17,24 +17,14 @@ async function main() {
       };
 
   const pool = new Pool(poolConfig);
+  const schemaFile = path.join(ROOT, 'migrations', 'schema_consolidated.sql');
 
-  // Nạp tuần tự mọi file schema*.sql từ migrations/ (schema.sql trước, rồi schema_v2.sql, ...)
-  const migrationsDir = path.join(ROOT, 'migrations');
-  const files = fs.readdirSync(migrationsDir)
-    .filter(f => /^schema.*\.sql$/i.test(f))
-    .sort((a, b) => {
-      if (a === 'schema.sql') return -1;
-      if (b === 'schema.sql') return 1;
-      const numA = parseInt((a.match(/\d+/) || [0])[0]);
-      const numB = parseInt((b.match(/\d+/) || [0])[0]);
-      return numA - numB;
-    });
   try {
-    for (const f of files) {
-      const sql = fs.readFileSync(path.join(migrationsDir, f), 'utf8');
-      await pool.query(sql);
-      console.log(`  ✓ đã nạp ${f}`);
-    }
+    console.log(`📦 Đang nạp schema từ: ${schemaFile}`);
+    const sql = fs.readFileSync(schemaFile, 'utf8');
+    await pool.query(sql);
+    console.log('  ✓ Đã nạp schema_consolidated.sql');
+
     const tablesRes = await pool.query(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema='public' ORDER BY table_name`);
