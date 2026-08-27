@@ -16,7 +16,7 @@ export function usePerm() {
   const can = (app, action) => {
     if (isAdmin) return true;
     const val = perms[app]?.[action];
-    return val === 'ALLOW' || val === true;
+    return val === 'ALLOW' || val === true || val?.status === 'ALLOW';
   };
 
   // Quyền 1 trường: 'edit' | 'view' (chỉ đọc) | 'hidden' (ẩn)

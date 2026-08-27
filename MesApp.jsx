@@ -213,7 +213,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     if (isAdmin || it.always) return true;
     if (it.adminOnly) return false;
     const v = user?.permissions?.[it.perm || it.key]?.view;
-    return v === 'ALLOW' || v === true;
+    return v === 'ALLOW' || v === true || v?.status === 'ALLOW';
   };
 
   const items = allItems.map(it => {
