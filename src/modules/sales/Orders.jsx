@@ -316,8 +316,6 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
                         <th className="text-left px-3 py-2 w-10">#</th>
                         <th className="text-left px-3 py-2">Công đoạn</th>
                         <th className="text-left px-3 py-2">Máy</th>
-                        <th className="text-left px-3 py-2 w-24">Ca</th>
-                        <th className="text-left px-3 py-2">Đội</th>
                         <th className="text-left px-3 py-2">Công nhân</th>
                       </tr>
                     </thead>
@@ -330,16 +328,6 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
                             <select className={inputCls + ' py-1'} value={s.machine_id} onChange={(e) => setStage(s._k, 'machine_id', e.target.value)}>
                               <option value="">-- Chọn máy --</option>
                               {machinesOf(s.assigned_team).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-2 py-2">
-                            <select className={inputCls + ' py-1'} value={s.shift} onChange={(e) => setStage(s._k, 'shift', e.target.value)}>
-                              <option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}
-                            </select>
-                          </td>
-                          <td className="px-2 py-2">
-                            <select className={inputCls + ' py-1'} value={s.assigned_team} onChange={(e) => setStage(s._k, 'assigned_team', e.target.value)}>
-                              <option value="">-- Đội --</option>{teams.map((t) => <option key={t}>{t}</option>)}
                             </select>
                           </td>
                           <td className="px-2 py-2">
