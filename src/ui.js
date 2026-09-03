@@ -5,6 +5,7 @@ export { toast };
 // src/ui.js — helper dùng chung cho các module
 export const inputCls =
   "w-full px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-800 " +
+  "placeholder:text-slate-400 disabled:placeholder-transparent " +
   "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition";
 
 export const fmt = (n) => (n == null || n === "" ? "—" : Number(n).toLocaleString("vi-VN"));

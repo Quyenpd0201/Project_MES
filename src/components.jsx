@@ -46,8 +46,8 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
     <>
       <button type="button" ref={triggerRef} disabled={disabled} onClick={() => (open ? setOpen(false) : openMenu())}
         className={(className || inputCls) + " text-left flex items-center justify-between gap-2" + (disabled ? " bg-slate-50 text-slate-400" : "")}>
-        <span className={"truncate " + (selected ? "" : "text-slate-400")}>{selected ? selected.label : placeholder}</span>
-        <ChevronDown size={16} className="text-slate-400 shrink-0" />
+        <span className={"truncate " + (selected ? "" : (disabled ? "text-transparent" : "text-slate-400"))}>{selected ? selected.label : placeholder}</span>
+        <ChevronDown size={16} className={"shrink-0 " + (disabled && !selected ? "text-transparent" : "text-slate-400")} />
       </button>
       {open && !disabled && pos && createPortal(
         <div ref={menuRef} style={{ position: "fixed", left: pos.left, top: pos.top, width: pos.width, zIndex: 1000 }}
@@ -274,7 +274,7 @@ export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "K
 
   const { slice, Pager, Filler } = usePager(filtered, pageSize);
   const pad = dense ? "px-3 py-2" : "px-4 py-3";
-  const inputCls = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none";
+  const inputCls = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 disabled:placeholder-transparent focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none";
 
   return (
     <div className="space-y-3">
