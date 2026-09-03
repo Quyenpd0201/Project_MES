@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle } from "lucide-react";
-import { resource, salesOrders as salesOrdersApi } from "../../mesApi.js";
+import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle, CalendarClock } from "lucide-react";
+import { resource, salesOrders as salesOrdersApi, planning, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast } from "../../ui.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
@@ -132,6 +132,205 @@ function LsxLinks({ orders }) {
   );
 }
 
+/* ---- Modal phân công nhanh từ chi tiết đơn hàng ---- */
+const mapStageName = (s) => (/c[ắa]t/i.test(`${s.name || ''} ${s.workshop || ''} ${s.machine_name || ''}`) ? 'Cắt' : 'Thổi');
+const stageFactory = (stage) => (stage === 'Cắt' ? 'Nhà máy cắt' : 'Nhà máy thổi');
+
+function QuickAllocateModal({ orderId, lookups, onClose, onDone }) {
+  const [loading, setLoading] = useState(true);
+  const [batchItems, setBatchItems] = useState([]); // items còn remaining thuộc đơn này
+  const [fullyCovered, setFullyCovered] = useState(false);
+  const [planned_date, setPlannedDate] = useState('');
+  const [qty, setQty] = useState({});
+  const [stages, setStages] = useState([]);
+  const [loadingProc, setLoadingProc] = useState(true);
+  const emps = lookups.employees || [];
+  const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
+  const machinesOf = (team) => (lookups.machines || []).filter((m) => !team || m.factory === team);
+  const workersOf = (team) => emps.filter((e) => !team || e.factory === team);
+
+  // Bước 1: lấy danh sách batch từ planning API, lọc theo orderId
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await planning.fromOrders();
+        const allItems = (r.batches || []).flatMap((b) => b.items || []);
+        // Lọc các dòng thuộc đơn hàng này và còn remaining > 0
+        const mine = allItems.filter((it) => it.sales_order_id === orderId || it.order_id === orderId);
+        if (!cancel) {
+          if (!mine.length) {
+            setFullyCovered(true);
+          } else {
+            setBatchItems(mine);
+            setQty(Object.fromEntries(mine.map((i) => [i.item_id, String(Number(i.remaining ?? i.quantity) || 0)])));
+            // Bước 2: nạp quy trình từ sản phẩm đầu tiên
+            const productId = mine[0]?.product_id;
+            if (productId) {
+              try {
+                const list = await processes.list({ product_id: productId });
+                if (list.length) {
+                  const proc = await processes.get(list[0].id);
+                  const rows = (proc.steps || []).map((s, i) => {
+                    const stage = mapStageName(s);
+                    return { _k: i, name: s.name || stage, stage, machine_id: (s.machine_ids?.[0]) || s.machine_id || '', shift: '', assigned_team: s.workshop || stageFactory(stage), assigned_worker: '' };
+                  });
+                  if (!cancel) setStages(rows);
+                }
+              } catch { /* bỏ qua nếu chưa có quy trình */ }
+            }
+          }
+        }
+      } catch (e) { toast.error('Lỗi tải dữ liệu: ' + e.message); }
+      finally { if (!cancel) { setLoading(false); setLoadingProc(false); } }
+    })();
+    return () => { cancel = true; };
+  }, [orderId]); // eslint-disable-line
+
+  const setStage = (k, field, v) => setStages((arr) => arr.map((s) => {
+    if (s._k !== k) return s;
+    const nx = { ...s, [field]: v };
+    if (field === 'assigned_team') { const keep = emps.find((e) => e.name === s.assigned_worker && (!v || e.factory === v)); nx.assigned_worker = keep ? s.assigned_worker : ''; }
+    return nx;
+  }));
+
+  const save = async () => {
+    const planItems = batchItems.map((i) => ({ item_id: i.item_id, qty: qty[i.item_id] })).filter((x) => Number(x.qty) > 0);
+    if (!planItems.length) return toast.error('Nhập số lượng sản xuất cho ít nhất 1 dòng.');
+    try {
+      const r = await planning.generate({
+        items: planItems, planned_date,
+        stages: stages.map((s) => ({ stage: s.stage, name: s.name, machine_id: s.machine_id, shift: s.shift, assigned_team: s.assigned_team, assigned_worker: s.assigned_worker })),
+      });
+      toast.success(`Đã tạo ${r.created.length} lệnh sản xuất: ${r.created.join(', ')}`);
+      onDone();
+    } catch (e) { toast.error('Lỗi tạo lệnh: ' + e.message); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarClock size={20} className="text-blue-600" /> Phân công nhanh</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+        </div>
+
+        {loading ? (
+          <div className="py-10 text-center text-slate-400">Đang tải dữ liệu…</div>
+        ) : fullyCovered ? (
+          <div className="py-6 space-y-3">
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
+              <CheckCircle size={20} className="text-emerald-500 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-semibold text-emerald-800">Đơn hàng đã có đủ lệnh sản xuất</div>
+                <div className="text-sm text-emerald-700 mt-0.5">Tất cả dòng hàng trong đơn đã được phân bổ đủ số lượng vào lệnh SX. Không cần tạo thêm.</div>
+              </div>
+            </div>
+            <div className="flex justify-end"><button onClick={onClose} className="btn-ghost">Đóng</button></div>
+          </div>
+        ) : (
+          <>
+            <div>
+              <div className="text-sm font-medium text-slate-600 mb-1.5">Số lượng sản xuất theo dòng đơn <span className="text-slate-400 font-normal">(có thể lập một phần)</span></div>
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                    <tr><th className="text-left px-3 py-2">Đơn hàng</th><th className="text-left px-3 py-2">Khách</th>
+                      <th className="text-right px-3 py-2">Còn lại</th><th className="text-right px-3 py-2 w-28">SL sản xuất</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {batchItems.map((it) => {
+                      const rem = Number(it.remaining ?? it.quantity) || 0;
+                      return (
+                        <tr key={it.item_id}>
+                          <td className="px-3 py-2 font-medium text-blue-600">{it.order_code}</td>
+                          <td className="px-3 py-2 text-slate-600">{it.customer_name || '—'}</td>
+                          <td className="px-3 py-2 text-right text-slate-500">{fmt(rem)} {it.unit}</td>
+                          <td className="px-3 py-2 text-right">
+                            <input type="number" min="0" max={rem} className={inputCls + ' text-right py-1'}
+                              value={qty[it.item_id]} onChange={(e) => setQty((p) => ({ ...p, [it.item_id]: e.target.value }))} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1">Nhập nhỏ hơn số còn lại nếu chỉ sản xuất trước một phần — phần còn lại vẫn nằm chờ trong kế hoạch.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="block text-sm font-medium text-slate-600 mb-1.5">Ngày bắt đầu sản xuất</label>
+                <input type="date" className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} />
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium text-slate-600 mb-1.5">Phân bổ theo công đoạn <span className="text-slate-400 font-normal">(công đoạn nối tiếp: xong công đoạn trước mới sang công đoạn sau)</span></div>
+              {loadingProc ? (
+                <div className="text-sm text-slate-400 py-4 text-center">Đang nạp quy trình…</div>
+              ) : !stages.length ? (
+                <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">Sản phẩm chưa có quy trình công nghệ — lệnh sẽ tạo không kèm công đoạn.</div>
+              ) : (
+                <div className="border border-slate-200 rounded-lg overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                      <tr>
+                        <th className="text-left px-3 py-2 w-10">#</th>
+                        <th className="text-left px-3 py-2">Công đoạn</th>
+                        <th className="text-left px-3 py-2">Máy</th>
+                        <th className="text-left px-3 py-2 w-24">Ca</th>
+                        <th className="text-left px-3 py-2">Đội</th>
+                        <th className="text-left px-3 py-2">Công nhân</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {stages.map((s, idx) => (
+                        <tr key={s._k}>
+                          <td className="px-3 py-2 text-slate-400 font-semibold">{idx + 1}</td>
+                          <td className="px-3 py-2"><span className="font-medium text-slate-700">{s.name}</span><span className="text-slate-400"> · {s.stage}</span></td>
+                          <td className="px-2 py-2">
+                            <select className={inputCls + ' py-1'} value={s.machine_id} onChange={(e) => setStage(s._k, 'machine_id', e.target.value)}>
+                              <option value="">-- Chọn máy --</option>
+                              {machinesOf(s.assigned_team).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <select className={inputCls + ' py-1'} value={s.shift} onChange={(e) => setStage(s._k, 'shift', e.target.value)}>
+                              <option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <select className={inputCls + ' py-1'} value={s.assigned_team} onChange={(e) => setStage(s._k, 'assigned_team', e.target.value)}>
+                              <option value="">-- Đội --</option>{teams.map((t) => <option key={t}>{t}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <select className={inputCls + ' py-1'} value={s.assigned_worker} onChange={(e) => setStage(s._k, 'assigned_worker', e.target.value)}>
+                              <option value="">-- Công nhân --</option>
+                              {workersOf(s.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ''}</option>)}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button onClick={onClose} className="btn-ghost">Hủy</button>
+              <button onClick={save} className="btn-primary"><Save size={16} /> Tạo {batchItems.map(i => qty[i.item_id]).filter(q => Number(q) > 0).length} lệnh</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ---- Form đơn hàng ---- */
 function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreateDelivery }) {
   const { can, fperm } = usePerm();
@@ -139,6 +338,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const fdis = (k) => fperm("orders", k) !== "edit";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
+  const [allocating, setAllocating] = useState(false);
   const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null, priority: "Trung bình", mix_ratio: [] });
   const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]);
   const [seq, setSeq] = useState(2);
@@ -201,6 +401,9 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         actions={editId && !editing ? (<>
           <button onClick={() => onPrint?.(editId)} className="btn-ghost"><Printer size={16} /> In phiếu</button>
           {onCreateDelivery && <button onClick={() => onCreateDelivery(editId)} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><FileText size={16} /> Tạo phiếu giao hàng</button>}
+          {["Mới", "Đang sản xuất"].includes(f.status) && can("planning", "edit") && (
+            <button onClick={() => setAllocating(true)} className="btn-primary"><CalendarClock size={16} /> Phân công nhanh</button>
+          )}
           {can("orders", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("orders", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
@@ -446,6 +649,14 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
       </Section>
       )}
       </fieldset>
+      {allocating && (
+        <QuickAllocateModal
+          orderId={editId}
+          lookups={lookups}
+          onClose={() => setAllocating(false)}
+          onDone={() => { setAllocating(false); loadData(); }}
+        />
+      )}
     </div>
   );
 }
