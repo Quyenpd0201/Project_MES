@@ -40,6 +40,14 @@
       /* Trường chỉ-đọc (chế độ xem): rõ chữ, không bị mờ */
       input:disabled, select:disabled, textarea:disabled {
         background:#f8fafc; color:#334155; -webkit-text-fill-color:#334155; opacity:1; cursor:default; }
+      
+      /* Xử lý placeholder: mờ khi bình thường, ẩn hoàn toàn khi bị disabled */
+      input::placeholder, textarea::placeholder {
+        color: #94a3b8 !important; -webkit-text-fill-color: #94a3b8 !important; opacity: 1;
+      }
+      input:disabled::placeholder, textarea:disabled::placeholder {
+        color: transparent !important; -webkit-text-fill-color: transparent !important;
+      }
       fieldset { min-width:0; border:0; margin:0; padding:0; }
     </style>
   </head>
