@@ -136,7 +136,7 @@ function LsxLinks({ orders }) {
 const mapStageName = (s) => (/c[ắa]t/i.test(`${s.name || ''} ${s.workshop || ''} ${s.machine_name || ''}`) ? 'Cắt' : 'Thổi');
 const stageFactory = (stage) => (stage === 'Cắt' ? 'Nhà máy cắt' : 'Nhà máy thổi');
 
-function QuickAllocateModal({ orderId, lookups, onClose, onDone }) {
+function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
   const [loading, setLoading] = useState(true);
   const [batchItems, setBatchItems] = useState([]); // items còn remaining thuộc đơn này
   const [fullyCovered, setFullyCovered] = useState(false);
@@ -149,7 +149,9 @@ function QuickAllocateModal({ orderId, lookups, onClose, onDone }) {
   const machinesOf = (team) => (lookups.machines || []).filter((m) => !team || m.factory === team);
   const workersOf = (team) => emps.filter((e) => !team || e.factory === team);
 
-  // Bước 1: lấy danh sách batch từ planning API, lọc theo orderId
+  // IDs của các dòng hàng trong đơn này — dùng để lọc batch items chính xác
+  const orderItemIds = new Set((orderItems || []).map((it) => it.id).filter(Boolean));
+
   useEffect(() => {
     let cancel = false;
     (async () => {
@@ -157,28 +159,62 @@ function QuickAllocateModal({ orderId, lookups, onClose, onDone }) {
       try {
         const r = await planning.fromOrders();
         const allItems = (r.batches || []).flatMap((b) => b.items || []);
-        // Lọc các dòng thuộc đơn hàng này và còn remaining > 0
-        const mine = allItems.filter((it) => it.sales_order_id === orderId || it.order_id === orderId);
+
+        // Ưu tiên match theo item_id (chính xác nhất); fallback theo order_code nếu cần
+        const orderCodes = new Set((orderItems || []).map((it) => it.order_code).filter(Boolean));
+        const mine = allItems.filter((it) =>
+          orderItemIds.has(it.item_id) ||
+          it.sales_order_id === orderId ||
+          it.order_id === orderId ||
+          (it.order_code && orderCodes.has(it.order_code))
+        );
+
         if (!cancel) {
           if (!mine.length) {
             setFullyCovered(true);
           } else {
             setBatchItems(mine);
             setQty(Object.fromEntries(mine.map((i) => [i.item_id, String(Number(i.remaining ?? i.quantity) || 0)])));
-            // Bước 2: nạp quy trình từ sản phẩm đầu tiên
+
+            // Nạp công đoạn: thử dùng phân bổ từ LSX gần nhất trước, fallback về quy trình template
             const productId = mine[0]?.product_id;
             if (productId) {
-              try {
-                const list = await processes.list({ product_id: productId });
-                if (list.length) {
-                  const proc = await processes.get(list[0].id);
-                  const rows = (proc.steps || []).map((s, i) => {
-                    const stage = mapStageName(s);
-                    return { _k: i, name: s.name || stage, stage, machine_id: (s.machine_ids?.[0]) || s.machine_id || '', shift: '', assigned_team: s.workshop || stageFactory(stage), assigned_worker: '' };
-                  });
-                  if (!cancel) setStages(rows);
-                }
-              } catch { /* bỏ qua nếu chưa có quy trình */ }
+              let stagesLoaded = false;
+              // Thử lấy tasks từ LSX cuối cùng của đơn hàng này
+              const allLsx = (orderItems || []).flatMap((it) => it.production_orders || []);
+              if (allLsx.length) {
+                try {
+                  // Lấy LSX mới nhất (phần tử cuối)
+                  const latestLsx = allLsx[allLsx.length - 1];
+                  const tasks = await production.getTasks(latestLsx.id);
+                  if (tasks && tasks.length && !cancel) {
+                    const rows = tasks.map((t, i) => ({
+                      _k: i,
+                      name: t.name || t.stage || '',
+                      stage: t.stage || 'Thổi',
+                      machine_id: t.machine_id || '',
+                      shift: t.shift || '',
+                      assigned_team: t.assigned_team || '',
+                      assigned_worker: t.assigned_worker || '',
+                    }));
+                    if (!cancel) { setStages(rows); stagesLoaded = true; }
+                  }
+                } catch { /* fallback về process template */ }
+              }
+              // Nếu chưa có từ LSX → load từ process template
+              if (!stagesLoaded) {
+                try {
+                  const list = await processes.list({ product_id: productId });
+                  if (list.length) {
+                    const proc = await processes.get(list[0].id);
+                    const rows = (proc.steps || []).map((s, i) => {
+                      const stage = mapStageName(s);
+                      return { _k: i, name: s.name || stage, stage, machine_id: (s.machine_ids?.[0]) || s.machine_id || '', shift: '', assigned_team: s.workshop || stageFactory(stage), assigned_worker: '' };
+                    });
+                    if (!cancel) setStages(rows);
+                  }
+                } catch { /* bỏ qua nếu chưa có quy trình */ }
+              }
             }
           }
         }
@@ -652,6 +688,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
       {allocating && (
         <QuickAllocateModal
           orderId={editId}
+          orderItems={items}
           lookups={lookups}
           onClose={() => setAllocating(false)}
           onDone={() => { setAllocating(false); loadData(); }}
