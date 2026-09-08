@@ -559,7 +559,7 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
         </div>
         <button onClick={handleSelectAll} className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium whitespace-nowrap">Chọn tất cả</button>
-        <button onClick={() => setDraft({})} className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium whitespace-nowrap">Bỏ hết</button>
+        <button onClick={() => { if (window.confirm("Bỏ hết tất cả quyền?")) setDraft({}); }} className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium whitespace-nowrap">Bỏ hết</button>
         <span className="text-sm text-slate-500 whitespace-nowrap">
           <span className="font-bold text-indigo-600">{totalSelected}</span> quyền đã chọn
         </span>
@@ -863,7 +863,17 @@ export default function PermissionsModule() {
             <label className="block text-sm font-medium text-slate-500 mb-2">Kế thừa quyền từ</label>
             <select
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 focus:ring-indigo-500 outline-none"
-              value={parentId} onChange={e => setParentId(e.target.value)} disabled={!roleId}
+              value={parentId}
+              disabled={!roleId}
+              onChange={async (e) => {
+                const newParentId = e.target.value;
+                setParentId(newParentId);
+                try {
+                  await roles.savePermissions(roleId, perms, newParentId || null);
+                  fetchEffective(roleId);
+                  toast.success(newParentId ? "Đã cập nhật kế thừa quyền" : "Đã bỏ kế thừa quyền");
+                } catch (err) { toast.error("Lỗi cập nhật kế thừa: " + err.message); }
+              }}
             >
               <option value="">-- Không kế thừa --</option>
               {roleList.filter(r => r.id !== roleId).map(r => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
@@ -969,7 +979,10 @@ export default function PermissionsModule() {
                         <div className="divide-y divide-slate-100">
                           {cat.modules.map(mod => {
                             const isModExpand  = !!expandedMods[mod.key];
-                            const directCount  = mod.displayActions.filter(a => perms[mod.key]?.[a] !== undefined).length;
+                            const directCount  = mod.displayActions.filter(a => {
+                              const v = perms[mod.key]?.[a];
+                              return v?.status === "ALLOW" || v === true;
+                            }).length;
                             const inheritCount = mod.displayActions.length - directCount;
 
                             return (
