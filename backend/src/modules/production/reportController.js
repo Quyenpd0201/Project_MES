@@ -10,8 +10,16 @@ exports.kpi = async (req, res) => {
         (SELECT COALESCE(SUM(quantity), 0) FROM inventory_stock) AS total_inventory_items
     `);
     const trendQuery = await db.query(`
-      SELECT to_char(planned_date, 'MM-DD') AS date, COALESCE(SUM(quantity), 0) AS plan_qty, COALESCE(SUM(actual_qty), 0) AS actual_qty
-      FROM production_tasks WHERE planned_date >= CURRENT_DATE - INTERVAL '6 days' GROUP BY planned_date ORDER BY planned_date
+      WITH dates AS (
+        SELECT generate_series(CURRENT_DATE - INTERVAL '6 days', CURRENT_DATE, '1 day'::interval)::date AS d
+      )
+      SELECT to_char(d.d, 'DD/MM') AS date,
+             COALESCE(SUM(pt.quantity), 0) AS plan_qty,
+             COALESCE(SUM(pt.actual_qty), 0) AS actual_qty
+      FROM dates d
+      LEFT JOIN production_tasks pt ON pt.planned_date = d.d
+      GROUP BY d.d
+      ORDER BY d.d
     `);
     const statusQuery = await db.query(`SELECT status AS name, COUNT(*)::int AS value FROM production_orders WHERE is_deleted = FALSE GROUP BY status`);
     const productQuery = await db.query(`
