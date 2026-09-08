@@ -128,9 +128,10 @@ export const PERM_TREE = [
     icon: ShieldCheck,
     modules: [
       { key: "sys_users",       label: "Tài khoản người dùng", actions: ["view", "create", "edit", "delete"] },
-      { key: "md_roles",        label: "Vai trò & Phân quyền", actions: ["view", "create", "edit", "delete"] },
-      { key: "sys_config",      label: "Cấu hình hệ thống",     actions: ["view", "edit"] },
-      { key: "sys_logs",        label: "Nhật ký hoạt động",     actions: ["view", "export"] },
+      { key: "md_roles",        label: "Vai trò",              actions: ["view", "create", "edit", "delete"] },
+      { key: "sys_permissions", label: "Phân quyền hệ thống",  actions: ["view", "edit"] },
+      { key: "sys_config",      label: "Cấu hình hệ thống",    actions: ["view", "edit"] },
+      { key: "sys_logs",        label: "Nhật ký hoạt động",    actions: ["view", "export"] },
     ]
   },
   {

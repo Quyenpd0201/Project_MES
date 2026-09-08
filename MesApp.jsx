@@ -200,8 +200,8 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
       key: "grp_sys", label: "Quản trị hệ thống", icon: Shield,
       children: [
         { key: "users", label: "Tài khoản", icon: UserCog, perm: "sys_users", path: "/users" },
-        { key: "md:roles", label: "Vai trò & Phân quyền", icon: Shield, path: "/master-data/roles", perm: "md_roles" },
-        { key: "sys_config", label: "Cấu hình hệ thống", icon: Cog, perm: "sys_config", path: "/sys-config" },
+        { key: "md:roles", label: "Vai trò", icon: Shield, path: "/master-data/roles", perm: "md_roles" },
+        { key: "permissions", label: "Phân quyền hệ thống", icon: ShieldCheck, perm: "sys_permissions", path: "/permissions" },
       ]
     }
   ];
