@@ -106,8 +106,7 @@ const PRODUCT_XLSX_COLS = [
 const StatusBadge = ({ status }) => {
   const active = status === "Hoạt động";
   return (
-    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-      active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-emerald-500" : "bg-rose-500"}`} />
       {status}
     </span>
@@ -177,38 +176,38 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     {
       key: "grp_rep", label: "Báo cáo", icon: Activity,
       children: [
-        { key: "reports",       label: "Báo cáo KPI",          icon: Activity,  path: "/reports" },
-        { key: "rep_inv",       label: "Báo cáo kho",          icon: Warehouse, path: "/reports/inventory" },
-        { key: "rep_employee",  label: "Hiệu suất nhân viên",  icon: Users,     path: "/reports/employees" },
+        { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
+        { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
+        { key: "rep_employee", label: "Hiệu suất nhân viên", icon: Users, path: "/reports/employees" },
       ]
     },
     {
       key: "grp_master", label: "Thông tin chung", icon: Package,
       children: [
-        { key: "products",     label: "Sản phẩm",         icon: Package,    path: "/products" },
-        { key: "bom",          label: "Định mức (BOM)",    icon: FlaskConical, path: "/bom" },
-        { key: "process",      label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
-        { key: "md:machines",  label: "Máy móc",           icon: Wrench,     path: "/master-data/machines",  perm: "md_machines" },
-        { key: "md:employees", label: "Nhân viên",          icon: Users,      path: "/master-data/employees", perm: "md_employees" },
-        { key: "md:shifts",    label: "Ca làm việc",        icon: Clock,      path: "/master-data/shifts",    perm: "md_shifts" },
-        { key: "md:warehouses",label: "Kho (danh mục)",    icon: Warehouse,  path: "/master-data/warehouses",perm: "md_warehouses" },
-        { key: "md:zones",     label: "Khu vực",           icon: MapPin,     path: "/master-data/zones",     perm: "md_zones" },
-        { key: "md:locations", label: "Vị trí lưu trữ",    icon: MapPin,     path: "/master-data/locations", perm: "md_locations" },
-        { key: "md:customers", label: "Khách hàng",         icon: Users,      path: "/master-data/customers", perm: "md_customers" },
+        { key: "products", label: "Sản phẩm", icon: Package, path: "/products" },
+        { key: "bom", label: "Định mức (BOM)", icon: FlaskConical, path: "/bom" },
+        { key: "process", label: "Quy trình công nghệ", icon: GitBranch, path: "/process" },
+        { key: "md:machines", label: "Máy móc", icon: Wrench, path: "/master-data/machines", perm: "md_machines" },
+        { key: "md:employees", label: "Nhân viên", icon: Users, path: "/master-data/employees", perm: "md_employees" },
+        { key: "md:shifts", label: "Ca làm việc", icon: Clock, path: "/master-data/shifts", perm: "md_shifts" },
+        { key: "md:warehouses", label: "Kho (danh mục)", icon: Warehouse, path: "/master-data/warehouses", perm: "md_warehouses" },
+        { key: "md:zones", label: "Khu vực", icon: MapPin, path: "/master-data/zones", perm: "md_zones" },
+        { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations", perm: "md_locations" },
+        { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers", perm: "md_customers" },
       ]
     },
     {
       key: "grp_sys", label: "Quản trị hệ thống", icon: Shield,
       children: [
-        { key: "users",        label: "Tài khoản",           icon: UserCog,    perm: "sys_users", path: "/users" },
-        { key: "md:roles",     label: "Vai trò & Phân quyền",icon: Shield,     path: "/master-data/roles", perm: "md_roles" },
-        { key: "sys_config",   label: "Cấu hình hệ thống",   icon: Cog,        perm: "sys_config", path: "#" },
+        { key: "users", label: "Tài khoản", icon: UserCog, perm: "sys_users", path: "/users" },
+        { key: "md:roles", label: "Vai trò & Phân quyền", icon: Shield, path: "/master-data/roles", perm: "md_roles" },
+        { key: "sys_config", label: "Cấu hình hệ thống", icon: Cog, perm: "sys_config", path: "/sys-config" },
       ]
     }
   ];
 
   const isAdmin = !!user?.is_admin;
-  
+
   const checkPerm = (it) => {
     if (isAdmin || it.always) return true;
     if (it.adminOnly) return false;
@@ -243,8 +242,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   }).filter(Boolean);
 
   const itemCls = (isActive) =>
-    `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition ${
-      isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
+    `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition ${isActive ? "bg-blue-600 text-white shadow-sm" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
 
   return (
     <>
@@ -252,88 +250,87 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         <div className="fixed inset-0 bg-slate-900/50 z-40 md:hidden" onClick={onCloseMobile} />
       )}
       <aside className={`fixed inset-y-0 left-0 z-50 transform ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 ${collapsed ? "md:w-16 w-60" : "w-60"} shrink-0 bg-white border-r border-slate-200 text-slate-600 h-screen flex flex-col transition-all duration-300`}>
-      <div className={`px-4 py-4 border-b border-slate-100 shrink-0 flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all`}>
-        <button onClick={onToggle} className="hidden md:block p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Thu gọn/Mở rộng menu">
-          <Menu size={20} />
-        </button>
-        <button onClick={onCloseMobile} className="md:hidden p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Đóng menu">
-          <ArrowLeft size={20} />
-        </button>
-        {!collapsed && (
-          <div className="flex-1 flex flex-col items-center pr-6">
-            <Logo className="max-h-10 max-w-full w-auto object-contain" />
-            <div className="text-[11px] text-slate-400 mt-0.5">Hệ thống MES</div>
-          </div>
-        )}
-      </div>
-      {!collapsed && (
-        <div className="px-3 py-3 border-b border-slate-100 shrink-0">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
-            <input 
-              value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40" 
-              placeholder="Tìm module..." 
-            />
-          </div>
-        </div>
-      )}
-      <nav className={`nav-scroll flex-1 min-h-0 overflow-y-auto ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
-        {filteredItems.map((it, idx) => {
-          const Icon = it.icon;
-          if (it.children) {
-            const childActive = it.children.some((c) => location.pathname.startsWith(c.path));
-            const open = isSearchActive || (expanded[it.key] ?? childActive);
-            return (
-              <div key={it.key}>
-                <button onClick={() => { if (!collapsed) setExpanded((e) => ({ ...e, [it.key]: !(e[it.key] ?? childActive) })) }}
-                  className={itemCls(false)} title={collapsed ? it.label : undefined}>
-                  <Icon size={18} className="shrink-0" /> 
-                  {!collapsed && <span className="flex-1 text-left truncate">{it.label}</span>}
-                  {!collapsed && <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />}
-                </button>
-                {open && !collapsed && (
-                  <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
-                    {it.children.map((c) => (
-                      <NavLink key={c.key} to={c.path} end={true} onClick={() => onCloseMobile?.()}
-                        className={({ isActive }) => {
-                          const active = isActive || (c.key === 'products' && location.pathname.startsWith('/products'));
-                          return `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${
-                            active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
-                        }}>
-                        <c.icon size={15} className="shrink-0" /> <span className="truncate">{c.label}</span>
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          }
-          return (
-            <NavLink key={it.key} to={it.path} end={it.key !== 'products'} onClick={() => onCloseMobile?.()} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
-              <Icon size={18} className="shrink-0" /> 
-              {!collapsed && <span className="truncate">{it.label}</span>}
-            </NavLink>
-          );
-        })}
-      </nav>
-      <div className={`px-4 py-3 border-t border-slate-100 shrink-0 ${collapsed ? "flex flex-col items-center gap-3 px-2" : ""}`}>
-        <div className={`flex items-center gap-2 ${collapsed ? "justify-center mb-0" : "mb-2"}`}>
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0" title={collapsed ? (user?.full_name || user?.username) : undefined}>
-            {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
-          </div>
+        <div className={`px-4 py-4 border-b border-slate-100 shrink-0 flex items-center ${collapsed ? 'justify-center' : 'gap-3'} transition-all`}>
+          <button onClick={onToggle} className="hidden md:block p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Thu gọn/Mở rộng menu">
+            <Menu size={20} />
+          </button>
+          <button onClick={onCloseMobile} className="md:hidden p-1 shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition" title="Đóng menu">
+            <ArrowLeft size={20} />
+          </button>
           {!collapsed && (
-            <div className="min-w-0">
-              <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
-              <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
+            <div className="flex-1 flex flex-col items-center pr-6">
+              <Logo className="max-h-10 max-w-full w-auto object-contain" />
+              <div className="text-[11px] text-slate-400 mt-0.5">Hệ thống MES</div>
             </div>
           )}
         </div>
-        <button onClick={onLogout} className={`flex items-center justify-center gap-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition ${collapsed ? "w-10 h-10 p-0" : "w-full px-3 py-2"}`} title={collapsed ? "Đăng xuất" : undefined}>
-          <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
-        </button>
-      </div>
-    </aside>
+        {!collapsed && (
+          <div className="px-3 py-3 border-b border-slate-100 shrink-0">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                placeholder="Tìm module..."
+              />
+            </div>
+          </div>
+        )}
+        <nav className={`nav-scroll flex-1 min-h-0 overflow-y-auto ${collapsed ? "px-2" : "px-3"} py-4 space-y-1`}>
+          {filteredItems.map((it, idx) => {
+            const Icon = it.icon;
+            if (it.children) {
+              const childActive = it.children.some((c) => location.pathname.startsWith(c.path));
+              const open = isSearchActive || (expanded[it.key] ?? childActive);
+              return (
+                <div key={it.key}>
+                  <button onClick={() => { if (!collapsed) setExpanded((e) => ({ ...e, [it.key]: !(e[it.key] ?? childActive) })) }}
+                    className={itemCls(false)} title={collapsed ? it.label : undefined}>
+                    <Icon size={18} className="shrink-0" />
+                    {!collapsed && <span className="flex-1 text-left truncate">{it.label}</span>}
+                    {!collapsed && <ChevronDown size={16} className={`transition ${open ? "rotate-180" : ""}`} />}
+                  </button>
+                  {open && !collapsed && (
+                    <div className="mt-1 ml-4 pl-3 border-l border-slate-200 space-y-1">
+                      {it.children.map((c) => (
+                        <NavLink key={c.key} to={c.path} end={true} onClick={() => onCloseMobile?.()}
+                          className={({ isActive }) => {
+                            const active = isActive || (c.key === 'products' && location.pathname.startsWith('/products'));
+                            return `w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition ${active ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-blue-50 hover:text-blue-700"}`;
+                          }}>
+                          <c.icon size={15} className="shrink-0" /> <span className="truncate">{c.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <NavLink key={it.key} to={it.path} end={it.key !== 'products'} onClick={() => onCloseMobile?.()} className={({ isActive }) => itemCls(isActive || (it.key === 'products' && location.pathname.startsWith('/products')))} title={collapsed ? it.label : undefined}>
+                <Icon size={18} className="shrink-0" />
+                {!collapsed && <span className="truncate">{it.label}</span>}
+              </NavLink>
+            );
+          })}
+        </nav>
+        <div className={`px-4 py-3 border-t border-slate-100 shrink-0 ${collapsed ? "flex flex-col items-center gap-3 px-2" : ""}`}>
+          <div className={`flex items-center gap-2 ${collapsed ? "justify-center mb-0" : "mb-2"}`}>
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold shrink-0" title={collapsed ? (user?.full_name || user?.username) : undefined}>
+              {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
+            </div>
+            {!collapsed && (
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
+                <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
+              </div>
+            )}
+          </div>
+          <button onClick={onLogout} className={`flex items-center justify-center gap-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition ${collapsed ? "w-10 h-10 p-0" : "w-full px-3 py-2"}`} title={collapsed ? "Đăng xuất" : undefined}>
+            <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
+          </button>
+        </div>
+      </aside>
     </>
   );
 }
@@ -398,14 +395,18 @@ function ProductList({ onOpen, onCreate, onCopy }) {
     { key: "product_code", label: "Mã SP", filter: "text", render: (p) => <button onClick={() => onOpen(p.id)} className="text-blue-600 font-medium hover:underline">{p.product_code}</button> },
     { key: "product_name", label: "Tên sản phẩm", filter: "text", tdClass: "text-slate-800" },
     { key: "status", label: "Trạng thái", filter: "select", render: (p) => <StatusBadge status={p.status} /> },
-    { key: "product_type", label: "Loại", filter: "select", tdClass: "text-slate-600",
+    {
+      key: "product_type", label: "Loại", filter: "select", tdClass: "text-slate-600",
       filterValue: (r) => (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type),
-      render: (r) => (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type) },
+      render: (r) => (r.product_types && r.product_types.length ? r.product_types.join(", ") : r.product_type)
+    },
     { key: "description", label: "Mô tả", filter: "text", tdClass: "text-slate-500 max-w-xs truncate" },
-    { key: "_act", label: "Hành động", align: "center", render: (p) => (<>
+    {
+      key: "_act", label: "Hành động", align: "center", render: (p) => (<>
         {can("products", "create") && <button onClick={() => onCopy(p.id)} title="Sao chép thành SP mới" className="text-slate-400 hover:text-blue-600 transition p-1"><Copy size={16} /></button>}
         <button onClick={() => del(p.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 transition p-1"><Trash2 size={16} /></button>
-      </>) },
+      </>)
+    },
   ];
 
   return (
@@ -601,7 +602,7 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   // Mã dự kiến khi thêm mới
-  useEffect(() => { if (!productId) nextCode("products").then(setCode).catch(() => {}); }, [productId]);
+  useEffect(() => { if (!productId) nextCode("products").then(setCode).catch(() => { }); }, [productId]);
 
   // Sao chép từ sản phẩm nguồn → SP mới
   useEffect(() => {
@@ -698,22 +699,22 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
   const load = () => {
     if (!id) { onBack(); return Promise.resolve(); }
     return api.get(id).then((d) => {
-    setP(d);
-    setForm({
-      product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
-      product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
-      barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
-      is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
-    });
-    const whLimits = (d.warehouse_limits || []).map((w, i) => ({ _key: i + 1, ...w }));
-    setWarehouseLimits(whLimits);
-    const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
-    setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
-    setKeySeq((attrs.length || 1) + 1);
-  }).catch((e) => toast.error("Lỗi tải chi tiết: " + e.message));
+      setP(d);
+      setForm({
+        product_name: d.product_name || "", production_area: d.production_area || "", category: d.category || "",
+        product_types: (d.product_types && d.product_types.length) ? d.product_types : (d.product_type ? [d.product_type] : ["Thành phẩm"]), product_group: d.product_group || "", unit: d.unit || "",
+        barcode_type: d.barcode_type || "", tracking_type: d.tracking_type || "Theo lô",
+        is_pqc_required: !!d.is_pqc_required, status: d.status || "Hoạt động", description: d.description || "",
+      });
+      const whLimits = (d.warehouse_limits || []).map((w, i) => ({ _key: i + 1, ...w }));
+      setWarehouseLimits(whLimits);
+      const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
+      setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
+      setKeySeq((attrs.length || 1) + 1);
+    }).catch((e) => toast.error("Lỗi tải chi tiết: " + e.message));
   };
   useEffect(() => { load(); }, [id]); // eslint-disable-line
-  useEffect(() => { if (id) productRelated(id).then(setRelated).catch(() => {}); }, [id]);
+  useEffect(() => { if (id) productRelated(id).then(setRelated).catch(() => { }); }, [id]);
 
   // Tài liệu / hình ảnh đính kèm
   const [files, setFiles] = useState([]);
@@ -721,7 +722,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
   const [uploading, setUploading] = useState(false);
   const loadFiles = () => {
     if (!id) return;
-    productFiles.list(id).then((r) => { setFiles(r.data || []); setPreview(r.preview || null); }).catch(() => {});
+    productFiles.list(id).then((r) => { setFiles(r.data || []); setPreview(r.preview || null); }).catch(() => { });
   };
   useEffect(() => { loadFiles(); }, [id]); // eslint-disable-line
   const onUpload = async (fileList) => {
@@ -780,8 +781,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       <div className="flex gap-1 border-b border-slate-200">
         {tabs.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition ${
-              tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+            className={`px-4 py-2.5 text-sm font-medium -mb-px border-b-2 transition ${tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
             {t.label}
           </button>
         ))}
@@ -1222,7 +1222,7 @@ export default function MesApp() {
     auth.me().then((r) => setUser(r.user)).catch(() => { setToken(""); setUser(null); }).finally(() => setAuthLoading(false));
   }, []);
 
-  const logout = () => { auth.logout().catch(() => {}); setToken(""); setUser(null); navigate("/"); };
+  const logout = () => { auth.logout().catch(() => { }); setToken(""); setUser(null); navigate("/"); };
 
   // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập,
   // và làm mới mỗi khi đổi màn để các dropdown luôn có dữ liệu mới nhất.
@@ -1242,14 +1242,14 @@ export default function MesApp() {
       { key: "bom", path: "/bom" }, { key: "process", path: "/process" },
       { key: "inventory", path: "/inventory" }, { key: "qrlabels", path: "/qrlabels" },
       { key: "qrscan", path: "/qrscan" }, { key: "workschedule", path: "/workschedule" },
-      { key: "md_customers",  path: "/master-data/customers" },
-      { key: "md_employees",  path: "/master-data/employees" },
-      { key: "md_machines",   path: "/master-data/machines" },
-      { key: "md_shifts",     path: "/master-data/shifts" },
+      { key: "md_customers", path: "/master-data/customers" },
+      { key: "md_employees", path: "/master-data/employees" },
+      { key: "md_machines", path: "/master-data/machines" },
+      { key: "md_shifts", path: "/master-data/shifts" },
       { key: "md_warehouses", path: "/master-data/warehouses" },
-      { key: "md_locations",  path: "/master-data/locations" },
-      { key: "md_roles",      path: "/master-data/roles" },
-      { key: "masterdata",    path: "/master-data/customers" }, // backward compat
+      { key: "md_locations", path: "/master-data/locations" },
+      { key: "md_roles", path: "/master-data/roles" },
+      { key: "masterdata", path: "/master-data/customers" }, // backward compat
     ];
     const first = order.find((k) => perms[k.key]?.view === 'ALLOW' || perms[k.key]?.view === true);
     if (first) navigate(first.path, { replace: true });
@@ -1276,71 +1276,71 @@ export default function MesApp() {
 
   return (
     <PermProvider user={user}>
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
-      <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} mobileMenuOpen={mobileMenuOpen} onCloseMobile={() => setMobileMenuOpen(false)} />
-      
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Mobile Header */}
-        <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0 z-30 shadow-sm">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setMobileMenuOpen(true)} className="p-1 text-slate-500 hover:bg-slate-100 rounded">
-              <Menu size={20} />
-            </button>
-            <Logo className="h-6" />
-          </div>
-          <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-            {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
-          </div>
-        </div>
+      <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
+        <Sidebar user={user} onLogout={logout} collapsed={sidebarHidden} onToggle={() => setSidebarHidden(!sidebarHidden)} mobileMenuOpen={mobileMenuOpen} onCloseMobile={() => setMobileMenuOpen(false)} />
 
-        <div className="nav-scroll flex-1 overflow-y-auto p-4 md:p-8 relative">
-        <Routes>
-          <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
-          <Route path="/products" element={<ProductList 
-            onCreate={() => { setProductEditId(null); setProductCopyId(null); navigate("/products/form"); }}
-            onCopy={(id) => { setProductEditId(null); setProductCopyId(id); navigate("/products/form"); }}
-            onOpen={(id) => { setDetailId(id); setDetailBack("/products"); navigate("/products/detail"); }} 
-          />} />
-          <Route path="/products/form" element={lookups ? <ProductForm productId={productEditId} copyId={productCopyId} lookups={lookups}
-            onBack={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
-            onSaved={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }} 
-          /> : loadingEl} />
-          <Route path="/products/detail" element={lookups ? <ProductDetail id={detailId} onBack={() => navigate(detailBack)}
-            onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} lookups={lookups}
-          /> : loadingEl} />
-          
-          <Route path="/planning" element={lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "/planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl} />
-          <Route path="/production" element={lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
-            onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
-          <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
-          <Route path="/execution" element={needLookups(ExecutionModule)} />
-          <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
-          <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
-          <Route path="/inventory/inbound" element={lookups ? <InboundModule lookups={lookups} /> : loadingEl} />
-          <Route path="/inventory/outbound" element={lookups ? <OutboundModule lookups={lookups} /> : loadingEl} />
-          <Route path="/inventory/transfer" element={lookups ? <TransferModule lookups={lookups} /> : loadingEl} />
-          <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
-          <Route path="/traceability/lot" element={<TraceabilityLot />} />
-          <Route path="/master-data/roles" element={<RolesModule />} />
-          <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
-          <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
-          <Route path="/qrlabels" element={<QrLabelsModule />} />
-          <Route path="/qrscan" element={<QrScanModule />} />
-          <Route path="/reports" element={needLookups(ReportsModule)} />
-          <Route path="/reports/inventory" element={lookups ? <InventoryReport lookups={lookups} /> : loadingEl} />
-          <Route path="/reports/employees" element={<EmployeeReport />} />
-          <Route path="/permissions" element={<PermissionsModule />} />
-          <Route path="/users" element={needLookups(UsersModule)} />
-          <Route path="/bom" element={needLookups(BomModule)} />
-          <Route path="/process" element={needLookups(ProcessModule)} />
-          <Route path="/orders" element={lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl} />
-          <Route path="/deliveries" element={lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-        </div>
-      </main>
+        <main className="flex-1 flex flex-col relative overflow-hidden">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200 shrink-0 z-30 shadow-sm">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setMobileMenuOpen(true)} className="p-1 text-slate-500 hover:bg-slate-100 rounded">
+                <Menu size={20} />
+              </button>
+              <Logo className="h-6" />
+            </div>
+            <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
+              {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
+            </div>
+          </div>
 
-    </div>
+          <div className="nav-scroll flex-1 overflow-y-auto p-4 md:p-8 relative">
+            <Routes>
+              <Route path="/" element={<Dashboard onNav={navigate} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} />} />
+              <Route path="/products" element={<ProductList
+                onCreate={() => { setProductEditId(null); setProductCopyId(null); navigate("/products/form"); }}
+                onCopy={(id) => { setProductEditId(null); setProductCopyId(id); navigate("/products/form"); }}
+                onOpen={(id) => { setDetailId(id); setDetailBack("/products"); navigate("/products/detail"); }}
+              />} />
+              <Route path="/products/form" element={lookups ? <ProductForm productId={productEditId} copyId={productCopyId} lookups={lookups}
+                onBack={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
+                onSaved={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
+              /> : loadingEl} />
+              <Route path="/products/detail" element={lookups ? <ProductDetail id={detailId} onBack={() => navigate(detailBack)}
+                onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} lookups={lookups}
+              /> : loadingEl} />
+
+              <Route path="/planning" element={lookups ? <PlanningModule lookups={lookups} onOpenOrder={goProductionOrder} onOpenProduct={(id) => goProductDetail(id, "/planning")} initialTab={planningTab} onTabChange={setPlanningTab} /> : loadingEl} />
+              <Route path="/production" element={lookups ? <ProductionModule lookups={lookups} focusId={focusOrderId} onFocusConsumed={() => setFocusOrderId(null)}
+                onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
+              <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
+              <Route path="/execution" element={needLookups(ExecutionModule)} />
+              <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
+              <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
+              <Route path="/inventory/inbound" element={lookups ? <InboundModule lookups={lookups} /> : loadingEl} />
+              <Route path="/inventory/outbound" element={lookups ? <OutboundModule lookups={lookups} /> : loadingEl} />
+              <Route path="/inventory/transfer" element={lookups ? <TransferModule lookups={lookups} /> : loadingEl} />
+              <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
+              <Route path="/traceability/lot" element={<TraceabilityLot />} />
+              <Route path="/master-data/roles" element={<RolesModule />} />
+              <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
+              <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
+              <Route path="/qrlabels" element={<QrLabelsModule />} />
+              <Route path="/qrscan" element={<QrScanModule />} />
+              <Route path="/reports" element={needLookups(ReportsModule)} />
+              <Route path="/reports/inventory" element={lookups ? <InventoryReport lookups={lookups} /> : loadingEl} />
+              <Route path="/reports/employees" element={<EmployeeReport />} />
+              <Route path="/permissions" element={<PermissionsModule />} />
+              <Route path="/users" element={needLookups(UsersModule)} />
+              <Route path="/bom" element={needLookups(BomModule)} />
+              <Route path="/process" element={needLookups(ProcessModule)} />
+              <Route path="/orders" element={lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl} />
+              <Route path="/deliveries" element={lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </div>
+        </main>
+
+      </div>
     </PermProvider>
   );
 }
