@@ -241,9 +241,24 @@ export function usePager(rows, initialSize = 10) {
 /* ---- Bảng dữ liệu có bộ lọc theo từng cột ---- */
 // Bỏ dấu tiếng Việt để lọc "gần đúng"
 const stripAccent = (s) => String(s ?? "").toLowerCase().normalize("NFD")
-  .replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
+.replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
 
 const alignCls = (a) => a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
+
+export function DateInput({ value, onChange, placeholder = "dd/mm/yyyy", className, ...props }) {
+  return (
+    <input
+      type={value ? "date" : "text"}
+      onFocus={(e) => (e.target.type = "date")}
+      onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
+      placeholder={placeholder}
+      value={value || ""}
+      onChange={onChange}
+      className={className}
+      {...props}
+    />
+  );
+}
 
 /**
  * Bảng dùng chung: có hàng bộ lọc ngay trên hàng tiêu đề cột.
@@ -291,7 +306,7 @@ export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "K
                       {distinct(c).map((v) => <option key={v} value={v}>{v}</option>)}
                     </select>
                   ) : c.filter === "date" ? (
-                    <input type="date" value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} className={inputCls} />
+                    <DateInput value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} className={inputCls} />
                   ) : c.filter === "text" ? (
                     <input value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} placeholder={c.label} className={inputCls} />
                   ) : null}
