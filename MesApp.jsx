@@ -200,9 +200,9 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     {
       key: "grp_sys", label: "Quản trị hệ thống", icon: Shield,
       children: [
-        { key: "users",        label: "Tài khoản",          icon: UserCog,    adminOnly: true, path: "/users" },
-        { key: "md:roles",     label: "Vai trò",             icon: Shield,     path: "/master-data/roles",    perm: "md_roles" },
-        { key: "permissions",  label: "Phân quyền",          icon: ShieldCheck, adminOnly: true, path: "/permissions" },
+        { key: "users",        label: "Tài khoản",           icon: UserCog,    perm: "sys_users", path: "/users" },
+        { key: "md:roles",     label: "Vai trò & Phân quyền",icon: Shield,     path: "/master-data/roles", perm: "md_roles" },
+        { key: "sys_config",   label: "Cấu hình hệ thống",   icon: Cog,        perm: "sys_config", path: "#" },
       ]
     }
   ];
@@ -1234,7 +1234,7 @@ export default function MesApp() {
   useEffect(() => {
     if (!user || user.is_admin || location.pathname !== "/") return;
     const perms = user.permissions || {};
-    if (perms.dashboard?.view === 'ALLOW' || perms.dashboard?.view === true) return;
+    if (perms.dashboard?.view === 'ALLOW' || perms.dashboard?.view === true || perms.dashboard?.view?.status === 'ALLOW') return;
     const order = [
       { key: "execution", path: "/execution" }, { key: "production", path: "/production" },
       { key: "planning", path: "/planning" }, { key: "orders", path: "/orders" },
