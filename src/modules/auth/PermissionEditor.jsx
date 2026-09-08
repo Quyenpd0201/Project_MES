@@ -59,6 +59,11 @@ const MODULE_ROUTES = {
   md_locations: "/api/locations",
   md_customers: "/api/customers",
   md_roles:     "/api/roles",
+  // Quản trị hệ thống
+  sys_users:       "/api/users",
+  sys_permissions: "/api/roles",
+  sys_config:      "/api/system/config",
+  sys_logs:        "/api/system/logs",
 };
 
 export const PERM_TREE = [
@@ -116,6 +121,16 @@ export const PERM_TREE = [
       { key: "reports",       label: "Báo cáo KPI",          actions: ["view","export"] },
       { key: "rep_inv",       label: "Báo cáo kho",          actions: ["view","export"] },
       { key: "rep_employee",  label: "Hiệu suất nhân viên",  actions: ["view","export"] },
+    ]
+  },
+  {
+    category: "Quản trị hệ thống",
+    icon: ShieldCheck,
+    modules: [
+      { key: "sys_users",       label: "Tài khoản người dùng", actions: ["view", "create", "edit", "delete"] },
+      { key: "sys_permissions", label: "Phân quyền hệ thống",   actions: ["view", "edit"] },
+      { key: "sys_config",      label: "Cấu hình hệ thống",     actions: ["view", "edit"] },
+      { key: "sys_logs",        label: "Nhật ký hoạt động",     actions: ["view", "export"] },
     ]
   },
   {
