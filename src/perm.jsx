@@ -29,8 +29,7 @@ export function usePerm() {
     if (fp === "view") return "view";
     if (fp === "edit") return "edit";
     // INHERIT hoặc không có → dùng quyền hành động module làm fallback
-    return (perms[app]?.edit === 'ALLOW' || perms[app]?.edit === true ||
-            perms[app]?.create === 'ALLOW' || perms[app]?.create === true) ? "edit" : "view";
+    return (can(app, "edit") || can(app, "create")) ? "edit" : "view";
   };
 
   // Quyền trường KÍN (opt-in): mặc định 'hidden', chỉ admin hoặc role được cấp mới thấy.
