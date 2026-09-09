@@ -9,13 +9,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 
 
 router.get('/customers/:id/orders', salesOrders.byCustomer);
 router.get('/sales-orders', salesOrders.list);
-router.post('/sales-orders', requirePerm('sales:edit'), salesOrders.create);
+router.post('/sales-orders', requirePerm('orders:create'), salesOrders.create);
 router.get('/sales-orders/:id', salesOrders.getById);
-router.put('/sales-orders/:id', requirePerm('sales:edit'), salesOrders.update);
-router.delete('/sales-orders/:id', requirePerm('sales:edit'), salesOrders.remove);
+router.put('/sales-orders/:id', requirePerm('orders:edit'), salesOrders.update);
+router.delete('/sales-orders/:id', requirePerm('orders:delete'), salesOrders.remove);
 
 // Upload Excel
-router.post('/import/orders/preview', requirePerm('sales:edit'), importCtrl.previewOrders);
-router.post('/import/orders/confirm', requirePerm('sales:edit'), importCtrl.confirmOrders);
+router.post('/import/orders/preview', requirePerm('orders:create'), importCtrl.previewOrders);
+router.post('/import/orders/confirm', requirePerm('orders:create'), importCtrl.confirmOrders);
 
 module.exports = router;

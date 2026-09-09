@@ -4,9 +4,9 @@ const { requirePerm } = require('../../core/requireAuth');
 const bom = require('./bomController');
 
 router.get('/boms', bom.list);
-router.post('/boms', requirePerm('engineering:edit'), bom.create);
+router.post('/boms', requirePerm('bom:create'), bom.create);
 router.get('/boms/:id', bom.getById);
-router.put('/boms/:id', requirePerm('engineering:edit'), bom.update);
-router.delete('/boms/:id', requirePerm('engineering:edit'), bom.remove);
+router.put('/boms/:id', requirePerm('bom:edit'), bom.update);
+router.delete('/boms/:id', requirePerm('bom:delete'), bom.remove);
 
 module.exports = router;
