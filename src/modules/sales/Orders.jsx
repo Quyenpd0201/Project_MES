@@ -111,7 +111,7 @@ function MaterialTag({ materials }) {
 }
 
 /* ---- Danh sách Lệnh sản xuất gắn với dòng hàng (1 dòng → nhiều LSX) ---- */
-function LsxLinks({ orders }) {
+function LsxLinks({ orders, onOpenProductionOrder }) {
   return (
     <div className="pl-8">
       <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Lệnh sản xuất</div>
@@ -119,7 +119,7 @@ function LsxLinks({ orders }) {
         <div className="flex flex-wrap gap-2">
           {orders.map((o) => (
             <span key={o.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs">
-              <Link to="/production" className="font-semibold text-blue-600 hover:underline" title="Đến màn Lệnh sản xuất">{o.order_code}</Link>
+              <button type="button" onClick={() => onOpenProductionOrder && onOpenProductionOrder(o.id)} className="font-semibold text-blue-600 hover:underline" title="Đến màn Lệnh sản xuất">{o.order_code}</button>
               <span className="text-slate-400">·</span>
               <span className="text-slate-500">{fmt(o.quantity)} {o.unit}</span>
               <span className={"px-1.5 py-0.5 rounded-full text-[10px] " + statusClass(o.status)}>{o.status}</span>
@@ -357,23 +357,23 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
 }
 
 /* ---- Form đơn hàng ---- */
-function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreateDelivery }) {
+function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreateDelivery, onOpenProductionOrder }) {
   const { can, fperm } = usePerm();
   const fhid = (k) => fperm("orders", k) === "hidden";
   const fdis = (k) => fperm("orders", k) !== "edit";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [allocating, setAllocating] = useState(false);
-  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", material_type: null, priority: "Trung bình", mix_ratio: [] });
-  const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]);
+  const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", priority: "Trung bình", mix_ratio: [] });
+  const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null }]);
   const [seq, setSeq] = useState(2);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
   const loadData = useCallback(() => {
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", material_type: d.material_type || null, priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
-      setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [] })));
+      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
+      setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [], material_type: it.material_type || null })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
   }, [editId]); // eslint-disable-line
@@ -383,13 +383,13 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   useEffect(() => {
     if (editId || !copyId) return;
     ordersApi.get(copyId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", material_type: null, priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
-      setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "" })));
+      setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
+      setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "", material_type: it.material_type || null })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
-  const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "" }]); setSeq((s) => s + 1); };
+  const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null }]); setSeq((s) => s + 1); };
   const rmItem = (k) => setItems((a) => a.filter((x) => x._k !== k));
   const upItem = (k, fld, v) => setItems((a) => a.map((x) => {
     if (x._k !== k) return x;
@@ -457,140 +457,8 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         {!fhid("order_date") && <Field label="Ngày đặt"><DateInput className={inputCls} disabled={fdis("order_date")} value={f.order_date} onChange={(e) => set("order_date", e.target.value)} /></Field>}
         {!fhid("due_date") && <Field label="Ngày giao"><DateInput className={inputCls} disabled={fdis("due_date")} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} /></Field>}
         </div>
-        {/* Loại nguyên liệu */}
-        <div className="mt-4 pt-4 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Loại nguyên liệu</p>
-          <div className="flex gap-4">
-            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-              f.material_type === 'zin'
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
-              <input type="checkbox" className="hidden" disabled={!editing}
-                checked={f.material_type === 'zin'}
-                onChange={() => set("material_type", f.material_type === 'zin' ? null : 'zin')} />
-              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                f.material_type === 'zin' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
-              }`}>
-                {f.material_type === 'zin' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
-              </span>
-              <span className="text-sm font-medium">Hàng zin</span>
-              <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
-            </label>
-            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-              f.material_type === 'pha'
-                ? 'border-amber-500 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
-              <input type="checkbox" className="hidden" disabled={!editing}
-                checked={f.material_type === 'pha'}
-                onChange={() => set("material_type", f.material_type === 'pha' ? null : 'pha')} />
-              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                f.material_type === 'pha' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
-              }`}>
-                {f.material_type === 'pha' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
-              </span>
-              <span className="text-sm font-medium">Hàng pha</span>
-              <span className="text-xs text-slate-400">(tái chế)</span>
-            </label>
-            {f.material_type && editing && (
-              <button type="button" onClick={() => set("material_type", null)}
-                className="text-xs text-slate-400 hover:text-slate-600 underline self-center">
-                Bỏ chọn
-              </button>
-            )}
-          </div>
-          {f.material_type === 'pha' && (
-            <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
-                    <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
-                    <th className="px-3 py-2.5 uppercase tracking-wider">Nguyên vật liệu</th>
-                    <th className="px-3 py-2.5 w-32 uppercase tracking-wider">Tỷ lệ (%)</th>
-                    {editing && <th className="px-3 py-2.5 w-10"></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(f.mix_ratio || []).map((r, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0 bg-white">
-                      <td className="px-3 py-2.5 text-center text-slate-500 font-medium">{i + 1}</td>
-                      <td className="px-3 py-2.5">
-                        {editing ? (
-                          <SearchSelect
-                            options={lookups.products.filter(p => p.product_type === 'Nguyên vật liệu').map(p => ({ value: p.id, label: p.product_name + (p.product_code ? ` (${p.product_code})` : '') }))}
-                            value={r.material_id}
-                            onChange={(v) => {
-                              const newArr = [...f.mix_ratio];
-                              newArr[i].material_id = v;
-                              set("mix_ratio", newArr);
-                            }}
-                            placeholder="Chọn..."
-                            className="w-full rounded border-slate-300 text-sm py-1.5 px-2"
-                          />
-                        ) : (
-                          <span className="font-medium text-slate-700">{lookups.products.find(p => p.id === r.material_id)?.product_name || "—"}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {editing ? (
-                          <input
-                            type="number"
-                            className={inputCls}
-                            value={r.ratio}
-                            onChange={(e) => {
-                              const newArr = [...f.mix_ratio];
-                              newArr[i].ratio = e.target.value;
-                              set("mix_ratio", newArr);
-                            }}
-                            placeholder="%"
-                          />
-                        ) : (
-                          <span className="font-medium">{r.ratio}%</span>
-                        )}
-                      </td>
-                      {editing && (
-                        <td className="px-3 py-2.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newArr = [...f.mix_ratio];
-                              newArr.splice(i, 1);
-                              set("mix_ratio", newArr);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {editing && (
-                <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => set("mix_ratio", [...(f.mix_ratio || []), { material_id: "", ratio: "" }])}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                  >
-                    <Plus size={14} /> THÊM NGUYÊN VẬT LIỆU
-                  </button>
-                  {(() => {
-                    const total = (f.mix_ratio || []).reduce((acc, curr) => acc + (Number(curr.ratio) || 0), 0);
-                    return total > 0 && total !== 100 ? (
-                      <span className="text-xs font-medium text-amber-600 flex items-center gap-1.5 bg-amber-50 px-2 py-1 rounded">
-                        <AlertCircle size={14} /> Tổng tỷ lệ đang là {total}% (khác 100%)
-                      </span>
-                    ) : null;
-                  })()}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </Section>
+
 
       {!fhid("items") && (
       <Section title="Dòng hàng" action={!fdis("items") && <button onClick={addItem} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm dòng</button>}>
@@ -637,6 +505,49 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                 </div>
               </div>
               <div className="pl-8">
+                <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Loại nguyên liệu</div>
+                <div className="flex gap-4">
+                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                    it.material_type === 'zin'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  } ${editing && !fdis("items") ? '' : 'cursor-default pointer-events-none'}`}>
+                    <input type="checkbox" className="hidden" disabled={!editing || fdis("items")}
+                      checked={it.material_type === 'zin'}
+                      onChange={() => upItem(it._k, "material_type", it.material_type === 'zin' ? null : 'zin')} />
+                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      it.material_type === 'zin' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+                    }`}>
+                      {it.material_type === 'zin' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+                    </span>
+                    <span className="text-sm font-medium">Hàng zin</span>
+                    <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
+                  </label>
+                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                    it.material_type === 'pha'
+                      ? 'border-amber-500 bg-amber-50 text-amber-800'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                  } ${editing && !fdis("items") ? '' : 'cursor-default pointer-events-none'}`}>
+                    <input type="checkbox" className="hidden" disabled={!editing || fdis("items")}
+                      checked={it.material_type === 'pha'}
+                      onChange={() => upItem(it._k, "material_type", it.material_type === 'pha' ? null : 'pha')} />
+                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      it.material_type === 'pha' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
+                    }`}>
+                      {it.material_type === 'pha' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+                    </span>
+                    <span className="text-sm font-medium">Hàng pha</span>
+                    <span className="text-xs text-slate-400">(tái chế)</span>
+                  </label>
+                  {it.material_type && editing && !fdis("items") && (
+                    <button type="button" onClick={() => upItem(it._k, "material_type", null)}
+                      className="text-xs text-slate-400 hover:text-slate-600 underline self-center">
+                      Bỏ chọn
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="pl-8">
                 <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Tiến độ</div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <label>
@@ -665,7 +576,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   placeholder="Ghi chú riêng cho dòng hàng (vd: cho tẩy thêm, pha 8-2…)"
                   onChange={(e) => upItem(it._k, "note", e.target.value)} />
               </div>
-              {editId && <LsxLinks orders={it.production_orders} />}
+              {editId && <LsxLinks orders={it.production_orders} onOpenProductionOrder={onOpenProductionOrder} />}
             </div>
           ))}
         </div>
@@ -1009,7 +920,7 @@ function ExcelImportModal({ onClose, onDone }) {
   );
 }
 
-export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCreateDelivery }) {
+export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCreateDelivery, onOpenProductionOrder }) {
   const { can } = usePerm();
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
@@ -1033,7 +944,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
 
   if (view === "form") return <OrderForm lookups={lookups} editId={editId} copyId={copyId}
     onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
-    onPrint={(id) => { setVoucherId(id); setView("voucher"); }} onCreateDelivery={onCreateDelivery} />;
+    onPrint={(id) => { setVoucherId(id); setView("voucher"); }} onCreateDelivery={onCreateDelivery} onOpenProductionOrder={onOpenProductionOrder} />;
   if (view === "voucher") return <OrderVoucher id={voucherId} onBack={() => setView("list")} />;
 
   const columns = [

@@ -139,7 +139,7 @@ exports.generate = async (req, res) => {
 
     await client.query('BEGIN');
     const items = (await client.query(`
-      SELECT it.*, so.customer_id, so.due_date, so.id AS so_id, so.material_type, so.priority
+      SELECT it.*, so.customer_id, so.due_date, so.id AS so_id, so.priority
       FROM sales_order_items it JOIN sales_orders so ON so.id = it.sales_order_id
       WHERE it.id = ANY($1::uuid[])`, [ids])).rows;
 

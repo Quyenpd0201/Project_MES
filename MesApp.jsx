@@ -1333,7 +1333,7 @@ export default function MesApp() {
               <Route path="/users" element={needLookups(UsersModule)} />
               <Route path="/bom" element={needLookups(BomModule)} />
               <Route path="/process" element={needLookups(ProcessModule)} />
-              <Route path="/orders" element={lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} /> : loadingEl} />
+              <Route path="/orders" element={lookups ? <OrdersModule lookups={lookups} focusId={focusSalesOrderId} onFocusConsumed={() => setFocusSalesOrderId(null)} onCreateDelivery={goNewDelivery} onOpenProductionOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/deliveries" element={lookups ? <DeliveriesModule lookups={lookups} focusOrderId={deliveryOrderId} onFocusConsumed={() => setDeliveryOrderId(null)} /> : loadingEl} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
