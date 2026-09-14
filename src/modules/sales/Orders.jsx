@@ -119,7 +119,7 @@ function LsxLinks({ orders, onOpenProductionOrder }) {
         <div className="flex flex-wrap gap-2">
           {orders.map((o) => (
             <span key={o.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs">
-              <button type="button" onClick={() => onOpenProductionOrder && onOpenProductionOrder(o.id)} className="font-semibold text-blue-600 hover:underline" title="Đến màn Lệnh sản xuất">{o.order_code}</button>
+              <a href="#" onClick={(e) => { e.preventDefault(); onOpenProductionOrder && onOpenProductionOrder(o.id); }} className="font-semibold text-blue-600 hover:underline" title="Đến màn Lệnh sản xuất">{o.order_code}</a>
               <span className="text-slate-400">·</span>
               <span className="text-slate-500">{fmt(o.quantity)} {o.unit}</span>
               <span className={"px-1.5 py-0.5 rounded-full text-[10px] " + statusClass(o.status)}>{o.status}</span>
