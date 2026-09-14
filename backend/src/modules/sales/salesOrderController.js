@@ -112,19 +112,19 @@ async function saveItems(client, orderId, items) {
     const a = legacyAttrs(specs);
     const base = [it.product_id, it.quantity, upUnit(it.unit), JSON.stringify(specs), buildSpecKey(specs),
     a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
-    it.planned_start_date || null, it.planned_end_date || null, it.material_type || null];
+    it.planned_start_date || null, it.planned_end_date || null, it.material_type || null, JSON.stringify(it.mix_ratio || [])];
     if (it.id) {
       await client.query(
         `UPDATE sales_order_items SET product_id=$1, quantity=$2, unit=$3, specs=$4::jsonb, spec_key=$5,
            attr_size=$6, attr_thickness=$7, attr_color=$8, core_weight=$9, total_weight=$10, note=$11,
-           planned_start_date=$12, planned_end_date=$13, material_type=$14
-         WHERE id=$15 AND sales_order_id=$16`, [...base, it.id, orderId]);
+           planned_start_date=$12, planned_end_date=$13, material_type=$14, mix_ratio=$15::jsonb
+         WHERE id=$16 AND sales_order_id=$17`, [...base, it.id, orderId]);
     } else {
       await client.query(
         `INSERT INTO sales_order_items
            (sales_order_id, product_id, quantity, unit, specs, spec_key, attr_size, attr_thickness, attr_color,
-            core_weight, total_weight, note, planned_start_date, planned_end_date, material_type)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+            core_weight, total_weight, note, planned_start_date, planned_end_date, material_type, mix_ratio)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)`,
         [orderId, ...base]);
     }
   }
