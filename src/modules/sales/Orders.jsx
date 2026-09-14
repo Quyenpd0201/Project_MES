@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle, CalendarClock } from "lucide-react";
 import { resource, salesOrders as salesOrdersApi, planning, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
@@ -118,7 +119,7 @@ function LsxLinks({ orders }) {
         <div className="flex flex-wrap gap-2">
           {orders.map((o) => (
             <span key={o.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs">
-              <span className="font-semibold text-slate-700">{o.order_code}</span>
+              <Link to="/production" className="font-semibold text-blue-600 hover:underline" title="Đến màn Lệnh sản xuất">{o.order_code}</Link>
               <span className="text-slate-400">·</span>
               <span className="text-slate-500">{fmt(o.quantity)} {o.unit}</span>
               <span className={"px-1.5 py-0.5 rounded-full text-[10px] " + statusClass(o.status)}>{o.status}</span>
@@ -455,7 +456,6 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         </Field>}
         {!fhid("order_date") && <Field label="Ngày đặt"><DateInput className={inputCls} disabled={fdis("order_date")} value={f.order_date} onChange={(e) => set("order_date", e.target.value)} /></Field>}
         {!fhid("due_date") && <Field label="Ngày giao"><DateInput className={inputCls} disabled={fdis("due_date")} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} /></Field>}
-        {!fhid("note") && <Field label="Ghi chú"><input className={inputCls} disabled={fdis("note")} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>}
         </div>
         {/* Loại nguyên liệu */}
         <div className="mt-4 pt-4 border-t border-slate-100">
@@ -665,7 +665,6 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   placeholder="Ghi chú riêng cho dòng hàng (vd: cho tẩy thêm, pha 8-2…)"
                   onChange={(e) => upItem(it._k, "note", e.target.value)} />
               </div>
-              {editId && <MaterialTag materials={it.materials} />}
               {editId && <LsxLinks orders={it.production_orders} />}
             </div>
           ))}
@@ -753,7 +752,6 @@ function OrderVoucher({ id, onBack }) {
             </tr>
           </tbody>
         </table>
-        {o.note && <div className="text-sm mt-4"><span className="text-slate-500">Ghi chú:</span> {o.note}</div>}
 
         <div className="grid grid-cols-2 gap-4 mt-10 text-center text-sm">
           <div><div className="font-medium">Người lập phiếu</div><div className="text-slate-400 text-xs">(Ký, ghi rõ họ tên)</div></div>
@@ -1050,7 +1048,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
       } },
     { key: "item_count", label: "Số dòng", align: "center" },
     { key: "total_qty", label: "Tổng SL", align: "right", render: (r) => fmt(r.total_qty) },
-    { key: "priority", label: "Ưu tiên", filter: "select", render: (r) => {
+    { key: "priority", label: "Ưu tiên", filter: "select", options: ["Cao", "Trung bình", "Thấp"], render: (r) => {
         if (r.priority === 'Cao') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>;
         if (r.priority === 'Thấp') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span>;
         return <span className="text-slate-500 text-sm whitespace-nowrap">Trung bình</span>;

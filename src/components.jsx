@@ -272,6 +272,7 @@ export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "K
   const cellValue = (c, r) => c.filterValue ? c.filterValue(r) : r[c.filterKey || c.key];
 
   const distinct = (c) => {
+    if (c.options) return c.options;
     const set = new Set();
     rows.forEach((r) => { const v = cellValue(c, r); if (v !== null && v !== undefined && v !== "") set.add(String(v)); });
     return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));

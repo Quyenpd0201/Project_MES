@@ -182,6 +182,12 @@ exports.generate = async (req, res) => {
         `UPDATE sales_order_items SET planned_qty = $1, is_planned = ($1 >= quantity) WHERE id = $2`,
         [newPlanned, it.id]);
     }
+
+    const soIds = Array.from(new Set(items.map(it => it.so_id)));
+    if (soIds.length > 0) {
+      await client.query(`UPDATE sales_orders SET status = 'Đang sản xuất' WHERE id = ANY($1::uuid[]) AND status = 'Mới'`, [soIds]);
+    }
+
     await client.query('COMMIT');
     res.status(201).json({ created });
   } catch (err) {
