@@ -11,7 +11,7 @@ function mergePermissions(parentPerms, childPerms) {
     const cApp = child[appKey];
 
     // Handle old boolean style or new style actions
-    for (const action of ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'import', 'export', 'print', 'execute', 'assign', 'cancel', 'complete']) {
+    for (const action of ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'import', 'export', 'print', 'execute', 'assign', 'cancel', 'complete', 'view_amounts']) {
       if (cApp[action] !== undefined) {
         if (cApp[action] === 'INHERIT' || cApp[action] === '') {
            // inherit: do nothing, keep parent
