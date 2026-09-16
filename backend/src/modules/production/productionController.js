@@ -267,15 +267,15 @@ exports.create = async (req, res) => {
       `INSERT INTO production_orders
          (sales_order_id, customer_id, product_id, quantity, unit,
           specs, spec_key, attr_size, attr_thickness, attr_color, finishing,
-          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker, priority, mix_ratio)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+          machine_id, planned_date, shift, assigned_team, group_key, due_date, status, note, assigned_worker, priority, mix_ratio, material_type)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
         b.sales_order_id || null, b.customer_id || null, b.product_id, b.quantity, upUnit(b.unit),
         JSON.stringify(specs), buildSpecKey(specs), a.size || null, a.thickness || null, a.color || null, JSON.stringify(finishing),
         b.machine_id || null, b.planned_date || null, b.shift || null, b.assigned_team || null,
         group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority,
-        JSON.stringify(b.mix_ratio || [])
+        JSON.stringify(b.mix_ratio || []), b.material_type || null
       ]
     );
     res.status(201).json(rows[0]);
@@ -286,7 +286,7 @@ exports.update = async (req, res) => {
   try {
     const b = req.body;
     const fields = ['sales_order_id','customer_id','product_id','quantity','unit',
-      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority','mix_ratio'];
+      'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority','mix_ratio','material_type'];
     const cols = [], vals = []; let i = 1;
     for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(f === 'unit' ? upUnit(b[f]) : (b[f] === '' ? null : (f === 'mix_ratio' ? JSON.stringify(b[f]) : b[f]))); }
     if (b.finishing !== undefined) {
