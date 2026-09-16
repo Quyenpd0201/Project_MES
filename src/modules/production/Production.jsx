@@ -441,7 +441,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       </Section>
       )}
 
-      {!fhid("finishing") && (
+      {false /* !fhid("finishing") */ && (
       <Section title="Yêu cầu gia công hoàn thiện">
         <fieldset disabled={fdis("finishing")}>
         <div className="flex flex-wrap gap-3">
