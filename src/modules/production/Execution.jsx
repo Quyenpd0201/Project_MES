@@ -241,7 +241,7 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
 
 export default function ExecutionModule({ lookups }) {
   const { can, user } = usePerm();
-  const canEdit = can("execution", "edit");
+  const canEdit = can("execution", "execute");
   // Người dùng bị giới hạn theo Đội (không phải admin + có gắn đội) → chỉ thấy việc của đội đó
   const lockedTeam = (!user?.is_admin && user?.team) ? user.team : "";
   const [rows, setRows] = useState([]);
