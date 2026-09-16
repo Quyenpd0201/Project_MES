@@ -531,7 +531,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       )}
       </fieldset>
 
-      {editId && (
+      {false /* editId */ && (
         <Section title="Mã truy xuất các lô"
           action={tasks.some((t) => t.task_code) && <button onClick={() => window.print()} className="btn-ghost"><Printer size={16} /> In danh sách</button>}>
           <div className="po-qr-area flex flex-wrap gap-3">
