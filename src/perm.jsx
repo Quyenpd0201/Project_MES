@@ -37,7 +37,13 @@ export function usePerm() {
   const fpermSecret = (app, field) => {
     if (isAdmin) return "edit";
     const fp = perms[app]?.fields?.[field];
-    return fp === "edit" || fp === "view" ? fp : "hidden";
+    if (fp === "edit" || fp === "view") return fp;
+    
+    // Tích hợp với action view_amounts để quản lý qua giao diện UI phân quyền
+    if (app === "deliveries" && field === "amounts" && can("deliveries", "view_amounts")) {
+      return "edit"; // Hoặc view tuỳ logic, nhưng thường là edit/view đều show được
+    }
+    return "hidden";
   };
   return { isAdmin, can, fperm, fpermSecret, user };
 }

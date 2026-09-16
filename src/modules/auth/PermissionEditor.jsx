@@ -16,7 +16,7 @@ export const ACTION_LABELS = {
   view: "Xem", create: "Tạo mới", edit: "Sửa", delete: "Xóa",
   approve: "Duyệt", publish: "Phát hành", assign: "Phân công",
   execute: "Thực thi", import: "Import", export: "Xuất Excel",
-  print: "In tem"
+  print: "In tem", view_amounts: "Xem Kế toán/Tiền"
 };
 
 // HTTP method tương ứng với từng action
@@ -79,7 +79,7 @@ export const PERM_TREE = [
     icon: Calendar,
     modules: [
       { key: "orders",       label: "Đơn hàng",            actions: ["view","create","edit","delete","approve"] },
-      { key: "deliveries",   label: "Phiếu giao hàng",      actions: ["view","create","edit","delete","approve"] },
+      { key: "deliveries",   label: "Phiếu giao hàng",      actions: ["view","create","edit","delete","approve", "view_amounts"] },
       { key: "planning",     label: "Kế hoạch sản xuất",    actions: ["view","create","edit","publish"] },
       { key: "workschedule", label: "Lịch sản xuất",        actions: ["view","create","edit","publish"] },
     ]
