@@ -106,6 +106,7 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
                 <tr><th className="text-left px-3 py-2">Đơn hàng</th><th className="text-left px-3 py-2">Khách</th>
+                  <th className="text-left px-3 py-2">Ghi chú</th><th className="text-left px-3 py-2">Nguyên liệu</th>
                   <th className="text-right px-3 py-2">Còn lại</th><th className="text-right px-3 py-2 w-28">SL sản xuất</th></tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -113,6 +114,10 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
                   <tr key={it.item_id}>
                     <td className="px-3 py-2 font-medium text-blue-600">{it.order_code}</td>
                     <td className="px-3 py-2 text-slate-600">{it.customer_name || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500">{it.note || "—"}</td>
+                    <td className="px-3 py-2 text-slate-500">
+                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs">✦ Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs">⟳ Hàng pha</span> : "—"}
+                    </td>
                     <td className="px-3 py-2 text-right text-slate-500">{fmt(rem(it))} {it.unit}</td>
                     <td className="px-3 py-2 text-right">
                       <input type="number" min="0" max={rem(it)} className={inputCls + " text-right py-1"}
@@ -325,7 +330,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
             </div>
             <table className="w-full text-sm">
               <thead className="text-slate-400 text-xs uppercase">
-                <tr>{["Đơn hàng", "Khách", "Ưu tiên", "Đặt", "Còn lại", "Ngày giao"].map((h) => <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
+                <tr>{["Đơn hàng", "Khách", "Ưu tiên", "Đặt", "Còn lại", "Ngày giao", "Ghi chú", "Nguyên liệu"].map((h) => <th key={h} className="text-left px-4 py-2 font-medium">{h}</th>)}</tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {b.items.map((it) => (
@@ -339,6 +344,10 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
                     <td className="px-4 py-2 text-slate-500">{fmt(it.quantity)} {it.unit}</td>
                     <td className="px-4 py-2 font-medium text-slate-800">{fmt(it.remaining ?? it.quantity)} {it.unit}</td>
                     <td className="px-4 py-2">{fmtDate(it.due_date)}</td>
+                    <td className="px-4 py-2 text-slate-500">{it.note || "—"}</td>
+                    <td className="px-4 py-2 text-slate-500">
+                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✦ Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-100">⟳ Hàng pha</span> : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
