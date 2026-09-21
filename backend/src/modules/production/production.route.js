@@ -18,6 +18,10 @@ router.get('/production-orders/:id/tasks', production.getTasks);
 router.put('/production-orders/:id/tasks', requirePerm('production:edit'), production.saveTasks);
 router.get('/production-orders/:id/materials', production.getMaterials);
 router.post('/production-orders/:id/materials', requirePerm('production:edit'), production.saveMaterials);
+// NVL cần cung cấp (kế hoạch cấp NVL) + Yêu cầu NVL → xuất kho
+router.get('/production-orders/:id/planned-materials', production.getPlannedMaterials);
+router.post('/production-orders/:id/planned-materials', requirePerm('production:edit'), production.savePlannedMaterials);
+router.post('/production-orders/:id/request-materials', requirePerm('production:edit'), production.requestMaterials);
 router.delete('/production-orders/:id', requirePerm('production:delete'), production.remove);
 
 module.exports = router;

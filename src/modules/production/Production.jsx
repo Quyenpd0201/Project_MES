@@ -3,11 +3,12 @@ import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChart
 import { production, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect } from "../../components.jsx";
+import { PackageCheck } from "lucide-react";
 import Qr from "../../Qr.jsx";
 import ProductionGantt from "./ProductionGantt.jsx";
 
-const STATUSES = ["Chờ duyệt", "Đã lên kế hoạch", "Đang sản xuất", "Hoàn thành", "Đã hủy"];
+const STATUSES = ["Chờ duyệt", "Đã lên kế hoạch", "Chờ nguyên vật liệu", "Đang sản xuất", "Hoàn thành", "Đã hủy"];
 
 /* ---- Form tạo / sửa lệnh sản xuất ---- */
 function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
@@ -15,7 +16,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const fhid = (k) => fperm("production", k) === "hidden";
   const fdis = (k) => fperm("production", k) !== "edit";
   const [f, setF] = useState({
-    attr_size: "", attr_thickness: "", attr_color: "", due_date: "", note: "", priority: "Trung bình", material_type: null, mix_ratio: []
+    attr_size: "", attr_thickness: "", attr_color: "", due_date: "", note: "", priority: "Trung bình", material_type: null, mix_ratio: [], status: ""
   });
   const [finishing, setFinishing] = useState(
     (lookups.finishingOptions || []).map((name) => ({ name, checked: false }))
@@ -111,6 +112,45 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
     defaults: { shift: meta.shift, assigned_team: meta.assigned_team, assigned_worker: meta.assigned_worker, machine_id: meta.machine_id, planned_date: meta.planned_date?.slice(0, 10) },
   } : {});
 
+  // NVL cần cung cấp (kế hoạch cấp NVL) + trạng thái đã yêu cầu (xuất kho)
+  const [plannedMats, setPlannedMats] = useState([]);
+  const [matsIssued, setMatsIssued] = useState(false);
+  const [slip, setSlip] = useState(null); // phiếu xuất kho mới nhất {id, slip_code, status}
+  const [pmSeq, setPmSeq] = useState(1);
+  const [pmBusy, setPmBusy] = useState(false);
+  const nvlOptions = (lookups.products || []).filter((p) => p.product_type === 'Nguyên vật liệu')
+    .map((p) => ({ value: p.id, label: `${p.product_name}${p.product_code ? ` (${p.product_code})` : ''}` }));
+  const addMat = () => { setPlannedMats((a) => [...a, { _k: pmSeq, material_id: "", qty: "", unit: "", note: "", on_hand: null }]); setPmSeq((s) => s + 1); };
+  const rmMat = (k) => setPlannedMats((a) => a.filter((x) => x._k !== k));
+  const upMat = (k, field, v) => setPlannedMats((a) => a.map((x) => {
+    if (x._k !== k) return x;
+    const nx = { ...x, [field]: v };
+    if (field === 'material_id') { const p = (lookups.products || []).find((pp) => pp.id === v); nx.unit = p?.unit || x.unit; nx.on_hand = null; }
+    return nx;
+  }));
+  const suggestFromBom = async () => {
+    try {
+      const d = await production.materials(editId);
+      if (!d.has_bom || !d.lines?.length) return toast.error('Sản phẩm chưa có BOM để gợi ý.');
+      setPlannedMats(d.lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, qty: Math.round((l.suggested_qty || 0) * 100) / 100, unit: l.unit || '', note: '', on_hand: l.on_hand })));
+      setPmSeq(d.lines.length + 1);
+      toast.success(`Đã đổ ${d.lines.length} NVL gợi ý từ BOM. Hãy chỉnh/xóa theo thực tế rồi Lưu.`);
+    } catch (e) { toast.error('Lỗi lấy gợi ý BOM: ' + e.message); }
+  };
+  const requestMats = async () => {
+    const lines = plannedMats.filter((m) => m.material_id && Number(m.qty) > 0);
+    if (!lines.length) return toast.error('Chưa có NVL cần cung cấp (số kg > 0) để yêu cầu.');
+    if (!confirm(`Tạo phiếu xuất kho (Chờ xuất) cho ${lines.length} NVL?\nPhiếu sẽ gửi sang app Xuất kho để xác nhận trừ kho. Danh sách NVL sẽ bị khóa.`)) return;
+    setPmBusy(true);
+    try {
+      const r = await production.requestMaterials(editId, lines);
+      toast.success(r.message || 'Đã tạo phiếu xuất kho.');
+      setMatsIssued(true);
+      loadData();
+    } catch (e) { toast.error(e.message); }
+    finally { setPmBusy(false); }
+  };
+
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [meta, setMeta] = useState(null); // dữ liệu lệnh đã nạp (mã lệnh, SP, đơn...) cho tem QR
 
@@ -123,7 +163,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         product_id: d.product_id, customer_id: d.customer_id || "", quantity: d.quantity, unit: d.unit || "",
         attr_size: d.attr_size || "", attr_thickness: d.attr_thickness || "", attr_color: d.attr_color || "",
         due_date: d.due_date?.slice(0, 10) || "", note: d.note || "", priority: d.priority || "Trung bình",
-        material_type: d.material_type || null, mix_ratio: d.mix_ratio || []
+        material_type: d.material_type || null, mix_ratio: d.mix_ratio || [], status: d.status || ""
       });
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
@@ -145,6 +185,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             defaults: { shift: d.shift, assigned_team: d.assigned_team, assigned_worker: d.assigned_worker, machine_id: d.machine_id, planned_date: d.planned_date?.slice(0, 10) },
           });
         }
+      }).catch(() => {});
+      // NVL cần cung cấp + trạng thái đã xuất kho
+      production.plannedMaterials(editId).then((pm) => {
+        setMatsIssued(!!pm.materials_issued);
+        setSlip(pm.slip || null);
+        setPlannedMats((pm.lines || []).map((l, i) => ({ _k: i + 1, material_id: l.material_id, qty: Number(l.qty), unit: l.unit || '', note: l.note || '', on_hand: Number(l.on_hand) })));
+        setPmSeq((pm.lines || []).length + 1);
       }).catch(() => {});
     }).catch((e) => toast.error("Lỗi tải lệnh sản xuất: " + e.message));
   }, [editId]); // eslint-disable-line
@@ -182,8 +229,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
     if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Vui lòng nhập Số lượng hợp lệ");
     try {
       if (editId) {
-        await production.update(editId, { ...f, finishing });
-        await production.saveTasks(editId, tasks.filter((t) => t.stage));
+        // Status: chỉ áp khi người dùng CHỦ ĐỘNG đổi (khác trạng thái đã nạp).
+        const statusChanged = f.status && f.status !== meta?.status;
+        const { status, ...rest } = f;
+        await production.update(editId, { ...rest, finishing });          // các trường (kể cả SL mới), chưa đụng status
+        await production.saveTasks(editId, tasks.filter((t) => t.stage)); // recompute status theo tiến độ + SL mới
+        if (statusChanged) await production.update(editId, { status });   // áp status thủ công cuối cùng → thắng recompute
+        if (!matsIssued) await production.savePlannedMaterials(editId, plannedMats.filter((m) => m.material_id));
         toast.success("Lưu lệnh sản xuất thành công");
       } else {
         await production.create({ ...f, finishing });
@@ -200,8 +252,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
 
   return (
     <div className="space-y-5">
-      <PageHeader title={!editId ? (copyId ? "Tạo lệnh sản xuất (sao chép)" : "Tạo lệnh sản xuất") : editing ? "Sửa lệnh sản xuất" : "Chi tiết lệnh sản xuất"} onBack={onBack}
+      <PageHeader title={<span className="inline-flex items-center gap-2 flex-wrap">
+          {!editId ? (copyId ? "Tạo lệnh sản xuất (sao chép)" : "Tạo lệnh sản xuất") : editing ? "Sửa lệnh sản xuất" : "Chi tiết lệnh sản xuất"}
+          {meta?.order_code && <span className="text-slate-400 font-normal">· {meta.order_code}</span>}
+          {editId && meta?.status && <span className={`inline-flex px-2.5 py-0.5 rounded-full text-sm font-medium ${statusClass(meta.status)}`}>{meta.status}</span>}
+        </span>} onBack={onBack}
         actions={editId && !editing ? (<>
+          {can("production", "edit") && !matsIssued && <button onClick={requestMats} disabled={pmBusy} className="btn-ghost text-amber-700 border-amber-300 hover:bg-amber-50"><PackageCheck size={16} /> Yêu cầu NVL</button>}
           {can("production", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("production", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
@@ -239,6 +296,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
               <option value="Trung bình">Trung bình</option>
               <option value="Thấp">Thấp</option>
             </select>
+          </Field>}
+          {editId && <Field label="Trạng thái">
+            <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+              {!f.status && <option value="">-- Chọn trạng thái --</option>}
+              {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <p className="text-[11px] text-slate-400 mt-1">Có thể chuyển thủ công (vd sang “Chờ nguyên vật liệu”). Hệ thống vẫn tự cập nhật theo tiến độ SX.</p>
           </Field>}
           <Field label="Ghi chú">
             <input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} />
@@ -438,6 +502,86 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           </Field>
         </div>
         </fieldset>
+      </Section>
+      )}
+
+      {editId && (
+      <Section title="Nguyên vật liệu cần cung cấp"
+        action={<div className="flex items-center gap-2">
+          {matsIssued
+            ? (slip?.status === 'Đã xuất'
+                ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"><PackageCheck size={14} /> Đã xuất kho{slip?.slip_code ? ` · ${slip.slip_code}` : ''}</span>
+                : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><PackageCheck size={14} /> Chờ xuất kho{slip?.slip_code ? ` · ${slip.slip_code}` : ''}</span>)
+            : (editing && <>
+                <button type="button" onClick={suggestFromBom} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><GitBranch size={16} /> Lấy gợi ý từ BOM</button>
+                <button type="button" onClick={addMat} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm NVL</button>
+              </>)}
+        </div>}>
+        <p className="text-xs text-slate-500 mb-3">
+          NVL dự kiến cấp cho lệnh (kg). Do phối trộn theo kích cỡ/màu/độ dày nên số lượng do người dùng tự điền — có thể lấy gợi ý từ BOM rồi chỉnh/xóa.
+          {!matsIssued
+            ? <> Bấm <b>“Yêu cầu NVL”</b> để tạo <b>phiếu xuất kho (Chờ xuất)</b> gửi sang app Xuất kho; kho xác nhận phiếu mới trừ tồn.</>
+            : (slip?.status === 'Đã xuất'
+                ? <> Đã xuất kho theo phiếu <b>{slip?.slip_code}</b>.</>
+                : <> Đã tạo phiếu <b>{slip?.slip_code}</b> — vào <b>Kho → Xuất kho</b> để xác nhận trừ tồn (hoặc hủy phiếu để mở khóa).</>)}
+        </p>
+        <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead>
+              <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
+                <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
+                <th className="px-3 py-2.5 uppercase tracking-wider">Nguyên vật liệu</th>
+                <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Số kg</th>
+                <th className="px-3 py-2.5 w-24 uppercase tracking-wider">ĐVT</th>
+                <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Tồn kho</th>
+                <th className="px-3 py-2.5 uppercase tracking-wider">Ghi chú</th>
+                {editing && !matsIssued && <th className="px-3 py-2.5 w-10"></th>}
+              </tr>
+            </thead>
+            <tbody>
+              {plannedMats.length === 0 && (
+                <tr><td colSpan={editing && !matsIssued ? 7 : 6} className="px-3 py-4 text-center text-slate-400 bg-white">Chưa có NVL. {editing && !matsIssued ? 'Bấm “Lấy gợi ý từ BOM” hoặc “Thêm NVL”.' : ''}</td></tr>
+              )}
+              {plannedMats.map((r, i) => {
+                const short = r.on_hand != null && Number(r.qty) > Number(r.on_hand);
+                return (
+                <tr key={r._k} className="border-b border-slate-100 last:border-0 bg-white align-top">
+                  <td className="px-3 py-2.5 text-center text-slate-500 font-medium">{i + 1}</td>
+                  <td className="px-3 py-2.5">
+                    {editing && !matsIssued
+                      ? <SearchSelect value={r.material_id} onChange={(v) => upMat(r._k, 'material_id', v)} options={nvlOptions} placeholder="-- Chọn NVL --" />
+                      : <span className="font-medium text-slate-700">{nvlOptions.find((o) => o.value === r.material_id)?.label || '—'}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {editing && !matsIssued
+                      ? <input type="number" min="0" step="any" className={inputCls} value={r.qty} onChange={(e) => upMat(r._k, 'qty', e.target.value)} placeholder="kg" />
+                      : <span className="font-medium">{fmt(r.qty)}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {editing && !matsIssued
+                      ? <input className={inputCls} value={r.unit} onChange={(e) => upMat(r._k, 'unit', e.target.value)} placeholder="kg" />
+                      : <span className="text-slate-600">{r.unit || 'kg'}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {r.on_hand == null
+                      ? <span className="text-slate-400 text-xs">— lưu để xem</span>
+                      : <span className={short ? 'text-rose-600 font-semibold' : 'text-slate-700'}>{fmt(r.on_hand)}{short && <span className="block text-[11px] font-normal">thiếu {fmt(Number(r.qty) - Number(r.on_hand))}</span>}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {editing && !matsIssued
+                      ? <input className={inputCls} value={r.note} onChange={(e) => upMat(r._k, 'note', e.target.value)} placeholder="ghi chú" />
+                      : <span className="text-slate-500">{r.note || ''}</span>}
+                  </td>
+                  {editing && !matsIssued && (
+                    <td className="px-3 py-2.5">
+                      <button type="button" onClick={() => rmMat(r._k)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"><Trash2 size={15} /></button>
+                    </td>
+                  )}
+                </tr>
+              ); })}
+            </tbody>
+          </table>
+        </div>
       </Section>
       )}
 
@@ -698,6 +842,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
     { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
     { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
     { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
+    { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },
     { key: "attr_size", label: "Kích thước", filter: "select", render: (r) => r.attr_size || "—" },
     { key: "machine_name", label: "Máy", filter: "select", render: (r) => r.machine_name_display || r.machine_name || <span className="text-slate-400">Chưa xếp</span> },
@@ -726,7 +871,6 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
         if (r.priority === 'Thấp') return <span className="inline-flex px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span>;
         return <span className="text-slate-500 text-xs whitespace-nowrap">Trung bình</span>;
       } },
-    { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "_act", label: "", align: "right", render: (r) => (<>
         <button onClick={() => setScheduling(r)} disabled={!can("production", "update")} className="text-slate-400 hover:text-blue-600 p-1" title="Lập lịch / xếp máy"><CalendarClock size={16} /></button>
         {can("production", "create") && <button onClick={() => openForm({ copy: r.id })} title="Sao chép" className="text-slate-400 hover:text-blue-600 p-1"><Copy size={16} /></button>}

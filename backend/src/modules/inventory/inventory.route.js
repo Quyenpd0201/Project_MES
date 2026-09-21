@@ -11,4 +11,10 @@ router.post('/inventory/adjust', requirePerm('inv_adjust:create'), inventory.adj
 router.post('/inventory/stock', requirePerm('inv_adjust:create'), inventory.addStockLine);
 router.delete('/inventory/stock/:id', requirePerm('inv_adjust:create'), inventory.deleteStockLine);
 
+// Phiếu xuất kho (Chờ xuất → Đã xuất)
+router.get('/outbound-slips', inventory.listOutboundSlips);
+router.get('/outbound-slips/:id', inventory.getOutboundSlip);
+router.post('/outbound-slips/:id/confirm', requirePerm('inv_outbound:create'), inventory.confirmOutboundSlip);
+router.post('/outbound-slips/:id/cancel', requirePerm('inv_outbound:create'), inventory.cancelOutboundSlip);
+
 module.exports = router;

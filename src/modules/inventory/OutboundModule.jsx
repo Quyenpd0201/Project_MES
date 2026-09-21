@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Upload, Save, Plus, Trash2, RefreshCcw, History, AlertTriangle } from "lucide-react";
+import { Upload, Save, Plus, Trash2, RefreshCcw, History, AlertTriangle, PackageCheck, Check, Ban, ChevronRight, ChevronDown, ClipboardList } from "lucide-react";
 import { DataTable, PageHeader, UnitSelect } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
@@ -206,6 +206,137 @@ function OutboundForm({ lookups, onSaved }) {
   );
 }
 
+// Phiếu chờ xuất kho (do "Yêu cầu NVL" ở lệnh SX tạo ra) — xác nhận mới trừ kho
+function PendingSlips({ canConfirm, onConfirmed }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openId, setOpenId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await inventory.outboundSlips({ status: "Chờ xuất" })); }
+    catch (e) { toast.error("Lỗi: " + e.message); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const toggle = async (id) => {
+    if (openId === id) { setOpenId(null); setDetail(null); return; }
+    setOpenId(id); setDetail(null);
+    try { setDetail(await inventory.outboundSlip(id)); }
+    catch (e) { toast.error("Lỗi: " + e.message); }
+  };
+
+  const confirm = async (s) => {
+    if (!window.confirm(`Xác nhận xuất kho phiếu ${s.slip_code}? Thao tác này sẽ TRỪ TỒN KHO.`)) return;
+    setBusy(true);
+    try {
+      const r = await inventory.confirmOutboundSlip(s.id);
+      toast.success(r.message || "Đã xuất kho.");
+      setOpenId(null); setDetail(null);
+      await load(); onConfirmed && onConfirmed();
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  const cancel = async (s) => {
+    if (!window.confirm(`Hủy phiếu ${s.slip_code}? Lệnh sản xuất nguồn sẽ được mở khóa để yêu cầu lại.`)) return;
+    setBusy(true);
+    try {
+      const r = await inventory.cancelOutboundSlip(s.id);
+      toast.success(r.message || "Đã hủy phiếu.");
+      setOpenId(null); setDetail(null);
+      await load();
+    } catch (e) { toast.error(e.message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-amber-200">
+      <div className="px-5 py-4 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+        <div className="flex items-center gap-2 font-semibold text-amber-800">
+          <ClipboardList size={18} /> Phiếu chờ xuất kho
+          {rows.length > 0 && <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-800 text-xs">{rows.length}</span>}
+        </div>
+        <button onClick={load} className="btn-ghost text-sm flex items-center gap-1.5">
+          <RefreshCcw size={14} className={loading ? "animate-spin" : ""} /> Làm mới
+        </button>
+      </div>
+      <div className="p-4">
+        {rows.length === 0 ? (
+          <div className="text-center text-slate-400 py-6 text-sm">{loading ? "Đang tải…" : "Không có phiếu nào chờ xuất."}</div>
+        ) : (
+          <div className="rounded-lg border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            {rows.map((s) => (
+              <div key={s.id}>
+                <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60">
+                  <button onClick={() => toggle(s.id)} className="text-slate-400 hover:text-slate-600">
+                    {openId === s.id ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-700">{s.slip_code}
+                      <span className="ml-2 text-xs font-normal text-slate-400">{s.prod_order_code ? `Lệnh ${s.prod_order_code}` : (s.purpose || "")}</span>
+                    </div>
+                    <div className="text-xs text-slate-400">
+                      {s.warehouse_name ? `${s.warehouse_name}${s.location_name ? " · " + s.location_name : ""} · ` : ""}
+                      {s.line_count} dòng · tổng {fmt(s.total_qty)} · {new Date(s.created_at).toLocaleString("vi-VN")}
+                    </div>
+                  </div>
+                  {canConfirm && <>
+                    <button onClick={() => confirm(s)} disabled={busy}
+                      className="btn-ghost text-emerald-700 border-emerald-300 hover:bg-emerald-50 text-sm flex items-center gap-1.5">
+                      <Check size={15} /> Xác nhận xuất
+                    </button>
+                    <button onClick={() => cancel(s)} disabled={busy}
+                      className="btn-ghost text-rose-600 border-rose-200 hover:bg-rose-50 text-sm flex items-center gap-1.5">
+                      <Ban size={15} /> Hủy
+                    </button>
+                  </>}
+                </div>
+                {openId === s.id && (
+                  <div className="px-4 pb-4 bg-slate-50/50">
+                    {!detail ? <div className="text-xs text-slate-400 py-2">Đang tải chi tiết…</div> : (
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-slate-500 text-xs uppercase tracking-wide text-left">
+                            <th className="px-3 py-2">Vật tư</th>
+                            <th className="px-3 py-2 text-right w-28">SL xuất</th>
+                            <th className="px-3 py-2 w-20">ĐVT</th>
+                            <th className="px-3 py-2 text-right w-28">Tồn hiện tại</th>
+                            <th className="px-3 py-2">Ghi chú</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {(detail.lines || []).map((l) => {
+                            const short = Number(l.quantity) > Number(l.on_hand);
+                            return (
+                              <tr key={l.id} className={short ? "bg-rose-50/40" : ""}>
+                                <td className="px-3 py-2"><span className="text-blue-600 font-medium">{l.product_code}</span> · {l.product_name}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-rose-600">−{fmt(l.quantity)}</td>
+                                <td className="px-3 py-2 text-slate-500">{l.unit || ""}</td>
+                                <td className={`px-3 py-2 text-right ${short ? "text-rose-600 font-semibold" : "text-slate-600"}`}>
+                                  {fmt(l.on_hand)}{short && <span className="block text-[11px] font-normal">thiếu {fmt(Number(l.quantity) - Number(l.on_hand))}</span>}
+                                </td>
+                                <td className="px-3 py-2 text-slate-400 text-xs">{l.note || ""}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function OutboundHistory() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -252,6 +383,11 @@ export default function OutboundModule({ lookups }) {
   return (
     <div className="space-y-6">
       <PageHeader title="Xuất kho" icon={Upload} />
+      {can("inv_outbound", "view") && (
+        <PendingSlips key={"pending" + refreshKey}
+          canConfirm={can("inv_outbound", "create") || can("inv_outbound", "edit")}
+          onConfirmed={() => setRefreshKey(k => k + 1)} />
+      )}
       {(can("inv_outbound", "create") || can("inv_outbound", "edit")) && (
         <OutboundForm lookups={lookups} onSaved={() => setRefreshKey(k => k + 1)} />
       )}

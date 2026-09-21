@@ -38,6 +38,7 @@ export const UNITS = ["Kg", "Cái", "Chiếc", "Dem", "Gram", "Cuộn", "Thùng"
 const STATUS_COLORS = {
   "Chờ duyệt": "bg-slate-100 text-slate-600",
   "Đã lên kế hoạch": "bg-blue-50 text-blue-700",
+  "Chờ nguyên vật liệu": "bg-purple-50 text-purple-700",
   "Đang sản xuất": "bg-amber-50 text-amber-700",
   "Hoàn thành": "bg-emerald-50 text-emerald-700",
   "Đã hủy": "bg-rose-50 text-rose-700",

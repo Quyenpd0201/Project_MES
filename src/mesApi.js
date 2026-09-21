@@ -92,6 +92,10 @@ export const production = {
   updateTask: (taskId, data) => http(`/production/tasks/${taskId}`, body("PUT", data)),
   materials: (id) => http(`/production-orders/${id}/materials`),
   saveMaterials: (id, lines) => http(`/production-orders/${id}/materials`, body("POST", { lines })),
+  // NVL cần cung cấp (kế hoạch) + Yêu cầu NVL (xuất kho)
+  plannedMaterials: (id) => http(`/production-orders/${id}/planned-materials`).then((r) => r.data),
+  savePlannedMaterials: (id, lines) => http(`/production-orders/${id}/planned-materials`, body("POST", { lines })),
+  requestMaterials: (id, lines) => http(`/production-orders/${id}/request-materials`, body("POST", { lines })),
 };
 
 export const planning = {
@@ -121,6 +125,14 @@ export const inventory = {
   },
   addStock: (data) => http(`/inventory/stock`, body("POST", data)),
   deleteStock: (id) => http(`/inventory/stock/${id}`, { method: "DELETE" }),
+  // Phiếu xuất kho (Chờ xuất → Đã xuất)
+  outboundSlips: (params = {}) => {
+    const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));
+    return http(`/outbound-slips?${q.toString()}`).then((r) => r.data || []);
+  },
+  outboundSlip: (id) => http(`/outbound-slips/${id}`).then((r) => r.data),
+  confirmOutboundSlip: (id) => http(`/outbound-slips/${id}/confirm`, body("POST", {})),
+  cancelOutboundSlip: (id) => http(`/outbound-slips/${id}/cancel`, body("POST", {})),
 };
 
 export const reports = {

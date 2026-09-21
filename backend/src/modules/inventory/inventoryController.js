@@ -219,3 +219,106 @@ exports.adjust = async (req, res) => {
     console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi điều chỉnh tồn kho' });
   } finally { client.release(); }
 };
+
+// ── PHIẾU XUẤT KHO (outbound slips) ───────────────────────────────────────────
+// GET /api/outbound-slips?status= — danh sách phiếu (mặc định tất cả)
+exports.listOutboundSlips = async (req, res) => {
+  try {
+    const where = []; const params = []; let i = 1;
+    if (req.query.status) { where.push(`s.status = $${i++}`); params.push(req.query.status); }
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const { rows } = await db.query(`
+      SELECT s.*, po.order_code AS prod_order_code,
+             w.name AS warehouse_name, l.name AS location_name,
+             (SELECT COUNT(*)::int FROM outbound_slip_lines sl WHERE sl.slip_id = s.id) AS line_count,
+             (SELECT COALESCE(SUM(sl.quantity),0) FROM outbound_slip_lines sl WHERE sl.slip_id = s.id) AS total_qty
+      FROM outbound_slips s
+      LEFT JOIN production_orders po ON po.id = s.prod_order_id
+      LEFT JOIN locations l ON l.id = s.location_id
+      LEFT JOIN warehouses w ON w.id = l.warehouse_id
+      ${whereSql} ORDER BY s.created_at DESC LIMIT 300`, params);
+    res.json({ data: rows });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy danh sách phiếu xuất' }); }
+};
+
+// GET /api/outbound-slips/:id — chi tiết phiếu + dòng + tồn kho hiện tại
+exports.getOutboundSlip = async (req, res) => {
+  try {
+    const s = (await db.query(`
+      SELECT s.*, po.order_code AS prod_order_code, w.name AS warehouse_name, l.name AS location_name
+      FROM outbound_slips s
+      LEFT JOIN production_orders po ON po.id = s.prod_order_id
+      LEFT JOIN locations l ON l.id = s.location_id
+      LEFT JOIN warehouses w ON w.id = l.warehouse_id
+      WHERE s.id = $1`, [req.params.id])).rows[0];
+    if (!s) return res.status(404).json({ message: 'Không tìm thấy phiếu xuất' });
+    const lines = (await db.query(`
+      SELECT sl.*, p.product_code, p.product_name,
+             COALESCE((SELECT SUM(quantity) FROM inventory_stock st WHERE st.product_id = sl.product_id), 0) AS on_hand
+      FROM outbound_slip_lines sl JOIN products p ON p.id = sl.product_id
+      WHERE sl.slip_id = $1 ORDER BY p.product_code`, [req.params.id])).rows;
+    res.json({ data: { ...s, lines } });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết phiếu xuất' }); }
+};
+
+// POST /api/outbound-slips/:id/confirm — XÁC NHẬN xuất kho → TRỪ TỒN (1 lần). Chặn nếu tồn không đủ.
+exports.confirmOutboundSlip = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const s = (await client.query(`SELECT * FROM outbound_slips WHERE id = $1`, [req.params.id])).rows[0];
+    if (!s) return res.status(404).json({ message: 'Không tìm thấy phiếu xuất' });
+    if (s.status === 'Đã xuất') return res.status(400).json({ message: 'Phiếu này đã được xuất kho rồi.' });
+    if (s.status === 'Đã hủy') return res.status(400).json({ message: 'Phiếu đã hủy, không thể xuất.' });
+    const lines = (await client.query(`SELECT * FROM outbound_slip_lines WHERE slip_id = $1`, [req.params.id])).rows;
+    if (!lines.length) return res.status(400).json({ message: 'Phiếu chưa có dòng hàng.' });
+
+    // Chặn tồn âm — báo cần mua
+    const shortages = [];
+    for (const l of lines) {
+      const onHand = Number((await client.query(`SELECT COALESCE(SUM(quantity),0)::numeric AS q FROM inventory_stock WHERE product_id = $1`, [l.product_id])).rows[0].q);
+      if (Number(l.quantity) > onHand) {
+        const p = (await client.query(`SELECT product_code, product_name, unit FROM products WHERE id = $1`, [l.product_id])).rows[0] || {};
+        shortages.push({ code: p.product_code, name: p.product_name, unit: l.unit || p.unit || '', on_hand: onHand, need: Number(l.quantity), buy: Number(l.quantity) - onHand });
+      }
+    }
+    if (shortages.length) {
+      const msg = 'Không đủ tồn kho để xuất — vui lòng nhập kho / mua bổ sung trước:\n' +
+        shortages.map((x) => `• ${x.code} ${x.name}: tồn ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → cần mua ${x.buy} ${x.unit}`).join('\n');
+      return res.status(400).json({ message: msg, shortages });
+    }
+
+    await client.query('BEGIN');
+    for (const l of lines) {
+      await client.query(
+        `INSERT INTO inventory_stock (product_id, location_id, spec_key, lot_code, quantity, unit)
+         VALUES ($1,$2,'',$3,$4,$5)
+         ON CONFLICT (product_id, location_id, spec_key, lot_code)
+         DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, unit = COALESCE(EXCLUDED.unit, inventory_stock.unit), updated_at = now()`,
+        [l.product_id, s.location_id, l.lot_code || '', -Number(l.quantity), upUnit(l.unit)]);
+      await client.query(
+        `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
+         VALUES ($1,$2,'Xuất',$3,$4,$5,$6)`,
+        [l.product_id, s.location_id, Number(l.quantity), l.lot_code || '', s.slip_code, s.purpose || 'Xuất kho']);
+    }
+    await client.query(`UPDATE outbound_slips SET status = 'Đã xuất', confirmed_at = now() WHERE id = $1`, [req.params.id]);
+    await client.query('COMMIT');
+    res.json({ message: `Đã xác nhận xuất kho phiếu ${s.slip_code} (${lines.length} dòng).`, count: lines.length });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi xác nhận xuất kho' }); }
+  finally { client.release(); }
+};
+
+// POST /api/outbound-slips/:id/cancel — HỦY phiếu (chỉ khi Chờ xuất). Mở khóa lệnh SX nguồn.
+exports.cancelOutboundSlip = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const s = (await client.query(`SELECT * FROM outbound_slips WHERE id = $1`, [req.params.id])).rows[0];
+    if (!s) return res.status(404).json({ message: 'Không tìm thấy phiếu xuất' });
+    if (s.status !== 'Chờ xuất') return res.status(400).json({ message: 'Chỉ hủy được phiếu đang Chờ xuất.' });
+    await client.query('BEGIN');
+    await client.query(`UPDATE outbound_slips SET status = 'Đã hủy' WHERE id = $1`, [req.params.id]);
+    if (s.prod_order_id) await client.query(`UPDATE production_orders SET materials_issued = FALSE WHERE id = $1`, [s.prod_order_id]);
+    await client.query('COMMIT');
+    res.json({ message: `Đã hủy phiếu ${s.slip_code}.` });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi hủy phiếu' }); }
+  finally { client.release(); }
+};

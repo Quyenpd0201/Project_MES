@@ -506,84 +506,129 @@ exports.getMaterials = async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy NVL theo BOM' }); }
 };
 
-// POST /api/production-orders/:id/materials — ghi nhận NVL thực tế + trừ tồn kho (theo chênh lệch)
+// POST /api/production-orders/:id/materials — CHỈ GHI NHẬN NVL thực tế (theo dõi tiêu hao).
+// KHÔNG trừ kho nữa: việc trừ kho NVL đã chuyển sang "Yêu cầu nguyên vật liệu" (xuất kho) ở màn Lệnh SX,
+// tránh trừ trùng 2 lần. Phần này chỉ để so sánh kế hoạch (cần cung cấp) vs thực tế dùng.
 exports.saveMaterials = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const poId = req.params.id;
     const lines = Array.isArray(req.body.lines) ? req.body.lines : [];
-    const po = (await client.query(`SELECT order_code FROM production_orders WHERE id = $1`, [poId])).rows[0];
+    const po = (await client.query(`SELECT id FROM production_orders WHERE id = $1`, [poId])).rows[0];
     if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
 
     await client.query('BEGIN');
-    const nvlLoc = (await client.query(
-      `SELECT l.id FROM locations l JOIN warehouses w ON w.id = l.warehouse_id
-       WHERE w.warehouse_type = 'NVL' AND l.is_deleted = FALSE ORDER BY l.created_at LIMIT 1`)).rows[0]?.id || null;
-
-    const existing = Object.fromEntries((await client.query(
-      `SELECT material_id, qty FROM production_material_usage WHERE production_order_id = $1`, [poId])).rows.map((r) => [r.material_id, Number(r.qty)]));
-
-    // KHÔNG cho ghi tiêu hao vượt tồn — kho không được âm. Chặn & báo số lượng cần mua.
-    const shortages = [];
-    for (const l of lines) {
-      if (!l.material_id) continue;
-      const add = (Number(l.qty) || 0) - (existing[l.material_id] || 0); // phần xuất thêm so với lần ghi trước
-      if (add <= 0) continue; // giảm / hoàn lại thì không cần kiểm
-      const onHand = Number((await client.query(
-        `SELECT COALESCE(SUM(quantity),0)::numeric AS q FROM inventory_stock WHERE product_id = $1`, [l.material_id])).rows[0].q);
-      if (add > onHand) {
-        const p = (await client.query(`SELECT product_code, product_name, unit FROM products WHERE id = $1`, [l.material_id])).rows[0] || {};
-        const unit = upUnit(l.unit) || p.unit || '';
-        shortages.push({ material_id: l.material_id, code: p.product_code, name: p.product_name, unit,
-          on_hand: onHand, need: add, buy: add - onHand });
-      }
-    }
-    if (shortages.length) {
-      await client.query('ROLLBACK');
-      const msg = 'Không đủ NVL trong kho — không thể ghi nhận sản xuất. Vui lòng nhập kho / mua bổ sung trước:\n' +
-        shortages.map((s) => `• ${s.code} ${s.name}: tồn ${s.on_hand} ${s.unit}, cần ${s.need} ${s.unit} → cần mua ${s.buy} ${s.unit}`).join('\n');
-      return res.status(400).json({ message: msg, shortages });
-    }
-
-    // Áp dụng chênh lệch tồn kho cho 1 NVL (delta>0: xuất thêm, delta<0: hoàn lại)
-    const applyDelta = async (materialId, delta, unit) => {
-      if (!delta) return;
-      await client.query(
-        `INSERT INTO inventory_stock (product_id, location_id, spec_key, lot_code, quantity, unit)
-         VALUES ($1,$2,'','',$3,$4)
-         ON CONFLICT (product_id, location_id, spec_key, lot_code)
-         DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
-                       unit = COALESCE(EXCLUDED.unit, inventory_stock.unit), updated_at = now()`,
-        [materialId, nvlLoc, -delta, upUnit(unit)]);
-      await client.query(
-        `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, ref_code, note)
-         VALUES ($1,$2,$3,$4,$5,$6)`,
-        [materialId, nvlLoc, delta > 0 ? 'Xuất' : 'Nhập', Math.abs(delta), po.order_code, 'NVL thực tế (thực thi SX)']);
-    };
-
     const seen = new Set();
     for (const l of lines) {
       if (!l.material_id) continue;
       seen.add(l.material_id);
-      const newQty = Number(l.qty) || 0;
-      const oldQty = existing[l.material_id] || 0;
-      await applyDelta(l.material_id, newQty - oldQty, l.unit);
       await client.query(
         `INSERT INTO production_material_usage (production_order_id, material_id, qty, unit)
          VALUES ($1,$2,$3,$4)
          ON CONFLICT (production_order_id, material_id)
          DO UPDATE SET qty = EXCLUDED.qty, unit = EXCLUDED.unit, updated_at = now()`,
-        [poId, l.material_id, newQty, upUnit(l.unit)]);
+        [poId, l.material_id, Number(l.qty) || 0, upUnit(l.unit)]);
     }
-    // NVL bị bỏ khỏi danh sách → hoàn lại tồn & xóa ghi nhận
-    for (const mid of Object.keys(existing)) {
-      if (seen.has(mid)) continue;
-      await applyDelta(mid, -existing[mid], null);
-      await client.query(`DELETE FROM production_material_usage WHERE production_order_id = $1 AND material_id = $2`, [poId, mid]);
+    const existing = (await client.query(`SELECT material_id FROM production_material_usage WHERE production_order_id = $1`, [poId])).rows.map((r) => r.material_id);
+    for (const mid of existing) if (!seen.has(mid)) await client.query(`DELETE FROM production_material_usage WHERE production_order_id = $1 AND material_id = $2`, [poId, mid]);
+    await client.query('COMMIT');
+    res.json({ message: 'Đã ghi nhận NVL thực tế (theo dõi tiêu hao)' });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi ghi nhận NVL' }); }
+  finally { client.release(); }
+};
+
+// ── NVL CẦN CUNG CẤP (kế hoạch cấp NVL cho lệnh) + Yêu cầu NVL (xuất kho) ──────
+// GET /api/production-orders/:id/planned-materials — danh sách NVL cần cung cấp + tồn kho hiện tại
+exports.getPlannedMaterials = async (req, res) => {
+  try {
+    const poId = req.params.id;
+    const po = (await db.query(`SELECT materials_issued FROM production_orders WHERE id = $1`, [poId])).rows[0];
+    if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    const { rows } = await db.query(`
+      SELECT pm.material_id, pm.qty, pm.unit, pm.note,
+             p.product_code AS material_code, p.product_name AS material_name,
+             COALESCE((SELECT SUM(quantity) FROM inventory_stock s WHERE s.product_id = pm.material_id), 0) AS on_hand
+      FROM production_order_materials pm
+      JOIN products p ON p.id = pm.material_id
+      WHERE pm.production_order_id = $1
+      ORDER BY pm.created_at`, [poId]);
+    // Phiếu xuất kho mới nhất (chưa hủy) của lệnh → để hiển thị trạng thái Chờ xuất / Đã xuất
+    const slip = (await db.query(
+      `SELECT id, slip_code, status FROM outbound_slips
+       WHERE prod_order_id = $1 AND status <> 'Đã hủy' ORDER BY created_at DESC LIMIT 1`, [poId])).rows[0] || null;
+    res.json({ data: { materials_issued: po.materials_issued, slip, lines: rows } });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy NVL cần cung cấp' }); }
+};
+
+// POST /api/production-orders/:id/planned-materials — lưu danh sách NVL cần cung cấp (thay thế)
+exports.savePlannedMaterials = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const poId = req.params.id;
+    const lines = (Array.isArray(req.body.lines) ? req.body.lines : []).filter((l) => l && l.material_id);
+    const po = (await client.query(`SELECT materials_issued FROM production_orders WHERE id = $1`, [poId])).rows[0];
+    if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    if (po.materials_issued) return res.status(400).json({ message: 'NVL đã được yêu cầu (xuất kho) — không sửa được danh sách cần cung cấp nữa.' });
+    await client.query('BEGIN');
+    await client.query(`DELETE FROM production_order_materials WHERE production_order_id = $1`, [poId]);
+    for (const l of lines) {
+      await client.query(
+        `INSERT INTO production_order_materials (production_order_id, material_id, qty, unit, note)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [poId, l.material_id, Number(l.qty) || 0, upUnit(l.unit), l.note || null]);
     }
     await client.query('COMMIT');
-    res.json({ message: 'Đã ghi nhận NVL & trừ tồn kho' });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi ghi nhận NVL' }); }
+    res.json({ message: 'Đã lưu NVL cần cung cấp', count: lines.length });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi lưu NVL cần cung cấp' }); }
+  finally { client.release(); }
+};
+
+// POST /api/production-orders/:id/request-materials — YÊU CẦU NVL: tạo PHIẾU XUẤT KHO "Chờ xuất"
+// KHÔNG trừ kho ở đây. Việc trừ kho do app Xuất kho xác nhận phiếu (có chứng từ, có thể duyệt).
+exports.requestMaterials = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const poId = req.params.id;
+    const po = (await client.query(`SELECT order_code, materials_issued FROM production_orders WHERE id = $1`, [poId])).rows[0];
+    if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    if (po.materials_issued) return res.status(400).json({ message: 'Lệnh này đã có phiếu yêu cầu NVL. Xử lý/hủy phiếu ở app Xuất kho trước khi yêu cầu lại.' });
+
+    await client.query('BEGIN');
+    // Lưu danh sách gửi kèm (nếu có) trước khi tạo phiếu
+    if (Array.isArray(req.body.lines)) {
+      const lines = req.body.lines.filter((l) => l && l.material_id);
+      await client.query(`DELETE FROM production_order_materials WHERE production_order_id = $1`, [poId]);
+      for (const l of lines) await client.query(
+        `INSERT INTO production_order_materials (production_order_id, material_id, qty, unit, note) VALUES ($1,$2,$3,$4,$5)`,
+        [poId, l.material_id, Number(l.qty) || 0, upUnit(l.unit), l.note || null]);
+    }
+
+    const plan = (await client.query(
+      `SELECT material_id, qty, unit, note FROM production_order_materials WHERE production_order_id = $1 AND qty > 0`, [poId])).rows;
+    if (!plan.length) { await client.query('ROLLBACK'); return res.status(400).json({ message: 'Chưa có NVL cần cung cấp để yêu cầu. Hãy thêm NVL trước.' }); }
+
+    const nvlLoc = (await client.query(
+      `SELECT l.id FROM locations l JOIN warehouses w ON w.id = l.warehouse_id
+       WHERE w.warehouse_type = 'NVL' AND l.is_deleted = FALSE ORDER BY l.created_at LIMIT 1`)).rows[0]?.id || null;
+
+    // Sinh mã phiếu PXK00001…
+    const slipCode = (await client.query(
+      `SELECT 'PXK' || LPAD((COALESCE(MAX(NULLIF(regexp_replace(slip_code,'\\D','','g'),''))::int,0)+1)::text,5,'0') AS code
+       FROM outbound_slips WHERE slip_code ~ '^PXK[0-9]+$'`)).rows[0].code;
+
+    const slip = (await client.query(
+      `INSERT INTO outbound_slips (slip_code, purpose, location_id, prod_order_id, status, note, created_by)
+       VALUES ($1,'Xuất cho sản xuất',$2,$3,'Chờ xuất',$4,$5) RETURNING id, slip_code`,
+      [slipCode, nvlLoc, poId, `Yêu cầu NVL cho lệnh ${po.order_code}`, req.userId || null])).rows[0];
+    for (const l of plan) await client.query(
+      `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,'',$5)`,
+      [slip.id, l.material_id, Number(l.qty), l.unit || null, l.note || null]);
+
+    // Khóa danh sách NVL (đã tạo phiếu yêu cầu). Trừ kho sẽ diễn ra khi xác nhận phiếu ở app Xuất kho.
+    await client.query(`UPDATE production_orders SET materials_issued = TRUE WHERE id = $1`, [poId]);
+    await client.query('COMMIT');
+    res.json({ message: `Đã tạo phiếu xuất kho ${slip.slip_code} (Chờ xuất) cho lệnh ${po.order_code}. Vào app Xuất kho để xác nhận trừ kho.`, slip_code: slip.slip_code, slip_id: slip.id, count: plan.length });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi yêu cầu NVL' }); }
   finally { client.release(); }
 };
 

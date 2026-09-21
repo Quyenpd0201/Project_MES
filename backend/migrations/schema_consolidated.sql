@@ -1670,3 +1670,58 @@ ALTER TABLE ONLY public.work_schedules
 --
 
 
+
+--
+-- NVL cần cung cấp cho lệnh SX (kế hoạch cấp NVL) + trạng thái đã xuất kho
+-- (bổ sung ngoài dump gốc — idempotent)
+--
+
+CREATE TABLE IF NOT EXISTS public.production_order_materials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    production_order_id uuid NOT NULL REFERENCES public.production_orders(id) ON DELETE CASCADE,
+    material_id uuid NOT NULL REFERENCES public.products(id),
+    qty numeric DEFAULT 0 NOT NULL,
+    unit character varying,
+    note text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pom_po ON public.production_order_materials USING btree (production_order_id);
+
+ALTER TABLE public.production_orders ADD COLUMN IF NOT EXISTS materials_issued boolean DEFAULT false;
+ALTER TABLE public.production_orders ADD COLUMN IF NOT EXISTS materials_issued_at timestamp with time zone;
+
+--
+-- Phiếu xuất kho (outbound slip) — có trạng thái Chờ xuất / Đã xuất / Đã hủy.
+-- "Yêu cầu NVL" ở lệnh SX tạo phiếu Chờ xuất; app Xuất kho xác nhận mới trừ kho.
+-- (bổ sung ngoài dump gốc — idempotent)
+--
+CREATE TABLE IF NOT EXISTS public.outbound_slips (
+  id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+  slip_code varchar UNIQUE,
+  slip_date date DEFAULT CURRENT_DATE,
+  purpose varchar,
+  location_id uuid REFERENCES public.locations(id),
+  prod_order_id uuid REFERENCES public.production_orders(id) ON DELETE SET NULL,
+  status varchar DEFAULT 'Chờ xuất',
+  note text,
+  created_by uuid,
+  created_at timestamptz DEFAULT now(),
+  confirmed_at timestamptz
+);
+CREATE TABLE IF NOT EXISTS public.outbound_slip_lines (
+  id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+  slip_id uuid NOT NULL REFERENCES public.outbound_slips(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL REFERENCES public.products(id),
+  quantity numeric DEFAULT 0 NOT NULL,
+  unit varchar,
+  lot_code varchar DEFAULT '',
+  note text
+);
+CREATE INDEX IF NOT EXISTS idx_obs_status ON public.outbound_slips(status);
+CREATE INDEX IF NOT EXISTS idx_obsl_slip ON public.outbound_slip_lines(slip_id);
+
+-- Bổ sung trạng thái "Chờ nguyên vật liệu" cho lệnh sản xuất (idempotent)
+ALTER TABLE public.production_orders DROP CONSTRAINT IF EXISTS production_orders_status_check;
+ALTER TABLE public.production_orders ADD CONSTRAINT production_orders_status_check
+  CHECK (status::text = ANY (ARRAY['Chờ duyệt','Đã lên kế hoạch','Chờ nguyên vật liệu','Đang sản xuất','Hoàn thành','Đã hủy']::text[]));
