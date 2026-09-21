@@ -16,7 +16,7 @@ exports.groups = async (req, res) => {
       const sts = req.query.status.split(',').map((s) => s.trim()).filter(Boolean);
       if (sts.length) { params.push(sts); statusFilter = `AND po.status = ANY($1)`; }
     } else if (req.query.pending !== 'false') {
-      statusFilter = `AND po.status IN ('Chờ duyệt','Đã lên kế hoạch')`;
+      statusFilter = `AND po.status IN ('Chờ duyệt','Đã lên kế hoạch','Chờ nguyên vật liệu')`;
     }
     const { rows } = await db.query(`
       SELECT po.id, po.order_code, po.quantity, po.unit, po.due_date, po.status,
@@ -207,7 +207,7 @@ exports.materialRequirements = async (req, res) => {
     const orders = (await db.query(`
       SELECT po.id, po.order_code, po.product_id, po.quantity, p.product_name
       FROM production_orders po JOIN products p ON p.id = po.product_id
-      WHERE po.is_deleted = FALSE AND po.status IN ('Chờ duyệt','Đã lên kế hoạch','Đang sản xuất')
+      WHERE po.is_deleted = FALSE AND po.status IN ('Chờ duyệt','Đã lên kế hoạch','Chờ nguyên vật liệu','Đang sản xuất')
     `)).rows;
 
     // 2) BOM mới nhất còn hiệu lực cho mỗi sản phẩm đầu ra

@@ -318,7 +318,7 @@ export default function OutputReport({ lookups }) {
         : <span className="text-slate-300">—</span>,
     },
     {
-      key: "status", label: "Trạng thái", filter: "select",
+      key: "status", label: "Trạng thái", filter: "select", options: ["Chờ duyệt", "Đã lên kế hoạch", "Chờ nguyên vật liệu", "Đang sản xuất", "Hoàn thành", "Đã hủy"],
       render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span>,
     },
     {

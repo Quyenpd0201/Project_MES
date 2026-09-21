@@ -364,7 +364,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
 
 /* ====== Tab 1: Gom nhóm chạy hàng loạt ====== */
 const GROUP_SCOPES = [
-  { key: "todo", label: "Cần lên lịch", statuses: "Chờ duyệt,Đã lên kế hoạch" },
+  { key: "todo", label: "Cần lên lịch", statuses: "Chờ duyệt,Đã lên kế hoạch,Chờ nguyên vật liệu" },
   { key: "running", label: "Đang chạy", statuses: "Đang sản xuất" },
   { key: "done", label: "Hoàn thành", statuses: "Hoàn thành" },
 ];

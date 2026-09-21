@@ -169,8 +169,11 @@ async function recomputeOrder(client, poId) {
   const qtyOf = (t) => (t.actual_qty == null ? Number(t.quantity) : Number(t.actual_qty)) || 0;
   const produced = tks.filter(t => t.stage === finalStage && t.status === 'Hoàn thành').reduce((s, t) => s + qtyOf(t), 0);
 
+  const MANUAL_STATUSES = new Set(['Chờ nguyên vật liệu', 'Đã hủy', 'Chờ duyệt']);
+  const cur = (await client.query(`SELECT status FROM production_orders WHERE id = $1`, [poId])).rows[0]?.status;
   const poStatus = tks.length ? (produced >= Number(ord.quantity) ? 'Hoàn thành' : 'Đang sản xuất') : null;
-  if (poStatus) await client.query(`UPDATE production_orders SET status = $1 WHERE id = $2`, [poStatus, poId]);
+  // Chỉ cập nhật nếu có kết quả tính toán VÀ trạng thái hiện tại không phải do người dùng đặt thủ công
+  if (poStatus && !MANUAL_STATUSES.has(cur)) await client.query(`UPDATE production_orders SET status = $1 WHERE id = $2`, [poStatus, poId]);
   // Đồng bộ kho theo từng công đoạn (WIP): xong công đoạn nào nhập kho đầu ra công đoạn đó, công đoạn sau tiêu hao BTP.
   await syncOrderInventory(client, poId);
 

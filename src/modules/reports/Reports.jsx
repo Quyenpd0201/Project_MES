@@ -303,6 +303,7 @@ const STATUS_COLORS_CHART = {
   'Đang sản xuất': '#f59e0b',
   'Chờ duyệt':    '#94a3b8',
   'Đã lên kế hoạch': '#3b82f6',
+  'Chờ nguyên vật liệu': '#a855f7',
   'Hoàn thành':   '#10b981',
   'Đã hủy':       '#ef4444',
   'Quá hạn':      '#ef4444',
@@ -471,8 +472,9 @@ function DetailedReport() {
             <select value={filters.status}
               onChange={e => setFilters({ ...filters, status: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
-              {['Tất cả', 'Chờ duyệt', 'Đã lên kế hoạch', 'Đang sản xuất', 'Hoàn thành', 'Đã hủy'].map(s =>
-                <option key={s}>{s}</option>)}
+              {['Tất cả', 'Chờ duyệt', 'Đã lên kế hoạch', 'Chờ nguyên vật liệu', 'Đang sản xuất', 'Hoàn thành', 'Đã hủy'].map(s =>
+                <option key={s} value={s}>{s}</option>
+              )}
             </select>
           </div>
           {/* Actions */}
@@ -529,7 +531,7 @@ function DetailedReport() {
                   <BarChart data={barData} barSize={32} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" tick={{ fontSize: 10 }} interval={0} tickFormatter={s => {
-                      const m = { 'Đang sản xuất': 'Đang SX', 'Chờ duyệt': 'Chờ duyệt', 'Đã lên kế hoạch': 'KH', 'Hoàn thành': 'HT', 'Đã hủy': 'Hủy' };
+                      const m = { 'Đang sản xuất': 'Đang SX', 'Chờ duyệt': 'Chờ duyệt', 'Đã lên kế hoạch': 'KH', 'Chờ nguyên vật liệu': 'Chờ NVL', 'Hoàn thành': 'HT', 'Đã hủy': 'Hủy' };
                       return m[s] || s;
                     }} />
                     <YAxis tick={{ fontSize: 10 }} />

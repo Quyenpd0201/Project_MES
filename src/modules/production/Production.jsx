@@ -842,7 +842,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
     { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
     { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
     { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
-    { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
+    { key: "status", label: "Trạng thái", filter: "select", options: STATUSES, render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },
     { key: "attr_size", label: "Kích thước", filter: "select", render: (r) => r.attr_size || "—" },
     { key: "machine_name", label: "Máy", filter: "select", render: (r) => r.machine_name_display || r.machine_name || <span className="text-slate-400">Chưa xếp</span> },
