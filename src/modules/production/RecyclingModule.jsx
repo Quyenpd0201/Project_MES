@@ -278,7 +278,7 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-slate-700">Danh sách cuộn PE nhận về</h3>
               {(!isCompleted && ticket.status === 'Đang tái chế') && (
-                <button onClick={() => setRolls([...rolls, { pe_type: 'PE tái chế', weight: '', note: '' }])} className="btn-ghost text-sm py-1">
+                <button onClick={() => setRolls([...rolls, { pe_type: 'Cuộn PE', weight: '', note: '' }])} className="btn-ghost text-sm py-1">
                   <Plus size={16}/> Thêm cuộn
                 </button>
               )}
