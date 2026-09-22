@@ -77,6 +77,11 @@ export default function RecyclingModule() {
       }`}>{r.status}</span>
     )},
     { key: "expected_qty", label: "Tổng (kg)", align: "right", render: r => <span className="font-semibold">{fmt(r.expected_qty)}</span> },
+    { key: "_act", label: "", align: "right", render: r => (
+      <button onClick={() => openTicket(r)} className="text-slate-400 hover:text-blue-600 p-1 bg-slate-50 hover:bg-blue-50 rounded" title="Xem chi tiết">
+        <ArrowRight size={16} />
+      </button>
+    )},
   ];
 
   return (
@@ -96,7 +101,6 @@ export default function RecyclingModule() {
         columns={cols}
         rowKey={r => r.id}
         loading={loading}
-        onRowClick={openTicket}
       />
 
       {showModal && (
