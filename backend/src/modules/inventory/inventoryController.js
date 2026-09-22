@@ -337,6 +337,8 @@ exports.cancelOutboundSlip = async (req, res) => {
     res.json({ message: `Đã hủy phiếu ${s.slip_code}.` });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi hủy phiếu' }); }
   finally { client.release(); }
+};
+
 // ── CHUYỂN KHO (atomic: Xuất + Nhập trong 1 transaction) ──────────────────────
 // POST /api/inventory/transfer
 // Body: { product_id, from_location_id, to_location_id, quantity, unit, lot_code, note }
