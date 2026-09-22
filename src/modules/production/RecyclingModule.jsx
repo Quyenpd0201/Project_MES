@@ -80,7 +80,7 @@ export default function RecyclingModule() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6">
       <PageHeader 
         title="Quản lý Tái chế" 
         icon={<Recycle size={28} className="text-emerald-500" />}
