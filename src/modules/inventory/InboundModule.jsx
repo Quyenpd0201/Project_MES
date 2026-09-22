@@ -42,6 +42,7 @@ function InboundForm({ lookups, onSaved }) {
     const validLines = lines.filter(l => l.product_id && Number(l.quantity) > 0);
     if (!validLines.length) return toast.error("Nhập ít nhất 1 sản phẩm với số lượng > 0");
     setSaving(true);
+    const finalRef = header.ref_code.trim() || `NK${new Date().toISOString().replace(/\D/g, '').slice(2, 14)}`;
     try {
       await Promise.all(validLines.map(l =>
         inventory.adjust({
@@ -51,7 +52,7 @@ function InboundForm({ lookups, onSaved }) {
           location_id: header.location_id,
           lot_code: l.lot_code || "",
           trx_type: "Nhập",
-          ref_code: header.ref_code || null,
+          ref_code: finalRef,
           note: [header.source, header.note, l.note].filter(Boolean).join(" | "),
         })
       ));

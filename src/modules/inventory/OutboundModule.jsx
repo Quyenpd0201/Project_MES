@@ -35,7 +35,7 @@ function OutboundForm({ lookups, onSaved }) {
 
   // Lấy tồn kho của 1 sản phẩm tại vị trí đang chọn
   const fetchAvailable = async (product_id) => {
-    if (!product_id) return null;
+    if (!product_id) return { total: null, lots: [] };
     try {
       const tree = await inventory.tree({ product_id });
       const locId = locationRef.current;
@@ -44,16 +44,23 @@ function OutboundForm({ lookups, onSaved }) {
       const rows = locId
         ? (tree || []).filter(x => x.product_id === product_id && x.location_id === locId)
         : (tree || []).filter(x => x.product_id === product_id);
-      return rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
-    } catch { return null; }
+      const total = rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+      const lots = [...new Set(rows.filter(r => r.quantity > 0 && r.lot_code).map(r => r.lot_code))];
+      return { total, lots };
+    } catch { return { total: null, lots: [] }; }
   };
 
   const onProductChange = async (k, id) => {
     const p = (lookups.products || []).find(x => x.id === id);
-    setLines(a => a.map(l => l._k === k ? { ...l, product_id: id, unit: p?.unit || "", available: null } : l));
+    setLines(a => a.map(l => l._k === k ? { ...l, product_id: id, unit: p?.unit || "", available: null, availableLots: [] } : l));
     if (id) {
-      const total = await fetchAvailable(id);
-      setLines(a => a.map(l => l._k === k ? { ...l, available: total } : l));
+      const { total, lots } = await fetchAvailable(id);
+      setLines(a => a.map(l => l._k === k ? { 
+        ...l, 
+        available: total, 
+        availableLots: lots,
+        lot_code: lots.length === 1 ? lots[0] : (l.lot_code || "") 
+      } : l));
     }
   };
 
@@ -62,11 +69,16 @@ function OutboundForm({ lookups, onSaved }) {
     locationRef.current = locId;
     setH("location_id", locId);
     // Reset available rồi fetch lại
-    setLines(a => a.map(l => ({ ...l, available: null })));
+    setLines(a => a.map(l => ({ ...l, available: null, availableLots: [] })));
     const currentLines = lines.filter(l => l.product_id);
     for (const l of currentLines) {
-      const total = await fetchAvailable(l.product_id);
-      setLines(a => a.map(x => x._k === l._k ? { ...x, available: total } : x));
+      const { total, lots } = await fetchAvailable(l.product_id);
+      setLines(a => a.map(x => x._k === l._k ? { 
+        ...x, 
+        available: total,
+        availableLots: lots,
+        lot_code: lots.length === 1 ? lots[0] : (x.lot_code || "")
+      } : x));
     }
   };
 
@@ -89,6 +101,7 @@ function OutboundForm({ lookups, onSaved }) {
     }
 
     setSaving(true);
+    const finalRef = header.ref_code.trim() || `XK${new Date().toISOString().replace(/\D/g, '').slice(2, 14)}`;
     try {
       await Promise.all(validLines.map(l =>
         inventory.adjust({
@@ -98,7 +111,7 @@ function OutboundForm({ lookups, onSaved }) {
           location_id: header.location_id,
           lot_code: l.lot_code || "",
           trx_type: "Xuất",
-          ref_code: header.ref_code || null,
+          ref_code: finalRef,
           note: [header.purpose, header.note, l.note].filter(Boolean).join(" | "),
         })
       ));
@@ -195,8 +208,14 @@ function OutboundForm({ lookups, onSaved }) {
                         <UnitSelect value={l.unit} onChange={v => setLine(l._k, "unit", v)} />
                       </td>
                       <td className="px-3 py-2">
-                        <input className={inputCls} placeholder="Số lô" value={l.lot_code}
+                        <input className={inputCls} placeholder="Số lô" value={l.lot_code || ""}
+                          list={`lot-${l._k}`}
                           onChange={e => setLine(l._k, "lot_code", e.target.value)} />
+                        {l.availableLots && l.availableLots.length > 0 && (
+                          <datalist id={`lot-${l._k}`}>
+                            {l.availableLots.map(lot => <option key={lot} value={lot} />)}
+                          </datalist>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <input className={inputCls} placeholder="Ghi chú…" value={l.note}
