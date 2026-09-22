@@ -101,18 +101,29 @@ exports.weigh = async (req, res) => {
 
     const ticket = rows[0];
 
+    // Tìm location mặc định của kho phế phẩm
+    const locRes = await db.query(`SELECT id FROM locations WHERE warehouse_id = $1 LIMIT 1`, [ticket.scrap_warehouse_id]);
+    const locationId = locRes.rows[0]?.id || null;
+
+    // Trừ tồn kho phế phẩm
+    await db.query(`
+      INSERT INTO inventory_stock (product_id, location_id, quantity, unit, lot_code, spec_key, specs, attr_size, attr_thickness, attr_color)
+      VALUES ($1, $2, $3, 'Kg', '', '||||', '{}'::jsonb, '', '', '')
+      ON CONFLICT (product_id, location_id, spec_key, lot_code)
+      DO UPDATE SET quantity = GREATEST(0, inventory_stock.quantity - EXCLUDED.quantity), updated_at = now()
+    `, [ticket.product_id, locationId, actualTotal]);
+
     // Tạo giao dịch xuất kho Phế phẩm
-    const pxCount = await db.query(`SELECT count(*) FROM inventory_transactions WHERE transaction_type = 'Xuất'`);
+    const pxCount = await db.query(`SELECT count(*) FROM inventory_transactions WHERE trx_type = 'Xuất'`);
     const pxCode = `PX-${String(parseInt(pxCount.rows[0].count) + 1).padStart(5, '0')}`;
     
     await db.query(`
       INSERT INTO inventory_transactions (
-        transaction_code, transaction_type, warehouse_id, product_id,
-        quantity, reference_type, reference_id, note, created_by
-      ) VALUES ($1, 'Xuất', $2, $3, $4, 'Tái chế', $5, $6, $7)
+        product_id, location_id, trx_type, quantity, ref_code, note, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color
+      ) VALUES ($1, $2, 'Xuất', $3, $4, $5, '{}'::jsonb, '||||', '', '', '', '')
     `, [
-      pxCode, ticket.scrap_warehouse_id, ticket.product_id, actualTotal, ticketId,
-      `Xuất phế phẩm đi tái chế (Phiếu ${ticket.ticket_code})`, req.user?.username || 'System'
+      ticket.product_id, locationId, actualTotal, pxCode,
+      `Xuất phế phẩm đi tái chế (Phiếu ${ticket.ticket_code})`
     ]);
 
     await db.query('COMMIT');
@@ -198,19 +209,30 @@ exports.complete = async (req, res) => {
       WHERE id = $3
     `, [import_warehouse_id, loss_qty, ticketId]);
 
+    // Tìm location mặc định của kho nhập PE
+    const locRes = await db.query(`SELECT id FROM locations WHERE warehouse_id = $1 LIMIT 1`, [import_warehouse_id]);
+    const locationId = locRes.rows[0]?.id || null;
+
     // Tạo giao dịch nhập kho PE
     if (Number(ticket.total_received_qty) > 0) {
-      const pnCount = await db.query(`SELECT count(*) FROM inventory_transactions WHERE transaction_type = 'Nhập'`);
+      // Cộng tồn kho PE
+      await db.query(`
+        INSERT INTO inventory_stock (product_id, location_id, quantity, unit, lot_code, spec_key, specs, attr_size, attr_thickness, attr_color)
+        VALUES ($1, $2, $3, 'Kg', '', '||||', '{}'::jsonb, '', '', '')
+        ON CONFLICT (product_id, location_id, spec_key, lot_code)
+        DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, updated_at = now()
+      `, [pe_product_id, locationId, ticket.total_received_qty]);
+
+      const pnCount = await db.query(`SELECT count(*) FROM inventory_transactions WHERE trx_type = 'Nhập'`);
       const pnCode = `PN-${String(parseInt(pnCount.rows[0].count) + 1).padStart(5, '0')}`;
       
       await db.query(`
         INSERT INTO inventory_transactions (
-          transaction_code, transaction_type, warehouse_id, product_id,
-          quantity, reference_type, reference_id, note, created_by
-        ) VALUES ($1, 'Nhập', $2, $3, $4, 'Tái chế', $5, $6, $7)
+          product_id, location_id, trx_type, quantity, ref_code, note, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color
+        ) VALUES ($1, $2, 'Nhập', $3, $4, $5, '{}'::jsonb, '||||', '', '', '', '')
       `, [
-        pnCode, import_warehouse_id, pe_product_id, ticket.total_received_qty, ticketId,
-        `Nhập kho PE tái chế từ phiếu ${ticket.ticket_code}`, req.user?.username || 'System'
+        pe_product_id, locationId, ticket.total_received_qty, pnCode,
+        `Nhập kho PE tái chế từ phiếu ${ticket.ticket_code}`
       ]);
     }
 
