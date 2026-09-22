@@ -169,3 +169,10 @@ export const scrap = {
   dailyDetails: (worker_name, date) => http(`/scrap/daily-details?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),
 };
 
+export const recycling = {
+  ...resource("recycling"),
+  weigh: (id, data) => http(`/recycling/${id}/weigh`, body("PUT", data)),
+  receiveRolls: (id, rolls) => http(`/recycling/${id}/receive`, body("PUT", { rolls })),
+  complete: (id, data) => http(`/recycling/${id}/complete`, body("PUT", data)),
+};
+

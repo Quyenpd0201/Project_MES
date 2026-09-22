@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
-  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen,
+  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen, Recycle,
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import Login from "./src/Login.jsx";
@@ -36,6 +36,7 @@ import InventoryReport from "./src/modules/reports/InventoryReport.jsx";
 import EmployeeReport from "./src/modules/reports/EmployeeReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
 import ScrapModule from "./src/modules/production/ScrapModule.jsx";
+import RecyclingModule from "./src/modules/production/RecyclingModule.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
 /* =====================================================================
@@ -154,6 +155,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
         { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
         { key: "scrap", label: "Ghi nhận phế phẩm", icon: Trash2, perm: "execution", path: "/scrap" },
+        { key: "recycling", label: "Quản lý tái chế", icon: Recycle, perm: "execution", path: "/recycling" },
         { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
         { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
       ]
@@ -1317,6 +1319,7 @@ export default function MesApp() {
               <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/execution" element={needLookups(ExecutionModule)} />
               <Route path="/scrap" element={<ScrapModule />} />
+              <Route path="/recycling" element={<RecyclingModule />} />
               <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
               <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
               <Route path="/inventory/inbound" element={lookups ? <InboundModule lookups={lookups} /> : loadingEl} />
