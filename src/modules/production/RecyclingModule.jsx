@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
   Recycle, Plus, Trash2, Save, FileText, Scale, CheckCircle2, 
-  ArrowRight, Box, Package, Calendar, User
+  ArrowRight, Box, Package, Calendar, User, X
 } from "lucide-react";
-import { PageHeader, DataTable, Modal } from "../../components.jsx";
+import { PageHeader, DataTable } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
 import { inputCls, fmt, toast } from "../../ui.js";
 
@@ -180,7 +180,17 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
   ];
 
   return (
-    <Modal title={ticket ? `Phiếu Tái Chế: ${ticket.ticket_code}` : "Tạo Phiếu Tái Chế Mới"} onClose={onClose} size="xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-slate-800">
+            {ticket ? `Phiếu Tái Chế: ${ticket.ticket_code}` : "Tạo Phiếu Tái Chế Mới"}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6 overflow-y-auto flex-1">
       <div className="flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
         {tabs.map((t, idx) => {
           const isActive = step === t.id;
@@ -364,6 +374,8 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
           </button>
         )}
       </div>
-    </Modal>
+      </div>
+    </div>
+    </div>
   );
 }
