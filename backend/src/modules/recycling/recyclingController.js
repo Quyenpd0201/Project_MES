@@ -193,13 +193,13 @@ exports.complete = async (req, res) => {
     // Tính hao hụt
     const loss_qty = Number(ticket.expected_qty) - Number(ticket.total_received_qty);
 
-    // Get "PE tái chế" product ID
-    const prodRes = await db.query(`SELECT id FROM products WHERE product_name = 'PE tái chế' LIMIT 1`);
+    // Get "Cuộn PE" (Bán thành phẩm) product ID
+    const prodRes = await db.query(`SELECT id FROM products WHERE product_name ILIKE 'Cuộn PE' AND product_type = 'Bán thành phẩm' LIMIT 1`);
     const pe_product_id = prodRes.rows[0]?.id || null;
 
     if (!pe_product_id) {
        await db.query('ROLLBACK');
-       return res.status(400).json({ message: 'Không tìm thấy mã sản phẩm PE tái chế' });
+       return res.status(400).json({ message: 'Không tìm thấy mã sản phẩm Cuộn PE (Bán thành phẩm)' });
     }
 
     // Cập nhật phiếu hoàn thành
