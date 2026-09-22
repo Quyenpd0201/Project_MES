@@ -131,6 +131,7 @@ export const inventory = {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));
     return http(`/outbound-slips?${q.toString()}`).then((r) => r.data || []);
   },
+  createOutboundSlip: (data) => http(`/outbound-slips`, body("POST", data)),
   outboundSlip: (id) => http(`/outbound-slips/${id}`).then((r) => r.data),
   confirmOutboundSlip: (id) => http(`/outbound-slips/${id}/confirm`, body("POST", {})),
   cancelOutboundSlip: (id) => http(`/outbound-slips/${id}/cancel`, body("POST", {})),

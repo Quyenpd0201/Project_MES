@@ -237,6 +237,39 @@ exports.adjust = async (req, res) => {
 };
 
 // ── PHIẾU XUẤT KHO (outbound slips) ───────────────────────────────────────────
+// POST /api/outbound-slips — TẠO PHIẾU XUẤT KHO "Chờ xuất" (không trừ tồn ngay)
+exports.createOutboundSlip = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const { purpose, location_id, note, lines } = req.body;
+    if (!location_id) return res.status(400).json({ message: 'Thiếu kho/vị trí xuất' });
+    if (!Array.isArray(lines) || !lines.length) return res.status(400).json({ message: 'Danh sách sản phẩm trống' });
+
+    await client.query('BEGIN');
+
+    // Sinh mã phiếu PXK00001…
+    const slipCode = (await client.query(
+      `SELECT 'PXK' || LPAD((COALESCE(MAX(NULLIF(regexp_replace(slip_code,'\\D','','g'),''))::int,0)+1)::text,5,'0') AS code
+       FROM outbound_slips WHERE slip_code ~ '^PXK[0-9]+$'`)).rows[0].code;
+
+    const slip = (await client.query(
+      `INSERT INTO outbound_slips (slip_code, purpose, location_id, status, note, created_by)
+       VALUES ($1,$2,$3,'Chờ xuất',$4,$5) RETURNING id, slip_code`,
+      [slipCode, purpose || 'Khác', location_id, note || null, req.userId || null])).rows[0];
+
+    for (const l of lines) {
+      if (!l.product_id || Number(l.quantity) <= 0) continue;
+      await client.query(
+        `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,$5,$6)`,
+        [slip.id, l.product_id, Number(l.quantity), l.unit || null, l.lot_code || '', l.note || null]);
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: `Đã tạo phiếu chờ xuất kho ${slip.slip_code}.`, slip_code: slip.slip_code, slip_id: slip.id });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
+  finally { client.release(); }
+};
+
 // GET /api/outbound-slips?status= — danh sách phiếu (mặc định tất cả)
 exports.listOutboundSlips = async (req, res) => {
   try {

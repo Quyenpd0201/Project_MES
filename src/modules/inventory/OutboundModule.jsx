@@ -106,19 +106,29 @@ function OutboundForm({ lookups, onSaved }) {
     setSaving(true);
     const finalRef = header.ref_code.trim() || `XK${new Date().toISOString().replace(/\D/g, '').slice(2, 14)}`;
     try {
-      await Promise.all(validLines.map(l =>
-        inventory.adjust({
-          product_id: l.product_id,
-          quantity: Number(l.quantity),
-          unit: l.unit,
+      if (header.purpose === "Giao cho khách hàng") {
+        await inventory.createOutboundSlip({
+          purpose: header.purpose,
           location_id: header.location_id,
-          lot_code: l.lot_code || "",
-          trx_type: "Xuất",
-          ref_code: finalRef,
-          note: [header.purpose, header.note, l.note].filter(Boolean).join(" | "),
-        })
-      ));
-      toast.success(`Đã xuất kho ${validLines.length} dòng sản phẩm thành công!`);
+          note: header.note,
+          lines: validLines
+        });
+        toast.success(`Đã tạo Phiếu chờ xuất kho cho khách hàng!`);
+      } else {
+        await Promise.all(validLines.map(l =>
+          inventory.adjust({
+            product_id: l.product_id,
+            quantity: Number(l.quantity),
+            unit: l.unit,
+            location_id: header.location_id,
+            lot_code: l.lot_code || "",
+            trx_type: "Xuất",
+            ref_code: finalRef,
+            note: [header.purpose, header.note, l.note].filter(Boolean).join(" | "),
+          })
+        ));
+        toast.success(`Đã xuất kho ${validLines.length} dòng sản phẩm thành công!`);
+      }
       setLines([emptyLine()]);
       setHeader(h => ({ ...h, ref_code: "" }));
       onSaved();
