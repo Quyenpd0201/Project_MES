@@ -1318,7 +1318,7 @@ export default function MesApp() {
                 onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
               <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/execution" element={needLookups(ExecutionModule)} />
-              <Route path="/scrap" element={<ScrapModule />} />
+              <Route path="/scrap" element={<ScrapModule onOpenOrder={goProductionOrder} />} />
               <Route path="/recycling" element={<RecyclingModule />} />
               <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
               <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />

@@ -9,7 +9,7 @@ import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast } from "../../ui.js";
 
 // ----- STATISTICS COMPONENT -----
-function ScrapStatistics({ worker }) {
+function ScrapStatistics({ worker, onOpenOrder }) {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState([]);
   
@@ -190,7 +190,12 @@ function ScrapStatistics({ worker }) {
                                       <div key={task.task_id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                                         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
                                           <div className="font-semibold text-blue-700 flex items-center gap-1.5">
-                                            <FileText size={14} className="text-blue-500" /> {task.order_code}
+                                            <FileText size={14} className="text-blue-500" />
+                                            {onOpenOrder && task.order_id ? (
+                                              <button onClick={(e) => { e.stopPropagation(); onOpenOrder(task.order_id); }} className="hover:underline">{task.order_code}</button>
+                                            ) : (
+                                              task.order_code
+                                            )}
                                           </div>
                                           <span className="text-xs font-medium px-2 py-1 bg-slate-200 text-slate-700 rounded-md">{task.step_name}</span>
                                         </div>
@@ -237,7 +242,7 @@ function ScrapStatistics({ worker }) {
 }
 
 // ----- RECORDING COMPONENT -----
-function ScrapForm({ worker, date, setDate }) {
+function ScrapForm({ worker, date, setDate, onOpenOrder }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -350,7 +355,7 @@ function ScrapForm({ worker, date, setDate }) {
   };
 
   const woCols = [
-    { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600" },
+    { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600", render: r => onOpenOrder && r.order_id ? <button onClick={(e) => { e.stopPropagation(); onOpenOrder(r.order_id); }} className="hover:underline">{r.order_code}</button> : r.order_code },
     { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
     { key: "total_qty", label: "Thành phẩm", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.total_qty)} {r.unit}</span> },
     { key: "last_completed_at", label: "TG Hoàn thành (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
@@ -497,7 +502,7 @@ function ScrapForm({ worker, date, setDate }) {
   );
 }
 
-export default function ScrapModule() {
+export default function ScrapModule({ onOpenOrder }) {
   const [activeTab, setActiveTab] = useState("record");
   
   // GLOBAL STATE
@@ -560,9 +565,9 @@ export default function ScrapModule() {
 
       <div className="py-2">
         {activeTab === "record" ? (
-          <ScrapForm worker={worker} date={date} setDate={setDate} />
+          <ScrapForm worker={worker} date={date} setDate={setDate} onOpenOrder={onOpenOrder} />
         ) : (
-          <ScrapStatistics worker={worker} />
+          <ScrapStatistics worker={worker} onOpenOrder={onOpenOrder} />
         )}
       </div>
     </div>

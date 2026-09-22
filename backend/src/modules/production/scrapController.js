@@ -34,6 +34,7 @@ exports.getDailyWos = async (req, res) => {
     // Lấy các lệnh SX và tổng thành phẩm của công nhân trong ngày
     const { rows } = await db.query(`
       SELECT 
+        po.id as order_id,
         po.order_code,
         po.product_id,
         p.product_name,
@@ -47,7 +48,7 @@ exports.getDailyWos = async (req, res) => {
       WHERE pt.assigned_worker = $1
         AND pt.status = 'Hoàn thành'
         AND pt.updated_at::date = $2
-      GROUP BY po.order_code, po.product_id, p.product_name, p.product_code, p.unit
+      GROUP BY po.id, po.order_code, po.product_id, p.product_name, p.product_code, p.unit
       ORDER BY last_completed_at DESC
     `, [worker_name, date]);
 
@@ -220,6 +221,7 @@ exports.getDailyDetails = async (req, res) => {
         pt.id as task_id,
         pt.stage as step_name,
         pt.actual_qty,
+        po.id as order_id,
         po.order_code,
         p.product_code,
         p.product_name,
