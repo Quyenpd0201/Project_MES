@@ -219,7 +219,7 @@ exports.adjust = async (req, res) => {
       `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color, quantity, unit)
        VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (product_id, location_id, spec_key, lot_code)
-       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
+       DO UPDATE SET quantity = GREATEST(0, inventory_stock.quantity + EXCLUDED.quantity),
                      specs = EXCLUDED.specs,
                      unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
                      updated_at = now()`,
