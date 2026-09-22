@@ -2,29 +2,36 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { 
   Users, Calendar, Save, List, Plus, Settings2, Trash2, Edit2, 
   BarChart2, FileText, CheckCircle2, TrendingUp, TrendingDown,
-  RefreshCcw
+  RefreshCcw, ChevronDown, ChevronRight
 } from "lucide-react";
 import { PageHeader, DataTable } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast } from "../../ui.js";
 
 // ----- STATISTICS COMPONENT -----
-function ScrapStatistics() {
+function ScrapStatistics({ worker }) {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState([]);
   
+  // Expanded rows logic
+  const [expandedDate, setExpandedDate] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [dailyDetails, setDailyDetails] = useState([]);
+
   const loadStats = useCallback(async () => {
+    if (!worker) return setStats([]);
     setLoading(true);
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const res = await scrap.stats(today);
+      const res = await scrap.stats(worker, today);
       setStats(res);
+      setExpandedDate(null);
     } catch (e) {
       toast.error("Lỗi tải thống kê: " + e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [worker]);
 
   useEffect(() => {
     loadStats();
@@ -42,12 +49,62 @@ function ScrapStatistics() {
     return { wos, finished, scrapTotal, ratio, kgPerKg };
   }, [stats]);
 
+  const handleRowClick = async (row) => {
+    if (expandedDate === row.date) {
+      setExpandedDate(null);
+      return;
+    }
+    setExpandedDate(row.date);
+    setDetailsLoading(true);
+    try {
+      const details = await scrap.dailyDetails(worker, row.date);
+      setDailyDetails(details || []);
+    } catch (e) {
+      toast.error("Lỗi lấy chi tiết: " + e.message);
+      setDailyDetails([]);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   const cols = [
+    { 
+      key: "expand", 
+      label: "", 
+      width: 40,
+      render: r => (
+        <button className="p-1 hover:bg-slate-100 rounded text-slate-500">
+          {expandedDate === r.date ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+      )
+    },
     { key: "date", label: "Ngày", render: r => new Date(r.date).toLocaleDateString("vi-VN") },
     { key: "total_wos", label: "Lệnh hoàn thành", align: "center", render: r => <span className="font-semibold">{r.total_wos}</span> },
     { key: "total_finished", label: "Thành phẩm", align: "right", render: r => fmt(r.total_finished) },
     { key: "total_scrap", label: "Phế phẩm", align: "right", render: r => <span className="text-rose-600 font-semibold">{fmt(r.total_scrap)}</span> },
   ];
+
+  const detailCols = [
+    { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600" },
+    { key: "step_name", label: "Công đoạn" },
+    { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
+    { key: "actual_qty", label: "Thực tế", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.actual_qty)} {r.unit}</span> },
+    { key: "product_scrap_qty", label: "Tổng Phế (SP/Ngày)", align: "right", render: r => <span className="font-semibold text-rose-500">{fmt(r.product_scrap_qty)}</span> },
+    { key: "ratio", label: "Tỷ lệ Phế / kg", align: "right", render: r => {
+      const actual = Number(r.actual_qty) || 0;
+      const pScrap = Number(r.product_scrap_qty) || 0;
+      return actual > 0 ? (pScrap / actual).toFixed(4) : "0.0000";
+    }}
+  ];
+
+  if (!worker) {
+    return (
+      <div className="py-12 text-center bg-white rounded-xl border border-slate-200">
+        <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+        <p className="text-slate-500">Vui lòng chọn công nhân ở phía trên để xem thống kê</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -83,8 +140,60 @@ function ScrapStatistics() {
             <RefreshCcw size={14} className={loading ? "animate-spin" : ""} /> Cập nhật
           </button>
         </div>
-        <div className="p-4">
-          <DataTable rows={stats} columns={cols} rowKey={r => r.date} dense />
+        <div className="p-0">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+              <tr>
+                {cols.map((c, i) => (
+                  <th key={i} className="px-4 py-3 font-semibold" style={{ textAlign: c.align || 'left', width: c.width }}>{c.label}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {stats.length === 0 ? (
+                <tr>
+                  <td colSpan={cols.length} className="px-4 py-8 text-center text-slate-500">
+                    {loading ? "Đang tải dữ liệu..." : "Không có dữ liệu trong 7 ngày qua"}
+                  </td>
+                </tr>
+              ) : (
+                stats.map((row) => (
+                  <React.Fragment key={row.date}>
+                    <tr 
+                      className={`hover:bg-slate-50 cursor-pointer transition-colors ${expandedDate === row.date ? 'bg-blue-50/30' : ''}`}
+                      onClick={() => handleRowClick(row)}
+                    >
+                      {cols.map((c, i) => (
+                        <td key={i} className={`px-4 py-3 ${c.tdClass || ""}`} style={{ textAlign: c.align || 'left' }}>
+                          {c.render ? c.render(row) : row[c.key]}
+                        </td>
+                      ))}
+                    </tr>
+                    {expandedDate === row.date && (
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <td colSpan={cols.length} className="p-0">
+                          <div className="px-10 py-4 shadow-inner">
+                            <div className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
+                              <List size={14} /> Chi tiết Công đoạn & Lệnh SX ngày {new Date(row.date).toLocaleDateString("vi-VN")}
+                            </div>
+                            {detailsLoading ? (
+                              <div className="text-slate-500 text-sm py-4 animate-pulse">Đang tải chi tiết...</div>
+                            ) : dailyDetails.length === 0 ? (
+                              <div className="text-slate-500 text-sm py-4">Không có công đoạn nào được ghi nhận.</div>
+                            ) : (
+                              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                                <DataTable rows={dailyDetails} columns={detailCols} rowKey={r => r.task_id} dense />
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -92,11 +201,7 @@ function ScrapStatistics() {
 }
 
 // ----- RECORDING COMPONENT -----
-function ScrapForm() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [worker, setWorker] = useState("");
-  const [workerList, setWorkerList] = useState([]);
-  
+function ScrapForm({ worker, date, setDate }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -105,21 +210,14 @@ function ScrapForm() {
   const [inputs, setInputs] = useState({}); // { product_id: { scrap_qty: 0 } }
   const [note, setNote] = useState("");
 
-  // Load available workers for the selected date
-  useEffect(() => {
-    scrap.workers(date).then(res => {
-      setWorkerList(res || []);
-      if (!res?.includes(worker)) {
-        setWorker("");
-        setWos([]);
-        setRecord(null);
-      }
-    }).catch(e => toast.error("Lỗi lấy danh sách công nhân: " + e.message));
-  }, [date]);
-
   // Load WOs and existing record for selected worker + date
   const loadData = useCallback(async () => {
-    if (!worker || !date) return;
+    if (!worker || !date) {
+      setWos([]);
+      setRecord(null);
+      setInputs({});
+      return;
+    }
     setLoading(true);
     try {
       const [wosData, recordData] = await Promise.all([
@@ -224,7 +322,7 @@ function ScrapForm() {
 
   return (
     <div className="space-y-6">
-      {/* FILTER HEADER */}
+      {/* FILTER HEADER (Local to Form for Date, but visually fits below the global worker) */}
       <div className="bg-white p-5 rounded-xl border border-slate-200 flex flex-wrap gap-6 shadow-sm">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Ngày ghi nhận</label>
@@ -234,26 +332,16 @@ function ScrapForm() {
               value={date} onChange={e => setDate(e.target.value)} />
           </div>
         </div>
-        <div className="flex-1 min-w-[250px]">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Chọn công nhân</label>
-          <div className="relative">
-            <Users className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <select className={inputCls + " pl-10 bg-slate-50 border-slate-200 focus:bg-white"} 
-              value={worker} onChange={e => setWorker(e.target.value)}>
-              <option value="">-- Chọn công nhân --</option>
-              {workerList.map(w => (
-                <option key={w} value={w}>{w}</option>
-              ))}
-            </select>
-          </div>
-          {workerList.length === 0 && (
-            <p className="text-xs text-rose-500 mt-1.5 flex items-center gap-1">Không có CN nào hoàn thành lệnh trong ngày này.</p>
-          )}
+        <div className="flex-[2]">
+           {/* Placeholder if we need more form-specific filters */}
+           <div className="h-full flex items-center justify-end text-sm text-slate-500">
+              Công nhân đang chọn: <span className="font-semibold ml-2 text-blue-600">{worker || "Chưa chọn"}</span>
+           </div>
         </div>
       </div>
 
       {/* CONTENT */}
-      {worker && (
+      {worker ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* LEFT: WO LIST */}
@@ -302,7 +390,7 @@ function ScrapForm() {
               
               <div className="p-5 space-y-6">
                 {productGroups.length === 0 ? (
-                  <p className="text-sm text-slate-500 italic text-center py-4">Vui lòng chờ hoặc chọn công nhân khác.</p>
+                  <p className="text-sm text-slate-500 italic text-center py-4">Chưa có thành phẩm nào.</p>
                 ) : (
                   <>
                     <div className="space-y-4">
@@ -363,6 +451,11 @@ function ScrapForm() {
             </div>
           </div>
         </div>
+      ) : (
+        <div className="py-12 text-center bg-white rounded-xl border border-slate-200">
+          <Users className="mx-auto h-12 w-12 text-slate-300 mb-3" />
+          <p className="text-slate-500">Vui lòng chọn công nhân ở phía trên để nhập liệu</p>
+        </div>
       )}
     </div>
   );
@@ -370,14 +463,46 @@ function ScrapForm() {
 
 export default function ScrapModule() {
   const [activeTab, setActiveTab] = useState("record");
+  
+  // GLOBAL STATE
+  const [worker, setWorker] = useState("");
+  const [workerList, setWorkerList] = useState([]);
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); // For recording form
+
+  // Load all workers who worked recently
+  useEffect(() => {
+    scrap.workers().then(res => {
+      setWorkerList(res || []);
+    }).catch(e => toast.error("Lỗi lấy danh sách công nhân: " + e.message));
+  }, []);
 
   return (
     <div className="space-y-6">
       <PageHeader 
         title="Ghi nhận Phế phẩm" 
         icon={Trash2}
-        description="Ghi nhận và quản lý lượng phế phẩm phát sinh theo công nhân mỗi ngày."
+        description="Ghi nhận và quản lý lượng phế phẩm phát sinh theo công nhân."
       />
+      
+      {/* GLOBAL WORKER FILTER */}
+      <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm bg-gradient-to-r from-blue-50 to-white">
+        <div className="max-w-md">
+          <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
+          <div className="relative">
+            <Users className="absolute left-3 top-2.5 text-blue-500" size={18} />
+            <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"} 
+              value={worker} onChange={e => setWorker(e.target.value)}>
+              <option value="">-- Vui lòng chọn công nhân --</option>
+              {workerList.map(w => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+          </div>
+          {workerList.length === 0 && (
+            <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">Chưa có công nhân nào phát sinh dữ liệu gần đây.</p>
+          )}
+        </div>
+      </div>
 
       {/* TABS */}
       <div className="flex items-center gap-1 border-b border-slate-200">
@@ -398,8 +523,11 @@ export default function ScrapModule() {
       </div>
 
       <div className="py-2">
-        {activeTab === "record" && <ScrapForm />}
-        {activeTab === "stats" && <ScrapStatistics />}
+        {activeTab === "record" ? (
+          <ScrapForm worker={worker} date={date} setDate={setDate} />
+        ) : (
+          <ScrapStatistics worker={worker} />
+        )}
       </div>
     </div>
   );

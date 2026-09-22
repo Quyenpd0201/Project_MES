@@ -3,15 +3,18 @@ const db = require('../../core/db');
 // GET /api/scrap/workers?date=2026-09-22
 exports.getWorkers = async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const date = req.query.date;
+    const dateCondition = date ? `AND updated_at::date = $1` : `AND updated_at::date >= current_date - interval '7 days'`;
+    const params = date ? [date] : [];
+    
     const { rows } = await db.query(`
       SELECT DISTINCT assigned_worker
       FROM production_tasks
       WHERE status = 'Hoàn thành'
         AND assigned_worker IS NOT NULL
-        AND updated_at::date = $1
+        ${dateCondition}
       ORDER BY assigned_worker
-    `, [date]);
+    `, params);
     res.json(rows.map(r => r.assigned_worker));
   } catch (err) {
     console.error(err);
@@ -158,39 +161,101 @@ exports.saveRecords = async (req, res) => {
   }
 };
 
-// GET /api/scrap/statistics
+// GET /api/scrap/statistics?worker_name=...&end_date=...
 exports.getStats = async (req, res) => {
   try {
     const end_date = req.query.end_date || new Date().toISOString().slice(0, 10);
+    const worker_name = req.query.worker_name;
+    if (!worker_name) return res.status(400).json({ message: 'Thiếu worker_name' });
+
     const statsQuery = await db.query(`
       WITH date_series AS (
         SELECT generate_series($1::date - interval '6 days', $1::date, '1 day')::date AS d
       ),
       wo_stats AS (
-        SELECT updated_at::date as d, COUNT(DISTINCT production_order_id) as total_wos
-        FROM production_tasks WHERE status = 'Hoàn thành' AND updated_at::date >= $1::date - interval '6 days'
+        SELECT updated_at::date as d, COUNT(DISTINCT production_order_id) as total_wos, SUM(actual_qty) as total_finished
+        FROM production_tasks 
+        WHERE status = 'Hoàn thành' 
+          AND assigned_worker = $2
+          AND updated_at::date >= $1::date - interval '6 days'
         GROUP BY updated_at::date
       ),
       scrap_stats AS (
-        SELECT dsr.record_date as d, SUM(dsi.finished_qty) as total_finished, SUM(dsi.scrap_qty) as total_scrap
+        SELECT dsr.record_date as d, SUM(dsi.scrap_qty) as total_scrap
         FROM daily_scrap_records dsr
         JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
-        WHERE dsr.record_date >= $1::date - interval '6 days'
+        WHERE dsr.worker_name = $2
+          AND dsr.record_date >= $1::date - interval '6 days'
         GROUP BY dsr.record_date
       )
       SELECT ds.d as date, 
              COALESCE(ws.total_wos, 0) as total_wos,
-             COALESCE(ss.total_finished, 0) as total_finished,
+             COALESCE(ws.total_finished, 0) as total_finished,
              COALESCE(ss.total_scrap, 0) as total_scrap
       FROM date_series ds
       LEFT JOIN wo_stats ws ON ws.d = ds.d
       LEFT JOIN scrap_stats ss ON ss.d = ds.d
       ORDER BY ds.d ASC
-    `, [end_date]);
+    `, [end_date, worker_name]);
 
     res.json(statsQuery.rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy thống kê' });
+  }
+};
+
+// GET /api/scrap/daily-details?worker_name=...&date=...
+exports.getDailyDetails = async (req, res) => {
+  try {
+    const date = req.query.date;
+    const worker_name = req.query.worker_name;
+    if (!worker_name || !date) return res.status(400).json({ message: 'Thiếu thông tin' });
+
+    // Fetch tasks completed by worker on this date
+    const tasksQuery = await db.query(`
+      SELECT 
+        pt.id as task_id,
+        pt.step_name,
+        pt.actual_qty,
+        po.order_code,
+        p.product_code,
+        p.product_name,
+        p.unit,
+        p.id as product_id
+      FROM production_tasks pt
+      JOIN production_orders po ON pt.production_order_id = po.id
+      JOIN products p ON po.product_id = p.id
+      WHERE pt.assigned_worker = $1
+        AND pt.status = 'Hoàn thành'
+        AND pt.updated_at::date = $2
+      ORDER BY po.order_code ASC, pt.step_name ASC
+    `, [worker_name, date]);
+
+    // Fetch scrap recorded for this worker on this date
+    const scrapQuery = await db.query(`
+      SELECT dsi.product_id, dsi.scrap_qty
+      FROM daily_scrap_records dsr
+      JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+      WHERE dsr.worker_name = $1 AND dsr.record_date = $2
+    `, [worker_name, date]);
+
+    // Map scrap to products
+    const scrapMap = {};
+    scrapQuery.rows.forEach(r => {
+      scrapMap[r.product_id] = Number(r.scrap_qty);
+    });
+
+    const tasks = tasksQuery.rows.map(t => ({
+      ...t,
+      // We pass the total scrap for this product on this day.
+      // (Since scrap is recorded per product, not per task)
+      product_scrap_qty: scrapMap[t.product_id] || 0
+    }));
+
+    res.json(tasks);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi khi lấy chi tiết ngày' });
   }
 };
