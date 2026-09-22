@@ -24,4 +24,12 @@ router.post('/production-orders/:id/planned-materials', requirePerm('production:
 router.post('/production-orders/:id/request-materials', requirePerm('production:edit'), production.requestMaterials);
 router.delete('/production-orders/:id', requirePerm('production:delete'), production.remove);
 
+const scrap = require('./scrapController');
+
+router.get('/scrap/workers', scrap.getWorkers);
+router.get('/scrap/daily-wos', scrap.getDailyWos);
+router.get('/scrap/records', scrap.getRecords);
+router.post('/scrap/records', requirePerm('production:edit'), scrap.saveRecords);
+router.get('/scrap/statistics', scrap.getStats);
+
 module.exports = router;

@@ -35,6 +35,7 @@ import ReportsModule from "./src/modules/reports/Reports.jsx";
 import InventoryReport from "./src/modules/reports/InventoryReport.jsx";
 import EmployeeReport from "./src/modules/reports/EmployeeReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
+import ScrapModule from "./src/modules/production/ScrapModule.jsx";
 import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
 
 /* =====================================================================
@@ -152,6 +153,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "production", label: "Lệnh sản xuất", icon: Factory, path: "/production" },
         { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
         { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
+        { key: "scrap", label: "Ghi nhận phế phẩm", icon: Trash2, path: "/scrap" },
         { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
         { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
       ]
@@ -1314,6 +1316,7 @@ export default function MesApp() {
                 onExit={prodOrderBack ? () => { const b = prodOrderBack; setProdOrderBack(null); navigate(b); } : null} /> : loadingEl} />
               <Route path="/orderstatus" element={lookups ? <OrderStatusModule lookups={lookups} onOpenOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/execution" element={needLookups(ExecutionModule)} />
+              <Route path="/scrap" element={<ScrapModule />} />
               <Route path="/production/output" element={lookups ? <OutputReport lookups={lookups} /> : loadingEl} />
               <Route path="/inventory" element={lookups ? <InventoryModule lookups={lookups} onOpenProduct={(id) => goProductDetail(id, "/inventory")} /> : loadingEl} />
               <Route path="/inventory/inbound" element={lookups ? <InboundModule lookups={lookups} /> : loadingEl} />
