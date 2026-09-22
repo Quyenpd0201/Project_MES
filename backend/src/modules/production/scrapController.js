@@ -3,7 +3,9 @@ const db = require('../../core/db');
 // GET /api/scrap/workers?date=2026-09-22
 exports.getWorkers = async (req, res) => {
   try {
-    const date = req.query.date;
+    let date = req.query.date;
+    if (date === 'undefined') date = undefined;
+    
     const dateCondition = date ? `AND updated_at::date = $1` : `AND updated_at::date >= current_date - interval '7 days'`;
     const params = date ? [date] : [];
     
