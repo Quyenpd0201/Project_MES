@@ -17,7 +17,7 @@ const Field = ({ label, required, children }) => (
 const OUTBOUND_PURPOSES = ["Giao cho khách hàng", "Xuất cho sản xuất", "Xuất trả NCC", "Hủy / Phế liệu", "Chuyển kho", "Khác"];
 
 const emptyLine = () => ({
-  _k: Math.random(), product_id: "", quantity: "", unit: "", lot_code: "", available: null, note: ""
+  _k: Math.random(), product_id: "", quantity: "", unit: "", lot_code: "", available: null, availableLots: [], availableLocations: null, note: ""
 });
 
 function OutboundForm({ lookups, onSaved }) {
@@ -35,9 +35,10 @@ function OutboundForm({ lookups, onSaved }) {
 
   // Lấy tồn kho của 1 sản phẩm tại vị trí đang chọn
   const fetchAvailable = async (product_id) => {
-    if (!product_id) return { total: null, lots: [] };
+    if (!product_id) return { total: null, lots: [], locations: [] };
     try {
       const tree = await inventory.tree({ product_id });
+      const availableLocations = [...new Set((tree || []).filter(r => r.quantity > 0 && r.location_id).map(r => r.location_id))];
       const locId = locationRef.current;
       // Nếu đã chọn kho: chỉ tính tồn tại kho đó
       // Nếu chưa chọn kho: tính tồn tích lũy toàn bộ
@@ -46,19 +47,20 @@ function OutboundForm({ lookups, onSaved }) {
         : (tree || []).filter(x => x.product_id === product_id);
       const total = rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
       const lots = [...new Set(rows.filter(r => r.quantity > 0 && r.lot_code).map(r => r.lot_code))];
-      return { total, lots };
-    } catch { return { total: null, lots: [] }; }
+      return { total, lots, locations: availableLocations };
+    } catch { return { total: null, lots: [], locations: [] }; }
   };
 
   const onProductChange = async (k, id) => {
     const p = (lookups.products || []).find(x => x.id === id);
-    setLines(a => a.map(l => l._k === k ? { ...l, product_id: id, unit: p?.unit || "", available: null, availableLots: [] } : l));
+    setLines(a => a.map(l => l._k === k ? { ...l, product_id: id, unit: p?.unit || "", available: null, availableLots: [], availableLocations: null } : l));
     if (id) {
-      const { total, lots } = await fetchAvailable(id);
+      const { total, lots, locations } = await fetchAvailable(id);
       setLines(a => a.map(l => l._k === k ? { 
         ...l, 
         available: total, 
         availableLots: lots,
+        availableLocations: locations,
         lot_code: lots.length === 1 ? lots[0] : (l.lot_code || "") 
       } : l));
     }
@@ -72,11 +74,12 @@ function OutboundForm({ lookups, onSaved }) {
     setLines(a => a.map(l => ({ ...l, available: null, availableLots: [] })));
     const currentLines = lines.filter(l => l.product_id);
     for (const l of currentLines) {
-      const { total, lots } = await fetchAvailable(l.product_id);
+      const { total, lots, locations } = await fetchAvailable(l.product_id);
       setLines(a => a.map(x => x._k === l._k ? { 
         ...x, 
         available: total,
         availableLots: lots,
+        availableLocations: locations,
         lot_code: lots.length === 1 ? lots[0] : (x.lot_code || "")
       } : x));
     }
@@ -126,6 +129,19 @@ function OutboundForm({ lookups, onSaved }) {
     }
   };
 
+  const selectedProductLines = lines.filter(l => l.product_id && l.availableLocations);
+  let validLocationIds = null;
+  if (selectedProductLines.length > 0) {
+    validLocationIds = selectedProductLines.reduce((acc, l) => {
+      if (acc === null) return new Set(l.availableLocations);
+      return new Set([...acc].filter(x => l.availableLocations.includes(x)));
+    }, null);
+  }
+
+  const locationsToShow = validLocationIds 
+    ? (lookups.locations || []).filter(l => validLocationIds.has(l.id))
+    : (lookups.locations || []);
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
       <div className="px-5 py-4 bg-rose-50 border-b border-rose-100 flex items-center gap-3">
@@ -151,7 +167,7 @@ function OutboundForm({ lookups, onSaved }) {
           <Field label="Kho / Vị trí xuất" required>
             <select className={inputCls} value={header.location_id} onChange={e => onLocationChange(e.target.value)}>
               <option value="">-- Chọn kho/vị trí --</option>
-              {(lookups.locations || []).map(l => (
+              {locationsToShow.map(l => (
                 <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
               ))}
             </select>

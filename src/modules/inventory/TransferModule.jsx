@@ -20,6 +20,7 @@ function TransferForm({ lookups, onSaved }) {
     from_location_id: "", to_location_id: "", note: ""
   });
   const [available, setAvailable] = useState(null);
+  const [availableLocations, setAvailableLocations] = useState(null);
   const [saving, setSaving] = useState(false);
   const set = (k, v) => setForm(s => ({ ...s, [k]: v }));
 
@@ -28,12 +29,16 @@ function TransferForm({ lookups, onSaved }) {
     set("product_id", id);
     if (p) set("unit", p.unit || "");
     setAvailable(null);
+    setAvailableLocations(null);
     if (id) {
       try {
         const tree = await inventory.tree({ product_id: id });
         // tree trả về mảng phẳng — cộng dồn quantity của tất cả dòng thuộc sản phẩm này
-        const total = (tree || []).filter(x => x.product_id === id).reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const filtered = (tree || []).filter(x => x.product_id === id);
+        const total = filtered.reduce((s, r) => s + Number(r.quantity || 0), 0);
+        const locs = [...new Set(filtered.filter(x => x.quantity > 0).map(x => x.location_id))];
         setAvailable(total);
+        setAvailableLocations(locs);
       } catch { /* ignore */ }
     }
   };
@@ -66,6 +71,7 @@ function TransferForm({ lookups, onSaved }) {
         from_location_id: "", to_location_id: "", note: ""
       });
       setAvailable(null);
+      setAvailableLocations(null);
       onSaved();
     } catch (e) {
       toast.error("Lỗi chuyển kho: " + e.message);
@@ -76,6 +82,11 @@ function TransferForm({ lookups, onSaved }) {
 
   const fromLoc = (lookups.locations || []).find(l => l.id === form.from_location_id);
   const toLoc = (lookups.locations || []).find(l => l.id === form.to_location_id);
+
+  const fromLocationsToShow = form.product_id && availableLocations
+    ? (lookups.locations || []).filter(l => availableLocations.includes(l.id))
+    : (lookups.locations || []);
+
   const overQty = available !== null && Number(form.quantity) > available;
 
   return (
@@ -118,7 +129,7 @@ function TransferForm({ lookups, onSaved }) {
               <Field label="Kho / Vị trí nguồn" required>
                 <select className={inputCls} value={form.from_location_id} onChange={e => set("from_location_id", e.target.value)}>
                   <option value="">-- Kho xuất hàng --</option>
-                  {(lookups.locations || []).map(l => (
+                  {fromLocationsToShow.map(l => (
                     <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
                   ))}
                 </select>
