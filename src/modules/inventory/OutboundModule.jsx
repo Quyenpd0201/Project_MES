@@ -27,21 +27,46 @@ function OutboundForm({ lookups, onSaved }) {
   });
   const [lines, setLines] = useState([emptyLine()]);
   const [saving, setSaving] = useState(false);
+  // Ref lưu location_id hiện tại để dùng trong async callbacks
+  const locationRef = React.useRef("");
 
   const setH = (k, v) => setHeader(s => ({ ...s, [k]: v }));
   const setLine = (k, field, v) => setLines(a => a.map(l => l._k === k ? { ...l, [field]: v } : l));
 
+  // Lấy tồn kho của 1 sản phẩm tại vị trí đang chọn
+  const fetchAvailable = async (product_id) => {
+    if (!product_id) return null;
+    try {
+      const tree = await inventory.tree({ product_id });
+      const locId = locationRef.current;
+      // Nếu đã chọn kho: chỉ tính tồn tại kho đó
+      // Nếu chưa chọn kho: tính tồn tích lũy toàn bộ
+      const rows = locId
+        ? (tree || []).filter(x => x.product_id === product_id && x.location_id === locId)
+        : (tree || []).filter(x => x.product_id === product_id);
+      return rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+    } catch { return null; }
+  };
+
   const onProductChange = async (k, id) => {
     const p = (lookups.products || []).find(x => x.id === id);
     setLines(a => a.map(l => l._k === k ? { ...l, product_id: id, unit: p?.unit || "", available: null } : l));
-    // Load current stock
     if (id) {
-      try {
-        const tree = await inventory.tree({ product_id: id });
-        // tree trả về mảng phẳng — cộng dồn quantity của tất cả dòng thuộc sản phẩm này
-        const total = (tree || []).filter(x => x.product_id === id).reduce((s, r) => s + Number(r.quantity || 0), 0);
-        setLines(a => a.map(l => l._k === k ? { ...l, available: total } : l));
-      } catch { /* ignore */ }
+      const total = await fetchAvailable(id);
+      setLines(a => a.map(l => l._k === k ? { ...l, available: total } : l));
+    }
+  };
+
+  // Khi đổi kho xuất: cập nhật lại tồn kho của tất cả dòng hàng
+  const onLocationChange = async (locId) => {
+    locationRef.current = locId;
+    setH("location_id", locId);
+    // Reset available rồi fetch lại
+    setLines(a => a.map(l => ({ ...l, available: null })));
+    const currentLines = lines.filter(l => l.product_id);
+    for (const l of currentLines) {
+      const total = await fetchAvailable(l.product_id);
+      setLines(a => a.map(x => x._k === l._k ? { ...x, available: total } : x));
     }
   };
 
@@ -111,7 +136,7 @@ function OutboundForm({ lookups, onSaved }) {
             </select>
           </Field>
           <Field label="Kho / Vị trí xuất" required>
-            <select className={inputCls} value={header.location_id} onChange={e => setH("location_id", e.target.value)}>
+            <select className={inputCls} value={header.location_id} onChange={e => onLocationChange(e.target.value)}>
               <option value="">-- Chọn kho/vị trí --</option>
               {(lookups.locations || []).map(l => (
                 <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
