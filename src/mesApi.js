@@ -125,6 +125,7 @@ export const inventory = {
   },
   addStock: (data) => http(`/inventory/stock`, body("POST", data)),
   deleteStock: (id) => http(`/inventory/stock/${id}`, { method: "DELETE" }),
+  transfer: (data) => http(`/inventory/transfer`, body("POST", data)),
   // Phiếu xuất kho (Chờ xuất → Đã xuất)
   outboundSlips: (params = {}) => {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null));

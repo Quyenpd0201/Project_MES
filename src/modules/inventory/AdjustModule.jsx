@@ -35,7 +35,8 @@ function AdjustForm({ lookups, onSaved }) {
     if (id) {
       try {
         const tree = await inventory.tree({ product_id: id });
-        const total = (tree || []).find(x => x.product_id === id)?.total || 0;
+        // tree trả về mảng phẳng — cộng dồn quantity của tất cả dòng thuộc sản phẩm này
+        const total = (tree || []).filter(x => x.product_id === id).reduce((s, r) => s + Number(r.quantity || 0), 0);
         setForm(s => ({ ...s, product_id: id, system_qty: total, unit: p?.unit || s.unit }));
       } catch { /* ignore */ }
     }

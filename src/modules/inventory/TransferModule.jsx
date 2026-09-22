@@ -31,7 +31,8 @@ function TransferForm({ lookups, onSaved }) {
     if (id) {
       try {
         const tree = await inventory.tree({ product_id: id });
-        const total = (tree || []).find(x => x.product_id === id)?.total || 0;
+        // tree trả về mảng phẳng — cộng dồn quantity của tất cả dòng thuộc sản phẩm này
+        const total = (tree || []).filter(x => x.product_id === id).reduce((s, r) => s + Number(r.quantity || 0), 0);
         setAvailable(total);
       } catch { /* ignore */ }
     }
@@ -43,32 +44,23 @@ function TransferForm({ lookups, onSaved }) {
     if (!form.from_location_id) return toast.error("Chọn kho/vị trí nguồn");
     if (!form.to_location_id) return toast.error("Chọn kho/vị trí đích");
     if (form.from_location_id === form.to_location_id) return toast.error("Kho nguồn và đích không được giống nhau");
+    // Chặn cứng ở frontend trước khi gọi API
+    if (available !== null && Number(form.quantity) > available)
+      return toast.error(`Không đủ tồn kho — tồn hiện có: ${available} ${form.unit}`);
 
     setSaving(true);
     try {
-      // 1. Xuất kho nguồn
-      await inventory.adjust({
+      // Gọi 1 endpoint atomic: backend thực hiện Xuất + Nhập trong 1 transaction
+      const result = await inventory.transfer({
         product_id: form.product_id,
+        from_location_id: form.from_location_id,
+        to_location_id: form.to_location_id,
         quantity: Number(form.quantity),
         unit: form.unit,
-        location_id: form.from_location_id,
         lot_code: form.lot_code || "",
-        trx_type: "Xuất",
-        ref_code: null,
-        note: `Chuyển kho → ${(lookups.locations || []).find(l => l.id === form.to_location_id)?.name || "đích"}${form.note ? " | " + form.note : ""}`,
+        note: form.note || "",
       });
-      // 2. Nhập kho đích
-      await inventory.adjust({
-        product_id: form.product_id,
-        quantity: Number(form.quantity),
-        unit: form.unit,
-        location_id: form.to_location_id,
-        lot_code: form.lot_code || "",
-        trx_type: "Nhập",
-        ref_code: null,
-        note: `Chuyển kho ← ${(lookups.locations || []).find(l => l.id === form.from_location_id)?.name || "nguồn"}${form.note ? " | " + form.note : ""}`,
-      });
-      toast.success("Chuyển kho thành công!");
+      toast.success(result?.message || "Chuyển kho thành công!");
       setForm({
         product_id: "", quantity: "", unit: "", lot_code: "",
         from_location_id: "", to_location_id: "", note: ""

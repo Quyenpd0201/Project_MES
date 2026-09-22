@@ -38,7 +38,8 @@ function OutboundForm({ lookups, onSaved }) {
     if (id) {
       try {
         const tree = await inventory.tree({ product_id: id });
-        const total = (tree || []).find(x => x.product_id === id)?.total || 0;
+        // tree trả về mảng phẳng — cộng dồn quantity của tất cả dòng thuộc sản phẩm này
+        const total = (tree || []).filter(x => x.product_id === id).reduce((s, r) => s + Number(r.quantity || 0), 0);
         setLines(a => a.map(l => l._k === k ? { ...l, available: total } : l));
       } catch { /* ignore */ }
     }
@@ -52,14 +53,14 @@ function OutboundForm({ lookups, onSaved }) {
     const validLines = lines.filter(l => l.product_id && Number(l.quantity) > 0);
     if (!validLines.length) return toast.error("Nhập ít nhất 1 sản phẩm với số lượng > 0");
 
-    // Warn if over stock (soft check)
+    // Chặn cứng: không cho phép xuất kho khi số lượng vượt tồn hiện có
     const overStock = validLines.filter(l => l.available !== null && Number(l.quantity) > l.available);
     if (overStock.length > 0) {
-      const names = overStock.map(l => {
+      const details = overStock.map(l => {
         const p = (lookups.products || []).find(x => x.id === l.product_id);
-        return p?.product_name || l.product_id;
-      }).join(", ");
-      if (!window.confirm(`Cảnh báo: ${names} có số lượng xuất vượt tồn kho hiện có. Tiếp tục?`)) return;
+        return `• ${p?.product_code || ""} ${p?.product_name || l.product_id}: tồn ${l.available} ${l.unit}, xuất ${l.quantity} ${l.unit}`;
+      }).join("\n");
+      return toast.error(`Không đủ tồn kho — vui lòng kiểm tra lại:\n${details}`);
     }
 
     setSaving(true);

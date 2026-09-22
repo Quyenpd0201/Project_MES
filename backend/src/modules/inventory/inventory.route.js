@@ -8,6 +8,7 @@ router.get('/inventory/tree', inventory.tree);
 router.get('/inventory/detail', inventory.stockDetail);
 router.get('/inventory/transactions', inventory.transactions);
 router.post('/inventory/adjust', inventory.adjust);
+router.post('/inventory/transfer', requirePerm('inv_transfer:create'), inventory.transfer);
 router.post('/inventory/stock', requirePerm('inv_adjust:create'), inventory.addStockLine);
 router.delete('/inventory/stock/:id', requirePerm('inv_adjust:create'), inventory.deleteStockLine);
 

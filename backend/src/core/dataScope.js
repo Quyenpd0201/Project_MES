@@ -46,9 +46,10 @@ exports.getDataScope = (req, moduleKey, action = 'view', config = {}) => {
       return `${warehouseCol} = '${escapeSql(val)}'`;
     }
     
-    // CUSTOM Rule Builder (hiện tại chưa có DB struct)
+    // CUSTOM Rule Builder (chưa có DB struct — fallback mở để không block toàn bộ data)
     if (scope === 'CUSTOM') {
-       return '1=0'; // Chặn nếu chọn CUSTOM mà chưa code logic
+      console.warn(`[dataScope] CUSTOM scope chưa được implement cho module "${moduleKey}". Fallback: 1=1 (cho phép tất cả).`);
+      return '1=1';
     }
   }
   

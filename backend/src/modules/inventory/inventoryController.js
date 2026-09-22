@@ -337,4 +337,88 @@ exports.cancelOutboundSlip = async (req, res) => {
     res.json({ message: `Đã hủy phiếu ${s.slip_code}.` });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi hủy phiếu' }); }
   finally { client.release(); }
+// ── CHUYỂN KHO (atomic: Xuất + Nhập trong 1 transaction) ──────────────────────
+// POST /api/inventory/transfer
+// Body: { product_id, from_location_id, to_location_id, quantity, unit, lot_code, note }
+exports.transfer = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const b = req.body;
+    if (!b.product_id)        return res.status(400).json({ message: 'Thiếu sản phẩm' });
+    if (!b.from_location_id)  return res.status(400).json({ message: 'Thiếu kho/vị trí nguồn' });
+    if (!b.to_location_id)    return res.status(400).json({ message: 'Thiếu kho/vị trí đích' });
+    if (!b.quantity || Number(b.quantity) <= 0) return res.status(400).json({ message: 'Số lượng phải lớn hơn 0' });
+    if (b.from_location_id === b.to_location_id) return res.status(400).json({ message: 'Kho nguồn và đích không được giống nhau' });
+
+    // Kiểm tra quyền chuyển kho
+    if (!req.user.is_admin) {
+      const perms = req.user.permissions;
+      const hasPerm = checkPerm(perms, 'inv_transfer', 'create') || checkPerm(perms, 'inv_transfer', 'edit');
+      const hasFallback = checkPerm(perms, 'inventory', 'edit') || checkPerm(perms, 'inventory', 'create');
+      if (!hasPerm && !hasFallback) {
+        return res.status(403).json({ message: 'Bạn không có quyền chuyển kho' });
+      }
+    }
+
+    const qty = Number(b.quantity);
+    const lot = b.lot_code || '';
+    const unit = upUnit(b.unit);
+
+    // Chặn cứng: kiểm tra tồn kho tại kho nguồn trước khi bắt đầu transaction
+    const onHandRow = await db.query(
+      `SELECT COALESCE(SUM(quantity), 0)::numeric AS q
+       FROM inventory_stock
+       WHERE product_id = $1 AND location_id = $2`,
+      [b.product_id, b.from_location_id]
+    );
+    const onHand = Number(onHandRow.rows[0].q);
+    if (qty > onHand) {
+      const prod = (await db.query(`SELECT product_code, product_name FROM products WHERE id = $1`, [b.product_id])).rows[0] || {};
+      return res.status(400).json({
+        message: `Không đủ tồn kho tại kho nguồn — ${prod.product_code} ${prod.product_name}: tồn ${onHand}, cần chuyển ${qty}`,
+      });
+    }
+
+    const fromLoc = (await db.query(`SELECT l.name, w.name AS wname FROM locations l LEFT JOIN warehouses w ON w.id = l.warehouse_id WHERE l.id = $1`, [b.from_location_id])).rows[0];
+    const toLoc   = (await db.query(`SELECT l.name, w.name AS wname FROM locations l LEFT JOIN warehouses w ON w.id = l.warehouse_id WHERE l.id = $1`, [b.to_location_id])).rows[0];
+    const fromLabel = fromLoc ? `${fromLoc.wname || ''} · ${fromLoc.name}` : b.from_location_id;
+    const toLabel   = toLoc   ? `${toLoc.wname   || ''} · ${toLoc.name}`   : b.to_location_id;
+
+    await client.query('BEGIN');
+
+    // 1. Xuất khỏi kho nguồn
+    await client.query(
+      `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, quantity, unit)
+       VALUES ($1, $2, '{}'::jsonb, '', $3, $4, $5)
+       ON CONFLICT (product_id, location_id, spec_key, lot_code)
+       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
+                     unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
+                     updated_at = now()`,
+      [b.product_id, b.from_location_id, lot, -qty, unit]);
+    await client.query(
+      `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
+       VALUES ($1, $2, 'Xuất', $3, $4, NULL, $5)`,
+      [b.product_id, b.from_location_id, qty, lot, `Chuyển kho → ${toLabel}${b.note ? ' | ' + b.note : ''}`]);
+
+    // 2. Nhập vào kho đích
+    await client.query(
+      `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, quantity, unit)
+       VALUES ($1, $2, '{}'::jsonb, '', $3, $4, $5)
+       ON CONFLICT (product_id, location_id, spec_key, lot_code)
+       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
+                     unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
+                     updated_at = now()`,
+      [b.product_id, b.to_location_id, lot, qty, unit]);
+    await client.query(
+      `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
+       VALUES ($1, $2, 'Nhập', $3, $4, NULL, $5)`,
+      [b.product_id, b.to_location_id, qty, lot, `Chuyển kho ← ${fromLabel}${b.note ? ' | ' + b.note : ''}`]);
+
+    await client.query('COMMIT');
+    res.status(201).json({ message: `Đã chuyển ${qty} ${unit} từ ${fromLabel} → ${toLabel}` });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ message: err.detail || 'Lỗi khi chuyển kho' });
+  } finally { client.release(); }
 };
