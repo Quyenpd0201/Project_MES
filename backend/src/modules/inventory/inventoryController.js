@@ -166,6 +166,20 @@ exports.transactions = async (req, res) => {
 
 // POST /api/inventory/adjust — nhập/xuất/điều chỉnh, upsert tồn + ghi giao dịch
 const VALID_TRX_TYPES = ['Nhập', 'Xuất', 'Điều chỉnh'];
+
+// Helper: kiểm tra 1 action trong permissions, hỗ trợ cả 3 định dạng:
+//   - boolean true (cũ)
+//   - string 'ALLOW' (cũ)
+//   - object { status: 'ALLOW', scope: '...' } (mới)
+function checkPerm(permissions, moduleKey, action) {
+  const mod = permissions?.[moduleKey];
+  if (!mod) return false;
+  const pval = mod[action];
+  if (!pval) return false;
+  if (typeof pval === 'object') return pval.status === 'ALLOW';
+  return pval === 'ALLOW' || pval === true;
+}
+
 exports.adjust = async (req, res) => {
   const client = await db.pool.connect();
   try {
@@ -177,20 +191,22 @@ exports.adjust = async (req, res) => {
 
     if (!req.user.is_admin) {
       let reqApp = 'inventory';
-      if (b.trx_type === 'Nhập') reqApp = 'inv_inbound';
-      if (b.trx_type === 'Xuất') reqApp = 'inv_outbound';
+      if (b.trx_type === 'Nhập')       reqApp = 'inv_inbound';
+      if (b.trx_type === 'Xuất')       reqApp = 'inv_outbound';
       if (b.trx_type === 'Điều chỉnh') reqApp = 'inv_adjust';
-      // Note: Chuyển kho is two transactions (Xuất then Nhập), it will require both if we secure them both. But the frontend might just use 'inventory:edit' as a fallback.
-      
-      const p = req.user.permissions?.[reqApp];
-      const hasPerm = p && (p.edit === 'ALLOW' || p.edit === true || p.create === 'ALLOW' || p.create === true);
-      const pFallback = req.user.permissions?.['inventory'];
-      const hasFallback = pFallback && (pFallback.edit === 'ALLOW' || pFallback.edit === true);
-      
+      const perms = req.user.permissions;
+      const hasPerm =
+        checkPerm(perms, reqApp, 'create') ||
+        checkPerm(perms, reqApp, 'edit');
+      const hasFallback =
+        checkPerm(perms, 'inventory', 'edit') ||
+        checkPerm(perms, 'inventory', 'create');
+
       if (!hasPerm && !hasFallback) {
-         return res.status(403).json({ message: 'Bạn không có quyền thực hiện loại giao dịch này' });
+        return res.status(403).json({ message: 'Bạn không có quyền thực hiện loại giao dịch này' });
       }
     }
+
 
     const delta = b.trx_type === 'Xuất' ? -Math.abs(Number(b.quantity)) : Number(b.quantity);
     const specs = specsFromBody(b);
