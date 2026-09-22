@@ -218,7 +218,7 @@ exports.getDailyDetails = async (req, res) => {
     const tasksQuery = await db.query(`
       SELECT 
         pt.id as task_id,
-        pt.step_name,
+        pt.stage as step_name,
         pt.actual_qty,
         po.order_code,
         p.product_code,
@@ -231,7 +231,7 @@ exports.getDailyDetails = async (req, res) => {
       WHERE pt.assigned_worker = $1
         AND pt.status = 'Hoàn thành'
         AND pt.updated_at::date = $2
-      ORDER BY po.order_code ASC, pt.step_name ASC
+      ORDER BY po.order_code ASC, pt.stage ASC
     `, [worker_name, date]);
 
     // Fetch scrap recorded for this worker on this date
