@@ -44,18 +44,19 @@ function InboundForm({ lookups, onSaved }) {
     setSaving(true);
     const finalRef = header.ref_code.trim() || `NK${new Date().toISOString().replace(/\D/g, '').slice(2, 14)}`;
     try {
-      await Promise.all(validLines.map(l =>
-        inventory.adjust({
+      await Promise.all(validLines.map((l, idx) => {
+        const finalLot = (l.lot_code || "").trim() || `LO${new Date().toISOString().replace(/\D/g, '').slice(2, 12)}${String(idx + 1).padStart(2, '0')}`;
+        return inventory.adjust({
           product_id: l.product_id,
           quantity: Number(l.quantity),
           unit: l.unit,
           location_id: header.location_id,
-          lot_code: l.lot_code || "",
+          lot_code: finalLot,
           trx_type: "Nhập",
           ref_code: finalRef,
           note: [header.source, header.note, l.note].filter(Boolean).join(" | "),
-        })
-      ));
+        });
+      }));
       toast.success(`Đã nhập kho ${validLines.length} dòng sản phẩm thành công!`);
       setLines([emptyLine()]);
       setHeader(h => ({ ...h, ref_code: "" }));
