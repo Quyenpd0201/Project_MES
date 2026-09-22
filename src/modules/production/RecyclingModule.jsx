@@ -91,15 +91,13 @@ export default function RecyclingModule() {
         }
       />
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <DataTable
-          rows={tickets}
-          columns={cols}
-          rowKey={r => r.id}
-          loading={loading}
-          onRowClick={openTicket}
-        />
-      </div>
+      <DataTable
+        rows={tickets}
+        columns={cols}
+        rowKey={r => r.id}
+        loading={loading}
+        onRowClick={openTicket}
+      />
 
       {showModal && (
         <TicketModal 
