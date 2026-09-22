@@ -342,11 +342,11 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">PE nhận về:</span>
-                    <span className="font-semibold text-emerald-600">{ticket.total_received_qty || rolls.reduce((s, r)=>s+(Number(r.weight)||0), 0)} kg</span>
+                    <span className="font-semibold text-emerald-600">{isCompleted ? Number(ticket.total_received_qty) : rolls.reduce((s, r)=>s+(Number(r.weight)||0), 0)} kg</span>
                   </div>
                   <div className="flex justify-between border-t border-slate-200 pt-2">
                     <span className="text-slate-600 font-bold">Hao hụt (Loss):</span>
-                    <span className="font-bold text-rose-600">{Number(ticket.expected_qty) - (ticket.total_received_qty || rolls.reduce((s, r)=>s+(Number(r.weight)||0), 0))} kg</span>
+                    <span className="font-bold text-rose-600">{Number(ticket.expected_qty) - (isCompleted ? Number(ticket.total_received_qty) : rolls.reduce((s, r)=>s+(Number(r.weight)||0), 0))} kg</span>
                   </div>
                 </div>
               </div>
