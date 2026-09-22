@@ -154,8 +154,8 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "production", label: "Lệnh sản xuất", icon: Factory, path: "/production" },
         { key: "orderstatus", label: "Lệnh theo trạng thái", icon: Layers, perm: "orderstatus", path: "/orderstatus" },
         { key: "execution", label: "Thực thi sản xuất", icon: Hammer, path: "/execution" },
-        { key: "scrap", label: "Ghi nhận phế phẩm", icon: Trash2, perm: "execution", path: "/scrap" },
-        { key: "recycling", label: "Quản lý tái chế", icon: Recycle, perm: "execution", path: "/recycling" },
+        { key: "scrap", label: "Ghi nhận phế phẩm", icon: Trash2, perm: "scrap", path: "/scrap" },
+        { key: "recycling", label: "Quản lý tái chế", icon: Recycle, perm: "recycling", path: "/recycling" },
         { key: "prod_output", label: "Sản lượng", icon: Activity, path: "/production/output" },
         { key: "qrlabels", label: "In tem xuất xứ", icon: QrCode, path: "/qrlabels" },
       ]

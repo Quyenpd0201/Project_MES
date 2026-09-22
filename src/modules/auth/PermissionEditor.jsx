@@ -36,6 +36,8 @@ const MODULE_ROUTES = {
   production:   "/api/production-orders",
   orderstatus:  "/api/production-orders",
   execution:    "/api/production/execution",
+  scrap:        "/api/scrap",
+  recycling:    "/api/recycling",
   prod_output:  "/api/production/output",
   qrlabels:     "/api/qr-labels",
   inventory:    "/api/inventory",
@@ -91,6 +93,8 @@ export const PERM_TREE = [
       { key: "production",  label: "Lệnh sản xuất",        actions: ["view","create","edit","delete","publish","assign","export"] },
       { key: "orderstatus", label: "Lệnh theo trạng thái", actions: ["view","edit"] },
       { key: "execution",   label: "Thực thi sản xuất",    actions: ["view","execute"] },
+      { key: "scrap",       label: "Ghi nhận phế phẩm",    actions: ["view","create"] },
+      { key: "recycling",   label: "Quản lý tái chế",      actions: ["view","create","edit","approve"] },
       { key: "prod_output", label: "Sản lượng",            actions: ["view","edit","export"] },
       { key: "qrlabels",   label: "In tem xuất xứ",        actions: ["view","create","print"] },
     ]
