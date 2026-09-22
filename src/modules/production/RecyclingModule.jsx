@@ -77,9 +77,9 @@ export default function RecyclingModule() {
       }`}>{r.status}</span>
     )},
     { key: "expected_qty", label: "Tổng (kg)", align: "right", render: r => <span className="font-semibold">{fmt(r.expected_qty)}</span> },
-    { key: "_act", label: "", align: "right", render: r => (
-      <button onClick={() => openTicket(r)} className="text-slate-400 hover:text-blue-600 p-1 bg-slate-50 hover:bg-blue-50 rounded" title="Xem chi tiết">
-        <ArrowRight size={16} />
+    { key: "_act", label: "Thao tác", align: "center", render: r => (
+      <button onClick={() => openTicket(r)} className={`text-xs font-semibold px-3 py-1.5 rounded transition-colors ${r.status === 'Hoàn thành' ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}>
+        {r.status === 'Hoàn thành' ? 'Xem chi tiết' : 'Chuyển trạng thái'}
       </button>
     )},
   ];
