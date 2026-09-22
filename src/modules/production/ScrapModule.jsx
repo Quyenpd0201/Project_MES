@@ -181,8 +181,44 @@ function ScrapStatistics({ worker }) {
                             ) : dailyDetails.length === 0 ? (
                               <div className="text-slate-500 text-sm py-4">Không có công đoạn nào được ghi nhận.</div>
                             ) : (
-                              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                <DataTable rows={dailyDetails} columns={detailCols} rowKey={r => r.task_id} dense />
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {dailyDetails.map(task => {
+                                   const actual = Number(task.actual_qty) || 0;
+                                   const pScrap = Number(task.product_scrap_qty) || 0;
+                                   const ratio = actual > 0 ? (pScrap / actual).toFixed(4) : "0.0000";
+                                   return (
+                                      <div key={task.task_id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                                        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                                          <div className="font-semibold text-blue-700 flex items-center gap-1.5">
+                                            <FileText size={14} className="text-blue-500" /> {task.order_code}
+                                          </div>
+                                          <span className="text-xs font-medium px-2 py-1 bg-slate-200 text-slate-700 rounded-md">{task.step_name}</span>
+                                        </div>
+                                        <div className="p-4 space-y-3">
+                                           <div>
+                                             <div className="text-xs text-slate-500 uppercase font-semibold mb-1">Sản phẩm</div>
+                                             <div className="text-sm font-medium text-slate-800 line-clamp-1" title={`${task.product_code} - ${task.product_name}`}>
+                                               {task.product_code} - {task.product_name}
+                                             </div>
+                                           </div>
+                                           <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                                             <div>
+                                                <div className="text-xs text-slate-500 uppercase font-semibold mb-1">Thực tế</div>
+                                                <div className="text-sm font-bold text-emerald-600">{fmt(task.actual_qty)} {task.unit}</div>
+                                             </div>
+                                             <div className="text-right">
+                                                <div className="text-xs text-slate-500 uppercase font-semibold mb-1">Tổng Phế/Ngày</div>
+                                                <div className="text-sm font-bold text-rose-500">{fmt(task.product_scrap_qty)}</div>
+                                             </div>
+                                           </div>
+                                           <div className="bg-amber-50 rounded-lg p-2.5 flex items-center justify-between mt-1">
+                                             <span className="text-xs text-amber-700 font-semibold">Tỷ lệ phế / {task.unit}:</span>
+                                             <span className="text-sm font-bold text-amber-600">{ratio}</span>
+                                           </div>
+                                        </div>
+                                      </div>
+                                   );
+                                })}
                               </div>
                             )}
                           </div>
