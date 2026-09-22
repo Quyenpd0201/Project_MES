@@ -288,33 +288,62 @@ exports.confirmOutboundSlip = async (req, res) => {
     const lines = (await client.query(`SELECT * FROM outbound_slip_lines WHERE slip_id = $1`, [req.params.id])).rows;
     if (!lines.length) return res.status(400).json({ message: 'Phiếu chưa có dòng hàng.' });
 
-    // Chặn tồn âm — báo cần mua
+    // Chặn tồn âm — báo cần mua (Kiểm tra theo đúng vị trí xuất)
     const shortages = [];
+    const allocations = []; // { product_id, lot_code, quantity, unit }
+
     for (const l of lines) {
-      const onHand = Number((await client.query(`SELECT COALESCE(SUM(quantity),0)::numeric AS q FROM inventory_stock WHERE product_id = $1`, [l.product_id])).rows[0].q);
-      if (Number(l.quantity) > onHand) {
+      const requiredQty = Number(l.quantity);
+      
+      // Lấy danh sách các lô có tồn > 0 của sản phẩm tại vị trí xuất, ưu tiên FIFO (id ASC)
+      const { rows: stockRows } = await client.query(
+        `SELECT lot_code, quantity, unit
+         FROM inventory_stock
+         WHERE product_id = $1 AND location_id = $2 AND quantity > 0
+         ORDER BY id ASC`,
+        [l.product_id, s.location_id]
+      );
+
+      const totalOnHand = stockRows.reduce((sum, r) => sum + Number(r.quantity), 0);
+      
+      if (requiredQty > totalOnHand) {
         const p = (await client.query(`SELECT product_code, product_name, unit FROM products WHERE id = $1`, [l.product_id])).rows[0] || {};
-        shortages.push({ code: p.product_code, name: p.product_name, unit: l.unit || p.unit || '', on_hand: onHand, need: Number(l.quantity), buy: Number(l.quantity) - onHand });
+        shortages.push({ code: p.product_code, name: p.product_name, unit: l.unit || p.unit || '', on_hand: totalOnHand, need: requiredQty, buy: requiredQty - totalOnHand });
+      } else {
+        // Phân bổ FIFO
+        let remain = requiredQty;
+        for (const sr of stockRows) {
+          if (remain <= 0) break;
+          const qtyToTake = Math.min(remain, Number(sr.quantity));
+          allocations.push({
+            product_id: l.product_id,
+            lot_code: sr.lot_code || '',
+            quantity: qtyToTake,
+            unit: l.unit || sr.unit,
+          });
+          remain -= qtyToTake;
+        }
       }
     }
+
     if (shortages.length) {
-      const msg = 'Không đủ tồn kho để xuất — vui lòng nhập kho / mua bổ sung trước:\n' +
-        shortages.map((x) => `• ${x.code} ${x.name}: tồn ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → cần mua ${x.buy} ${x.unit}`).join('\n');
+      const msg = 'Không đủ tồn kho tại vị trí xuất — vui lòng nhập/chuyển kho đến vị trí này trước:\n' +
+        shortages.map((x) => `• ${x.code} ${x.name}: tồn ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → thiếu ${x.buy} ${x.unit}`).join('\n');
       return res.status(400).json({ message: msg, shortages });
     }
 
     await client.query('BEGIN');
-    for (const l of lines) {
+    for (const alloc of allocations) {
       await client.query(
         `INSERT INTO inventory_stock (product_id, location_id, spec_key, lot_code, quantity, unit)
          VALUES ($1,$2,'',$3,$4,$5)
          ON CONFLICT (product_id, location_id, spec_key, lot_code)
          DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, unit = COALESCE(EXCLUDED.unit, inventory_stock.unit), updated_at = now()`,
-        [l.product_id, s.location_id, l.lot_code || '', -Number(l.quantity), upUnit(l.unit)]);
+        [alloc.product_id, s.location_id, alloc.lot_code, -alloc.quantity, upUnit(alloc.unit)]);
       await client.query(
         `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
          VALUES ($1,$2,'Xuất',$3,$4,$5,$6)`,
-        [l.product_id, s.location_id, Number(l.quantity), l.lot_code || '', s.slip_code, s.purpose || 'Xuất kho']);
+        [alloc.product_id, s.location_id, alloc.quantity, alloc.lot_code, s.slip_code, s.purpose || 'Xuất kho']);
     }
     await client.query(`UPDATE outbound_slips SET status = 'Đã xuất', confirmed_at = now() WHERE id = $1`, [req.params.id]);
     await client.query('COMMIT');
