@@ -39,7 +39,6 @@ export default function Login({ onLogin }) {
         </div>
         {err && <div className="text-sm text-rose-600 bg-rose-50 rounded-lg px-3 py-2">{err}</div>}
         <button className="btn-primary w-full justify-center" disabled={loading}>{loading ? "Đang đăng nhập…" : "Đăng nhập"}</button>
-        <p className="text-[11px] text-slate-400 text-center">Tài khoản mặc định: <b>admin</b> / <b>admin123</b></p>
       </form>
     </div>
   );
