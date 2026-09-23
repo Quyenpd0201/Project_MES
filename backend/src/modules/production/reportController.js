@@ -248,21 +248,34 @@ exports.employees = async (req, res) => {
     const { fromDate, toDate, stage, shift, team, orderCode } = req.query;
     const params = []; let i = 1;
     
-    // 1. Điều kiện cho tasks
     const taskWhere = [];
-    if (fromDate)  { taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)    { taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
+    const scrapWhere = [];
+    if (fromDate)  { 
+      taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i}`); 
+      scrapWhere.push(`dsr.record_date >= $${i}`);
+      params.push(fromDate); 
+      i++; 
+    }
+    if (toDate)    { 
+      taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i}`); 
+      scrapWhere.push(`dsr.record_date <= $${i}`);
+      params.push(toDate); 
+      i++; 
+    }
     if (stage)     { taskWhere.push(`t.stage = $${i++}`); params.push(stage); }
     if (shift)     { taskWhere.push(`t.shift = $${i++}`); params.push(shift); }
     if (orderCode) { taskWhere.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
     
     // Nếu user bị gán cố định với 1 worker, chỉ được xem báo cáo của worker đó
     if (req.user && req.user.linked_worker) {
-      taskWhere.push(`COALESCE(t.assigned_worker, po.assigned_worker) = $${i++}`);
+      taskWhere.push(`COALESCE(t.assigned_worker, po.assigned_worker) = $${i}`);
+      scrapWhere.push(`dsr.worker_name = $${i}`);
       params.push(req.user.linked_worker);
+      i++;
     }
     
     const taskWhereClause = taskWhere.length ? `AND ${taskWhere.join(' AND ')}` : '';
+    const scrapWhereClause = scrapWhere.length ? `WHERE ${scrapWhere.join(' AND ')}` : '';
 
     // 2. Điều kiện cho nhân viên
     const empWhere = [`e.is_deleted = FALSE`];
@@ -281,6 +294,13 @@ exports.employees = async (req, res) => {
         WHERE COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL
           AND COALESCE(t.assigned_worker, po.assigned_worker) != ''
           ${taskWhereClause}
+      ),
+      worker_scrap AS (
+        SELECT dsr.worker_name, SUM(dsi.scrap_qty) as total_scrap
+        FROM daily_scrap_records dsr
+        JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+        ${scrapWhereClause}
+        GROUP BY dsr.worker_name
       )
       SELECT
         e.name                                                                        AS worker,
@@ -290,7 +310,7 @@ exports.employees = async (req, res) => {
         COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
         COALESCE(SUM(CASE WHEN t.status = 'Hoàn thành'
           THEN COALESCE(t.actual_qty, t.quantity) ELSE 0 END), 0)::numeric            AS actual_qty,
-        COALESCE(SUM(t.scrap_qty), 0)::numeric                                        AS scrap_qty,
+        COALESCE(MAX(ws.total_scrap), 0)::numeric                                     AS scrap_qty,
         COUNT(DISTINCT t.planned_date)::int                                           AS work_days,
         COUNT(DISTINCT CONCAT(t.planned_date::text,'||',COALESCE(t.shift,''))) * 8   AS work_hours,
         COUNT(t.id) FILTER (WHERE t.status = 'Hoàn thành')::int                       AS done_count,
@@ -301,6 +321,7 @@ exports.employees = async (req, res) => {
           FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                        AS shifts
       FROM employees e
       LEFT JOIN filtered_tasks t ON t.final_worker = e.name
+      LEFT JOIN worker_scrap ws ON ws.worker_name = e.name
       WHERE ${empWhere.join(' AND ')}
       GROUP BY e.id, e.name, e.factory
       ORDER BY actual_qty DESC, planned_qty DESC, e.name
@@ -331,7 +352,7 @@ exports.employeeTasks = async (req, res) => {
     const ws = where.join(' AND ');
 
 
-    const [tasksQ, dailyQ, stagesQ] = await Promise.all([
+    const [tasksQ, dailyQ, stagesQ, scrapDailyQ] = await Promise.all([
       db.query(`
         SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty,
                t.status, t.planned_date, t.shift, t.assigned_team,
@@ -370,8 +391,20 @@ exports.employeeTasks = async (req, res) => {
         GROUP BY t.stage
         ORDER BY actual_qty DESC
       `, params),
+      db.query(`
+        SELECT dsr.record_date as date,
+               to_char(dsr.record_date, 'DD/MM') AS date_label,
+               COALESCE(SUM(dsi.scrap_qty),0)::numeric AS total_scrap
+        FROM daily_scrap_records dsr
+        JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+        WHERE dsr.worker_name = $1
+          ${fromDate ? `AND dsr.record_date >= $2` : ''}
+          ${toDate ? `AND dsr.record_date <= $${fromDate ? 3 : 2}` : ''}
+        GROUP BY dsr.record_date
+        ORDER BY dsr.record_date
+      `, params.slice(0, 1 + (fromDate ? 1 : 0) + (toDate ? 1 : 0))),
     ]);
-    res.json({ tasks: tasksQ.rows, daily: dailyQ.rows, stages: stagesQ.rows });
+    res.json({ tasks: tasksQ.rows, daily: dailyQ.rows, stages: stagesQ.rows, scrapDaily: scrapDailyQ.rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết nhân viên' }); }
 };
 

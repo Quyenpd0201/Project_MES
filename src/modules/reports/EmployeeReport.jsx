@@ -248,8 +248,25 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
     done_count, active_count, paused_count,
   } = workerData;
   const overall = pct(actual_qty, planned_qty);
-  const { tasks = [], daily = [], stages = [] } = detail || {};
+  const { tasks = [], daily = [], stages = [], scrapDaily = [] } = detail || {};
   const maxStage = Math.max(...stages.map(s => Number(s.actual_qty)), 1);
+
+  const mergedChartData = useMemo(() => {
+    const map = {};
+    daily.forEach(d => {
+      map[d.planned_date] = { ...d, total_scrap: 0, scrap_ratio: 0, _ts: new Date(d.planned_date).getTime() };
+    });
+    scrapDaily.forEach(s => {
+      if (!map[s.date]) {
+        map[s.date] = { date_label: s.date_label, actual_qty: 0, planned_qty: 0, total_scrap: 0, scrap_ratio: 0, _ts: new Date(s.date).getTime() };
+      }
+      map[s.date].total_scrap = Number(s.total_scrap);
+    });
+    return Object.values(map).sort((a,b) => a._ts - b._ts).map(d => ({
+      ...d,
+      scrap_ratio: d.actual_qty > 0 ? Number((d.total_scrap / d.actual_qty).toFixed(4)) : 0
+    }));
+  }, [daily, scrapDaily]);
 
   return (
     <div className="space-y-4">
@@ -288,22 +305,15 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
         </div>
       </div>
 
-      {/* ── KPI cards 2×3 ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-        <KpiCard label="Số lệnh" value={tasks_count} icon={Layers} color="blue"
-          extra={
-            <div className="flex gap-1 flex-wrap">
-              {done_count   > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium">{done_count} HT</span>}
-              {active_count > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{active_count} đang</span>}
-              {paused_count > 0 && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">{paused_count} dừng</span>}
-            </div>
-          }
-        />
-        <KpiCard label="Đơn hàng" value={orders_count} sub="đơn liên quan" icon={Package} color="indigo" />
-        <KpiCard label="Phế phẩm" value={scrap_qty > 0 ? fmt(scrap_qty) : "0"} sub={scrap_qty > 0 ? "cần kiểm tra" : "Không có"} icon={AlertCircle} color={scrap_qty > 0 ? "rose" : "green"} />
+      {/* ── KPI cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Sản lượng đã làm" value={fmt(actual_qty)} sub="tổng thực tế" icon={Layers} color="indigo" />
+        <KpiCard label="Tổng phế" value={scrap_qty > 0 ? fmt(scrap_qty) : "0"} sub="phế phẩm (kg)" icon={AlertCircle} color={scrap_qty > 0 ? "rose" : "green"} />
+        <KpiCard label="Phế/kg" value={actual_qty > 0 ? (Number(scrap_qty)/Number(actual_qty)).toFixed(4) : "0.0000"} sub="tỷ lệ" icon={Target} color="amber" />
+        <KpiCard label="Tỷ lệ hoàn thành" value={`${overall}%`} sub="KH so với TT" icon={TrendingUp} color="emerald" />
         <KpiCard label="Ngày làm việc" value={work_days ?? "—"} sub="ngày có phân công" icon={CalendarDays} color="blue" />
-        <KpiCard label="Giờ ước tính" value={work_hours > 0 ? `${work_hours}h` : "—"} sub="từ ca được phân công" icon={Clock} color="amber" />
-        <KpiCard label="Năng suất/ca" value={work_hours > 0 && actual_qty > 0 ? `${(Number(actual_qty)/work_hours).toFixed(1)}/h` : "—"} sub="sản phẩm / giờ" icon={TrendingUp} color="green" />
+        <KpiCard label="Giờ làm việc" value={work_hours > 0 ? `${work_hours}h` : "—"} sub="ước tính từ ca" icon={Clock} color="amber" />
+        <KpiCard label="Năng suất" value={work_hours > 0 && actual_qty > 0 ? `${(Number(actual_qty)/work_hours).toFixed(1)}/h` : "—"} sub="sản phẩm / giờ" icon={Package} color="green" />
       </div>
 
       {loading ? (
@@ -344,13 +354,13 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
           </div>
 
           {/* ── Daily output chart ── */}
-          {daily.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
+          {mergedChartData.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
               <p className="text-sm font-semibold text-slate-700 mb-1">Sản lượng theo ngày</p>
-              <p className="text-xs text-slate-400 mb-4">{daily.length} ngày có dữ liệu trong kỳ lọc</p>
+              <p className="text-xs text-slate-400 mb-4">{mergedChartData.length} ngày có dữ liệu trong kỳ lọc</p>
               <div style={{ height: 210 }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={daily} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
+                  <ComposedChart data={mergedChartData} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                     <XAxis dataKey="date_label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
@@ -358,6 +368,28 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                     <Bar dataKey="actual_qty" name="Thực tế" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     <Line type="monotone" dataKey="planned_qty" name="Kế hoạch" stroke="#cbd5e1" strokeWidth={2} dot={false} strokeDasharray="5 3" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {/* ── Daily Scrap chart ── */}
+          {mergedChartData.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+              <p className="text-sm font-semibold text-slate-700 mb-1">Phế phẩm theo ngày</p>
+              <p className="text-xs text-slate-400 mb-4">{mergedChartData.length} ngày có dữ liệu trong kỳ lọc</p>
+              <div style={{ height: 210 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={mergedChartData} margin={{ top: 4, right: 12, bottom: 0, left: -10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <XAxis dataKey="date_label" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                    <Bar yAxisId="left" dataKey="total_scrap" name="Tổng phế (kg)" fill="#f43f5e" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                    <Line yAxisId="right" type="monotone" dataKey="scrap_ratio" name="Phế/kg" stroke="#f59e0b" strokeWidth={2} dot={{r:3}} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -426,16 +458,17 @@ export default function EmployeeReport() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [empPage, setEmpPage]         = useState(1);
 
+  const isManager = isAdmin || can('reports', 'view_all');
+
   /* filters */
   const [from, setFrom]               = useState(monthStart());
   const [to, setTo]                   = useState(today());
-  const [stageFilter, setStageFilter] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
   const [teamFilter, setTeamFilter]   = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [nameFilter, setNameFilter]   = useState("");
 
-  const filterParams = { fromDate: from, toDate: to, stage: stageFilter, shift: shiftFilter, team: teamFilter, orderCode: orderFilter };
+  const filterParams = { fromDate: from, toDate: to, shift: shiftFilter, team: teamFilter, orderCode: orderFilter };
 
   /* load worker list */
   const loadWorkers = useCallback(async () => {
@@ -449,7 +482,7 @@ export default function EmployeeReport() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, stageFilter, shiftFilter, teamFilter, orderFilter]);
+  }, [from, to, shiftFilter, teamFilter, orderFilter]);
 
   useEffect(() => { loadWorkers(); }, [loadWorkers]);
 
@@ -465,7 +498,7 @@ export default function EmployeeReport() {
     } finally {
       setDetailLoading(false);
     }
-  }, [from, to, stageFilter, shiftFilter, teamFilter]);
+  }, [from, to, shiftFilter, teamFilter]);
 
   const handleSelectWorker = (w) => {
     if (selected?.worker === w.worker) { setSelected(null); setDetail(null); return; }
@@ -568,14 +601,6 @@ export default function EmployeeReport() {
             </div>
           ))}
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Công đoạn</label>
-            <select value={stageFilter} onChange={e => setStageFilter(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
-              <option value="">Tất cả</option>
-              {stageOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Ca làm việc</label>
             <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
@@ -583,19 +608,23 @@ export default function EmployeeReport() {
               {shiftOptions.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Đội / Nhà máy</label>
-            <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
-              <option value="">Tất cả</option>
-              {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Mã đơn hàng</label>
-            <input value={orderFilter} onChange={e => setOrderFilter(e.target.value)} placeholder="LSX-00001…"
-              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
-          </div>
+          {isManager && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Đội / Nhà máy</label>
+                <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
+                  <option value="">Tất cả</option>
+                  {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Mã đơn hàng</label>
+                <input value={orderFilter} onChange={e => setOrderFilter(e.target.value)} placeholder="LSX-00001…"
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -712,18 +741,104 @@ export default function EmployeeReport() {
               onClose={() => { setSelected(null); setDetail(null); }}
             />
           ) : (
-            /* Placeholder */
-            <div className="bg-white rounded-xl border border-slate-200 border-dashed flex flex-col items-center justify-center py-20 text-center">
-              <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
-                <Users size={28} className="text-indigo-400" />
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+                  <Users size={24} className="text-indigo-400" />
+                </div>
+                <p className="text-slate-600 font-semibold mb-1">Báo cáo chung</p>
+                <p className="text-sm text-slate-400">Chọn một nhân viên bên trái để xem chi tiết hiệu suất cá nhân</p>
+                {workers.length > 0 && (
+                  <div className="mt-4 flex items-center gap-4 text-xs text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
+                    <span>🏭 {workers.length} nhân viên</span>
+                    <span>📦 {workers.reduce((s, w) => s + w.tasks_count, 0)} lệnh</span>
+                    <span>📈 {fmt(workers.reduce((s, w) => s + Number(w.actual_qty), 0))} TT</span>
+                    <span>⚠ {fmt(workers.reduce((s, w) => s + Number(w.scrap_qty), 0))} Phế</span>
+                  </div>
+                )}
               </div>
-              <p className="text-slate-600 font-semibold mb-1">Chọn nhân viên để xem chi tiết</p>
-              <p className="text-sm text-slate-400">Nhấn vào bất kỳ nhân viên nào ở bảng bên trái</p>
-              {workers.length > 0 && (
-                <div className="mt-4 flex items-center gap-4 text-xs text-slate-400">
-                  <span>🏭 {workers.length} nhân viên</span>
-                  <span>📦 {workers.reduce((s, w) => s + w.tasks_count, 0)} lệnh</span>
-                  <span>📈 {fmt(workers.reduce((s, w) => s + Number(w.actual_qty), 0))} TT</span>
+
+              {workers.length > 0 && (() => {
+                const activeWorkers = workers.filter(w => Number(w.actual_qty) > 0);
+                const mostScrap = [...activeWorkers].filter(w => Number(w.scrap_qty) > 0).sort((a,b) => Number(b.scrap_qty) - Number(a.scrap_qty)).slice(0, 5);
+                const leastScrap = [...activeWorkers].sort((a,b) => Number(a.scrap_qty) - Number(b.scrap_qty)).slice(0, 5);
+                
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Top 5 Most Scrap */}
+                    <div className="bg-white rounded-xl border border-rose-100 shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 bg-rose-50/50 border-b border-rose-100 flex items-center gap-2">
+                        <AlertCircle size={16} className="text-rose-500" />
+                        <h3 className="font-semibold text-rose-800 text-sm">Top 5 Nhiều phế phẩm nhất</h3>
+                      </div>
+                      <div className="divide-y divide-slate-50">
+                        {mostScrap.length > 0 ? mostScrap.map((w, i) => (
+                          <div key={w.worker} className="px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
+                              <span className="text-sm font-medium text-slate-700">{w.worker}</span>
+                            </div>
+                            <span className="font-bold text-rose-600 text-sm">{fmt(w.scrap_qty)} kg</span>
+                          </div>
+                        )) : <div className="px-4 py-6 text-center text-sm text-slate-400">Không có dữ liệu phế phẩm</div>}
+                      </div>
+                    </div>
+
+                    {/* Top 5 Least Scrap */}
+                    <div className="bg-white rounded-xl border border-emerald-100 shadow-sm overflow-hidden">
+                      <div className="px-4 py-3 bg-emerald-50/50 border-b border-emerald-100 flex items-center gap-2">
+                        <Target size={16} className="text-emerald-500" />
+                        <h3 className="font-semibold text-emerald-800 text-sm">Top 5 Ít phế phẩm nhất</h3>
+                      </div>
+                      <div className="divide-y divide-slate-50">
+                        {leastScrap.length > 0 ? leastScrap.map((w, i) => (
+                          <div key={w.worker} className="px-4 py-3 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
+                              <span className="text-sm font-medium text-slate-700">{w.worker}</span>
+                            </div>
+                            <span className="font-bold text-emerald-600 text-sm">{fmt(w.scrap_qty)} kg</span>
+                          </div>
+                        )) : <div className="px-4 py-6 text-center text-sm text-slate-400">Không có dữ liệu sản xuất</div>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Scrap Ratio List for Managers */}
+              {isManager && workers.length > 0 && (
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
+                    <h3 className="font-semibold text-slate-700 text-sm">Danh sách Tỷ lệ Phế / 1kg thành phẩm</h3>
+                  </div>
+                  <div className="overflow-x-auto max-h-80">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-slate-500 bg-white sticky top-0 border-b border-slate-100">
+                        <tr>
+                          <th className="px-4 py-2 font-medium">Nhân viên</th>
+                          <th className="px-4 py-2 font-medium text-right">Tổng thành phẩm</th>
+                          <th className="px-4 py-2 font-medium text-right">Tổng phế phẩm</th>
+                          <th className="px-4 py-2 font-medium text-right">Phế / 1kg</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {workers.filter(w => Number(w.actual_qty) > 0)
+                          .sort((a,b) => (Number(b.scrap_qty)/Number(b.actual_qty)) - (Number(a.scrap_qty)/Number(a.actual_qty)))
+                          .map(w => {
+                          const ratio = (Number(w.scrap_qty) / Number(w.actual_qty)).toFixed(4);
+                          return (
+                            <tr key={w.worker} className="hover:bg-slate-50">
+                              <td className="px-4 py-2 font-medium text-slate-700">{w.worker}</td>
+                              <td className="px-4 py-2 text-right text-slate-600">{fmt(w.actual_qty)} kg</td>
+                              <td className="px-4 py-2 text-right text-rose-600 font-medium">{fmt(w.scrap_qty)} kg</td>
+                              <td className="px-4 py-2 text-right font-bold text-amber-600">{ratio}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </div>
