@@ -161,7 +161,8 @@ export const salesOrders = {
 };
 
 export const scrap = {
-  workers: (date) => http(`/scrap/workers${date ? '?date=' + date : ''}`).then(r => r),
+  workers: () => http(`/scrap/workers`).then(r => r),
+
   dailyWos: (worker_name, date) => http(`/scrap/daily-wos?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),
   records: (worker_name, date) => http(`/scrap/records?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),
   save: (data) => http(`/scrap/records`, body("POST", data)),

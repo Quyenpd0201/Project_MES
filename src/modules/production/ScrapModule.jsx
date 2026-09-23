@@ -12,6 +12,7 @@ import { inputCls, fmt, toast } from "../../ui.js";
 function ScrapStatistics({ worker, onOpenOrder }) {
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState([]);
+  const [totals, setTotals] = useState({ total_finished: 0, total_scrap: 0 });
   
   // Expanded rows logic
   const [expandedDate, setExpandedDate] = useState(null);
@@ -24,7 +25,15 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const res = await scrap.stats(worker, today);
-      setStats(res);
+      // API mới trả về { rows, totals } — rows cho bảng theo ngày, totals cho KPI summary
+      if (res && res.rows) {
+        setStats(res.rows);
+        setTotals(res.totals || { total_finished: 0, total_scrap: 0 });
+      } else {
+        // fallback nếu API cũ trả về array
+        setStats(Array.isArray(res) ? res : []);
+        setTotals({ total_finished: 0, total_scrap: 0 });
+      }
       setExpandedDate(null);
     } catch (e) {
       toast.error("Lỗi tải thống kê: " + e.message);
@@ -37,17 +46,16 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     loadStats();
   }, [loadStats]);
 
+  // Summary KPI tính từ `totals` (do server trả về, tính độc lập không bị lệch ngày)
   const summary = useMemo(() => {
-    let wos = 0, finished = 0, scrapTotal = 0;
-    stats.forEach(r => {
-      wos += Number(r.total_wos) || 0;
-      finished += Number(r.total_finished) || 0;
-      scrapTotal += Number(r.total_scrap) || 0;
-    });
+    let wos = 0;
+    stats.forEach(r => { wos += Number(r.total_wos) || 0; });
+    const finished = Number(totals.total_finished) || 0;
+    const scrapTotal = Number(totals.total_scrap) || 0;
     const ratio = finished > 0 ? (scrapTotal / finished * 100).toFixed(2) : 0;
     const kgPerKg = finished > 0 ? (scrapTotal / finished).toFixed(4) : 0;
     return { wos, finished, scrapTotal, ratio, kgPerKg };
-  }, [stats]);
+  }, [stats, totals]);
 
   const handleRowClick = async (row) => {
     if (expandedDate === row.date) {
@@ -358,7 +366,8 @@ function ScrapForm({ worker, date, setDate, onOpenOrder }) {
     { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600", render: r => onOpenOrder && r.order_id ? <button onClick={(e) => { e.stopPropagation(); onOpenOrder(r.order_id); }} className="hover:underline">{r.order_code}</button> : r.order_code },
     { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
     { key: "total_qty", label: "Thành phẩm", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.total_qty)} {r.unit}</span> },
-    { key: "last_completed_at", label: "TG Hoàn thành (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
+    { key: "completed_date", label: "Ngày hoàn thành", align: "center", render: r => r.completed_date ? <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{new Date(r.completed_date).toLocaleDateString("vi-VN")}</span> : "—" },
+    { key: "last_completed_at", label: "TG hoàn thành (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
   ];
 
   return (
@@ -390,13 +399,16 @@ function ScrapForm({ worker, date, setDate, onOpenOrder }) {
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="font-semibold text-slate-700 flex items-center gap-2">
-                  <List size={18} className="text-slate-400"/> Lệnh SX hoàn thành trong ngày
+                  <List size={18} className="text-slate-400"/> Lệnh SX hoàn thành (3 ngày gần nhất)
                 </div>
-                {wos.length > 0 && (
-                  <div className="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
-                    Tổng cộng: <span className="font-bold text-slate-800">{wos.length}</span> lệnh
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  {wos.length > 0 && (
+                    <div className="text-sm text-slate-500 bg-white px-3 py-1 rounded-full border border-slate-200">
+                      Tổng cộng: <span className="font-bold text-slate-800">{wos.length}</span> lệnh
+                    </div>
+                  )}
+                  <span className="text-xs text-slate-400 italic">Hiển thị WO từ {new Date(new Date(date) - 2*86400000).toLocaleDateString("vi-VN")} – {new Date(date).toLocaleDateString("vi-VN")}</span>
+                </div>
               </div>
               <div className="p-4">
                 {loading ? (

@@ -250,14 +250,17 @@ exports.employees = async (req, res) => {
     
     const taskWhere = [];
     const scrapWhere = [];
+
+    // Dùng COALESCE(t.updated_at::date, t.planned_date, ...) — ưu tiên ngày hoàn thành thực tế
+    // để không bỏ sót lệnh được làm trong kỳ nhưng kế hoạch từ trước
     if (fromDate)  { 
-      taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i}`); 
+      taskWhere.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) >= $${i}`); 
       scrapWhere.push(`dsr.record_date >= $${i}`);
       params.push(fromDate); 
       i++; 
     }
     if (toDate)    { 
-      taskWhere.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i}`); 
+      taskWhere.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) <= $${i}`); 
       scrapWhere.push(`dsr.record_date <= $${i}`);
       params.push(toDate); 
       i++; 
@@ -277,7 +280,7 @@ exports.employees = async (req, res) => {
     const taskWhereClause = taskWhere.length ? `AND ${taskWhere.join(' AND ')}` : '';
     const scrapWhereClause = scrapWhere.length ? `WHERE ${scrapWhere.join(' AND ')}` : '';
 
-    // 2. Điều kiện cho nhân viên
+    // Điều kiện cho nhân viên
     const empWhere = [`e.is_deleted = FALSE`];
     if (team) {
       empWhere.push(`e.factory = $${i++}`);
@@ -314,14 +317,16 @@ exports.employees = async (req, res) => {
         COUNT(t.id)::int                                                              AS tasks_count,
         COUNT(DISTINCT t.production_order_id)::int                                    AS orders_count,
         COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
-        COALESCE(SUM(CASE WHEN t.status = 'Hoàn thành'
+        COALESCE(SUM(CASE WHEN t.status = 'Ho\u00e0n th\u00e0nh'
           THEN COALESCE(t.actual_qty, t.quantity) ELSE 0 END), 0)::numeric            AS actual_qty,
         COALESCE(MAX(ws.total_scrap), 0)::numeric                                     AS scrap_qty,
-        COUNT(DISTINCT t.planned_date)::int                                           AS work_days,
-        COUNT(DISTINCT CONCAT(t.planned_date::text,'||',COALESCE(t.shift,''))) * 8   AS work_hours,
-        COUNT(t.id) FILTER (WHERE t.status = 'Hoàn thành')::int                       AS done_count,
-        COUNT(t.id) FILTER (WHERE t.status IN ('Đang sản xuất','Chờ'))::int           AS active_count,
-        COUNT(t.id) FILTER (WHERE t.status = 'Dừng sản xuất')::int                   AS paused_count,
+        -- work_days: s\u1ed1 ng\u00e0y l\u00e0m vi\u1ec7c th\u1ef1c t\u1ebf (d\u00f9ng updated_at n\u1ebfu c\u00f3, fallback planned_date)
+        COUNT(DISTINCT COALESCE(t.updated_at::date, t.planned_date))::int             AS work_days,
+        -- work_hours: 8h m\u1ed7i ng\u00e0y l\u00e0m vi\u1ec7c th\u1ef1c t\u1ebf
+        COUNT(DISTINCT COALESCE(t.updated_at::date, t.planned_date)) * 8              AS work_hours,
+        COUNT(t.id) FILTER (WHERE t.status = 'Ho\u00e0n th\u00e0nh')::int                       AS done_count,
+        COUNT(t.id) FILTER (WHERE t.status IN ('\u0110ang s\u1ea3n xu\u1ea5t','Ch\u1edd'))::int           AS active_count,
+        COUNT(t.id) FILTER (WHERE t.status = 'D\u1eebng s\u1ea3n xu\u1ea5t')::int                   AS paused_count,
         STRING_AGG(DISTINCT t.stage, ', ' ORDER BY t.stage)                           AS stages,
         STRING_AGG(DISTINCT t.shift, ', ')
           FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                        AS shifts
@@ -332,8 +337,9 @@ exports.employees = async (req, res) => {
       ORDER BY actual_qty DESC, planned_qty DESC, e.name
     `, params);
     res.json({ data: rows });
-  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy báo cáo nhân viên' }); }
+  } catch (err) { console.error(err); res.status(500).json({ message: 'L\u1ed7i khi l\u1ea5y b\u00e1o c\u00e1o nh\u00e2n vi\u00ean' }); }
 };
+
 
 // GET /reports/employees/:worker/tasks — chi tiết lệnh + phân tích theo ngày & công đoạn
 exports.employeeTasks = async (req, res) => {
@@ -348,19 +354,26 @@ exports.employeeTasks = async (req, res) => {
     const { fromDate, toDate, stage, shift, team } = req.query;
     const params = [worker]; let i = 2;
     // Match task-level OR order-level assigned_worker
+    // Dùng updated_at ưu tiên: để tìm task được hoàn thành trong kỳ dù planned_date có thể lệch
     const where = [`COALESCE(t.assigned_worker, po.assigned_worker) = $1`, `po.is_deleted = FALSE`];
-    if (fromDate) { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)   { where.push(`COALESCE(t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
+    if (fromDate) { where.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)   { where.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
     if (stage)    { where.push(`t.stage = $${i++}`); params.push(stage); }
     if (shift)    { where.push(`t.shift = $${i++}`); params.push(shift); }
     if (team)     { where.push(`COALESCE(t.assigned_team, po.assigned_team) = $${i++}`); params.push(team); }
     const ws = where.join(' AND ');
 
+    // Params riêng cho scrap query (chỉ cần worker + date range, không lệ thuộc vào thứ tự params chính)
+    const scrapParams = [worker];
+    const scrapWhere = [`dsr.worker_name = $1`];
+    let si = 2;
+    if (fromDate) { scrapWhere.push(`dsr.record_date >= $${si++}`); scrapParams.push(fromDate); }
+    if (toDate)   { scrapWhere.push(`dsr.record_date <= $${si++}`); scrapParams.push(toDate); }
 
     const [tasksQ, dailyQ, stagesQ, scrapDailyQ] = await Promise.all([
       db.query(`
         SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty,
-               t.status, t.planned_date, t.shift, t.assigned_team,
+               t.status, t.planned_date, t.updated_at, t.shift, t.assigned_team,
                po.id AS order_id, po.order_code, po.unit, po.material_type,
                so.order_code AS sales_order_code,
                p.product_name, p.product_code, c.name AS customer_name
@@ -370,23 +383,24 @@ exports.employeeTasks = async (req, res) => {
         LEFT JOIN sales_orders so ON so.id = po.sales_order_id
         LEFT JOIN customers c ON c.id = po.customer_id
         WHERE ${ws}
-        ORDER BY t.planned_date DESC NULLS LAST, po.order_code
+        ORDER BY COALESCE(t.updated_at, t.planned_date::timestamp) DESC NULLS LAST, po.order_code
       `, params),
       db.query(`
-        SELECT t.planned_date,
-               to_char(t.planned_date, 'DD/MM') AS date_label,
-               COALESCE(SUM(CASE WHEN t.status='Hoàn thành'
+        SELECT
+               COALESCE(t.updated_at::date, t.planned_date) AS planned_date,
+               to_char(COALESCE(t.updated_at::date, t.planned_date), 'DD/MM') AS date_label,
+               COALESCE(SUM(CASE WHEN t.status='Ho\u00e0n th\u00e0nh'
                  THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
                COALESCE(SUM(t.quantity),0)::numeric AS planned_qty
         FROM production_tasks t
         JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
-        WHERE ${ws} AND t.planned_date IS NOT NULL
-        GROUP BY t.planned_date
-        ORDER BY t.planned_date
+        WHERE ${ws} AND COALESCE(t.updated_at::date, t.planned_date) IS NOT NULL
+        GROUP BY COALESCE(t.updated_at::date, t.planned_date)
+        ORDER BY COALESCE(t.updated_at::date, t.planned_date)
       `, params),
       db.query(`
         SELECT t.stage,
-               COALESCE(SUM(CASE WHEN t.status='Hoàn thành'
+               COALESCE(SUM(CASE WHEN t.status='Ho\u00e0n th\u00e0nh'
                  THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
                COALESCE(SUM(t.quantity),0)::numeric AS planned_qty,
                COUNT(*)::int AS tasks_count
@@ -396,20 +410,19 @@ exports.employeeTasks = async (req, res) => {
         GROUP BY t.stage
         ORDER BY actual_qty DESC
       `, params),
+      // Scrap query dùng params riêng — tránh phụ thuộc vào thứ tự params chính
       db.query(`
         SELECT dsr.record_date as date,
                to_char(dsr.record_date, 'DD/MM') AS date_label,
                COALESCE(SUM(dsi.scrap_qty),0)::numeric AS total_scrap
         FROM daily_scrap_records dsr
         JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
-        WHERE dsr.worker_name = $1
-          ${fromDate ? `AND dsr.record_date >= $2` : ''}
-          ${toDate ? `AND dsr.record_date <= $${fromDate ? 3 : 2}` : ''}
+        WHERE ${scrapWhere.join(' AND ')}
         GROUP BY dsr.record_date
         ORDER BY dsr.record_date
-      `, params.slice(0, 1 + (fromDate ? 1 : 0) + (toDate ? 1 : 0))),
+      `, scrapParams),
     ]);
     res.json({ tasks: tasksQ.rows, daily: dailyQ.rows, stages: stagesQ.rows, scrapDaily: scrapDailyQ.rows });
-  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết nhân viên' }); }
+  } catch (err) { console.error(err); res.status(500).json({ message: 'L\u1ed7i khi l\u1ea5y chi ti\u1ebft nh\u00e2n vi\u00ean' }); }
 };
 

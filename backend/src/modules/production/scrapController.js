@@ -1,23 +1,15 @@
 const db = require('../../core/db');
 
-// GET /api/scrap/workers?date=2026-09-22
+// GET /api/scrap/workers — lấy toàn bộ nhân viên đang hoạt động
 exports.getWorkers = async (req, res) => {
   try {
-    let date = req.query.date;
-    if (date === 'undefined') date = undefined;
-    
-    const dateCondition = date ? `AND updated_at::date = $1` : `AND updated_at::date >= current_date - interval '7 days'`;
-    const params = date ? [date] : [];
-    
     const { rows } = await db.query(`
-      SELECT DISTINCT assigned_worker
-      FROM production_tasks
-      WHERE status = 'Hoàn thành'
-        AND assigned_worker IS NOT NULL
-        ${dateCondition}
-      ORDER BY assigned_worker
-    `, params);
-    res.json(rows.map(r => r.assigned_worker));
+      SELECT DISTINCT name
+      FROM employees
+      WHERE is_deleted = FALSE
+      ORDER BY name
+    `);
+    res.json(rows.map(r => r.name));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy danh sách công nhân' });
@@ -25,13 +17,17 @@ exports.getWorkers = async (req, res) => {
 };
 
 // GET /api/scrap/daily-wos?worker_name=...&date=...
+// Trả về lệnh SX hoàn thành trong vòng 3 ngày trước ngày ghi nhận.
+// Lý do: công nhân có thể cân và ghi phế vào ngày hôm sau (hoặc 2 ngày sau)
+// khi đã tập hợp đủ phế từ nhiều ca → không bị mất WO khi lệch ngày.
 exports.getDailyWos = async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const worker_name = req.query.worker_name;
     if (!worker_name) return res.status(400).json({ message: 'Thiếu worker_name' });
 
-    // Lấy các lệnh SX và tổng thành phẩm của công nhân trong ngày
+    // Lấy các lệnh SX hoàn thành trong [date-2, date] (cửa sổ 3 ngày)
+    // để tránh lệch ngày giữa ngày hoàn thành task và ngày cân/ghi phế
     const { rows } = await db.query(`
       SELECT 
         po.id as order_id,
@@ -41,13 +37,14 @@ exports.getDailyWos = async (req, res) => {
         p.product_code,
         p.unit,
         SUM(pt.actual_qty) as total_qty,
-        MAX(pt.updated_at) as last_completed_at
+        MAX(pt.updated_at) as last_completed_at,
+        MAX(pt.updated_at)::date as completed_date
       FROM production_tasks pt
       JOIN production_orders po ON pt.production_order_id = po.id
       JOIN products p ON po.product_id = p.id
       WHERE pt.assigned_worker = $1
         AND pt.status = 'Hoàn thành'
-        AND pt.updated_at::date = $2
+        AND pt.updated_at::date BETWEEN ($2::date - interval '2 days')::date AND $2::date
       GROUP BY po.id, po.order_code, po.product_id, p.product_name, p.product_code, p.unit
       ORDER BY last_completed_at DESC
     `, [worker_name, date]);
@@ -201,12 +198,31 @@ exports.getStats = async (req, res) => {
       ORDER BY ds.d ASC
     `, [end_date, worker_name]);
 
-    res.json(statsQuery.rows);
+    // Tổng hợp toàn bộ cửa sổ 7 ngày tách biệt để KPI summary luôn đúng
+    // dù task hoàn thành và ngày cân phế lệch 1-2 ngày
+    const totalsQuery = await db.query(`
+      SELECT
+        COALESCE(SUM(pt.actual_qty), 0)::numeric AS total_finished,
+        COALESCE((
+          SELECT SUM(dsi.scrap_qty)
+          FROM daily_scrap_records dsr
+          JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+          WHERE dsr.worker_name = $2
+            AND dsr.record_date BETWEEN $1::date - interval '6 days' AND $1::date
+        ), 0)::numeric AS total_scrap
+      FROM production_tasks pt
+      WHERE pt.assigned_worker = $2
+        AND pt.status = 'Hoàn thành'
+        AND pt.updated_at::date BETWEEN $1::date - interval '6 days' AND $1::date
+    `, [end_date, worker_name]);
+
+    res.json({ rows: statsQuery.rows, totals: totalsQuery.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy thống kê' });
   }
 };
+
 
 // GET /api/scrap/daily-details?worker_name=...&date=...
 exports.getDailyDetails = async (req, res) => {
