@@ -301,6 +301,12 @@ exports.employees = async (req, res) => {
         JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
         ${scrapWhereClause}
         GROUP BY dsr.worker_name
+      ),
+      dedup_employees AS (
+        SELECT name, STRING_AGG(DISTINCT factory, ', ') AS factory
+        FROM employees e
+        WHERE ${empWhere.join(' AND ')}
+        GROUP BY name
       )
       SELECT
         e.name                                                                        AS worker,
@@ -319,11 +325,10 @@ exports.employees = async (req, res) => {
         STRING_AGG(DISTINCT t.stage, ', ' ORDER BY t.stage)                           AS stages,
         STRING_AGG(DISTINCT t.shift, ', ')
           FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                        AS shifts
-      FROM employees e
+      FROM dedup_employees e
       LEFT JOIN filtered_tasks t ON t.final_worker = e.name
       LEFT JOIN worker_scrap ws ON ws.worker_name = e.name
-      WHERE ${empWhere.join(' AND ')}
-      GROUP BY e.id, e.name, e.factory
+      GROUP BY e.name, e.factory
       ORDER BY actual_qty DESC, planned_qty DESC, e.name
     `, params);
     res.json({ data: rows });
