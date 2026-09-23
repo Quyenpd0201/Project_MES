@@ -89,11 +89,10 @@ const TASK_STATUSES = ["Chờ", "Đang sản xuất", "Dừng sản xuất", "Ho
 /* ---- Thẻ 1 công việc (công nhân khai báo sản lượng) ---- */
 function TaskCard({ t, canEdit, onSaved, lookups }) {
   const [actual, setActual] = useState(t.actual_qty ?? "");
-  const [scrap, setScrap] = useState(t.scrap_qty ?? "");
   const [saving, setSaving] = useState(false);
   const [showMat, setShowMat] = useState(false);
   const [matMode, setMatMode] = useState(null); // "view" | "complete"
-  useEffect(() => { setActual(t.actual_qty ?? ""); setScrap(t.scrap_qty ?? ""); }, [t.id]); // eslint-disable-line
+  useEffect(() => { setActual(t.actual_qty ?? ""); }, [t.id]); // eslint-disable-line
 
   const st = t.status;
   const isRunning = st === "Đang sản xuất";       // đang chạy → cho điền
@@ -115,14 +114,14 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
     finally { setSaving(false); }
   };
   const start = () => doUpdate({ status: "Đang sản xuất" });                                   // Bắt đầu / Tiếp tục
-  const saveProgress = () => doUpdate({ status: "Đang sản xuất", actual_qty: actual, scrap_qty: scrap });
-  const pause = () => doUpdate({ status: "Dừng sản xuất", actual_qty: actual, scrap_qty: scrap }); // Tạm dừng
+  const saveProgress = () => doUpdate({ status: "Đang sản xuất", actual_qty: actual });
+  const pause = () => doUpdate({ status: "Dừng sản xuất", actual_qty: actual }); // Tạm dừng
   const complete = () => {
     const need = Number(t.quantity) || 0, act = Number(actual) || 0;
     if (act < need) return toast.error(`Chưa thể Hoàn thành: SL thực tế (${fmt(act)}) phải ≥ SL đơn hàng (${fmt(need)}).`);
     setMatMode("complete"); setShowMat(true); // bắt cập nhật NVL trước khi hoàn thành
   };
-  const finishComplete = () => doUpdate({ status: "Hoàn thành", actual_qty: actual, scrap_qty: scrap });
+  const finishComplete = () => doUpdate({ status: "Hoàn thành", actual_qty: actual });
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -203,14 +202,10 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
           <Info label="Đội / Công nhân" value={[t.assigned_team, t.assigned_worker].filter(Boolean).join(" · ")} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-100">
+        <div className="pt-1 border-t border-slate-100">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">SL thực tế sản xuất</label>
             <input type="number" min="0" className={inputCls + (editable ? "" : " bg-slate-50")} disabled={!editable} value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">SL phế phẩm</label>
-            <input type="number" min="0" className={inputCls + (editable ? "" : " bg-slate-50")} disabled={!editable} value={scrap} onChange={(e) => setScrap(e.target.value)} placeholder="0" />
           </div>
         </div>
         {!isRunning && !isDone && <div className="text-[11px] text-slate-400">Bấm <b>"Bắt đầu sản xuất"</b> để mở nhập số lượng & NVL.</div>}

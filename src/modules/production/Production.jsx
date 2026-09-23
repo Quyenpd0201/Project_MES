@@ -621,7 +621,6 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                   <th className="text-left py-2 font-medium min-w-[130px]">Đội</th>
                   <th className="text-left py-2 font-medium min-w-[160px]">Công nhân</th>
                   <th className="text-left py-2 font-medium min-w-[100px]">Thực tế</th>
-                  <th className="text-left py-2 font-medium min-w-[100px]">Phế phẩm</th>
                   <th className="text-left py-2 font-medium min-w-[130px]">Trạng thái</th>
                   <th className="w-10" />
                 </tr>
@@ -651,13 +650,12 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                         </select>
                       </td>
                       <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.actual_qty} onChange={(e) => upTask(t._k, "actual_qty", e.target.value)} placeholder="SL thực" /></td>
-                      <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.scrap_qty} onChange={(e) => upTask(t._k, "scrap_qty", e.target.value)} /></td>
                       <td className="py-1.5 pr-2"><select className={inputCls} value={t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Hoàn thành</option><option>Đã hủy</option></select></td>
                       <td className="py-1.5 text-center"><button onClick={() => rmTask(t._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button></td>
                     </tr>
                   );
                 })}
-                {!tasks.length && <tr><td colSpan={11} className="py-4 text-center text-slate-400 text-sm">Chưa có phân công. Bấm "Thêm phân công" để chia lệnh nhỏ.</td></tr>}
+                {!tasks.length && <tr><td colSpan={10} className="py-4 text-center text-slate-400 text-sm">Chưa có phân công. Bấm "Thêm phân công" để chia lệnh nhỏ.</td></tr>}
               </tbody>
             </table>
           </div>
