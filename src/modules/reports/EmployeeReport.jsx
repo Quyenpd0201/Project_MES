@@ -17,6 +17,12 @@ import { usePerm } from "../../perm.jsx";
 const today      = () => new Date().toISOString().slice(0, 10);
 const monthStart = () =>
   new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+const weekStart = () => {
+  const d = new Date();
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  return new Date(d.setDate(diff)).toISOString().slice(0, 10);
+};
 const pct      = (a, b) => (b > 0 ? Math.round((Number(a) / Number(b)) * 100) : 0);
 const pctColor = (p) => p >= 100 ? "text-emerald-600" : p >= 80 ? "text-amber-600" : "text-rose-600";
 const pctBg    = (p) => p >= 100 ? "bg-emerald-500" : p >= 80 ? "bg-amber-400"    : "bg-rose-400";
@@ -462,11 +468,23 @@ export default function EmployeeReport() {
   const isManager = isAdmin || can('reports', 'view_all');
 
   /* filters */
-  const [from, setFrom]               = useState(monthStart());
+  const [from, setFrom]               = useState(weekStart());
   const [to, setTo]                   = useState(today());
+  const [timeRange, setTimeRange]     = useState("week");
   const [teamFilter, setTeamFilter]   = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [nameFilter, setNameFilter]   = useState("");
+
+  const handleTimeRangeChange = (val) => {
+    setTimeRange(val);
+    if (val === "week") {
+      setFrom(weekStart());
+      setTo(today());
+    } else if (val === "month") {
+      setFrom(monthStart());
+      setTo(today());
+    }
+  };
 
   const filterParams = { fromDate: from, toDate: to, team: teamFilter, orderCode: orderFilter };
 
@@ -589,16 +607,29 @@ export default function EmployeeReport() {
           <Filter size={12} /> Bộ lọc
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { label: "Từ ngày",   type: "date",   value: from,        set: setFrom        },
-            { label: "Đến ngày",  type: "date",   value: to,          set: setTo          },
-          ].map(({ label, type, value, set }) => (
-            <div key={label}>
-              <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
-              <input type={type} value={value} onChange={e => set(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+          {!isManager ? (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">Thời gian</label>
+              <select value={timeRange} onChange={e => handleTimeRangeChange(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
+                <option value="week">Tuần này</option>
+                <option value="month">Tháng này</option>
+              </select>
             </div>
-          ))}
+          ) : (
+            <>
+              {[
+                { label: "Từ ngày",   type: "date",   value: from,        set: setFrom        },
+                { label: "Đến ngày",  type: "date",   value: to,          set: setTo          },
+              ].map(({ label, type, value, set }) => (
+                <div key={label}>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
+                  <input type={type} value={value} onChange={e => set(e.target.value)}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                </div>
+              ))}
+            </>
+          )}
           {isManager && (
             <>
               <div>
