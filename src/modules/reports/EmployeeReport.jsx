@@ -311,9 +311,10 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
         <KpiCard label="Tổng phế" value={scrap_qty > 0 ? fmt(scrap_qty) : "0"} sub="phế phẩm (kg)" icon={AlertCircle} color={scrap_qty > 0 ? "rose" : "green"} />
         <KpiCard label="Phế/kg" value={actual_qty > 0 ? (Number(scrap_qty)/Number(actual_qty)).toFixed(4) : "0.0000"} sub="tỷ lệ" icon={Target} color="amber" />
         <KpiCard label="Tỷ lệ hoàn thành" value={`${overall}%`} sub="KH so với TT" icon={TrendingUp} color="emerald" />
-        <KpiCard label="Ngày làm việc" value={work_days ?? "—"} sub="ngày có phân công" icon={CalendarDays} color="blue" />
+        <KpiCard label="Số lệnh làm việc" value={tasks_count} sub="tổng số lệnh" icon={Package} color="blue" />
+        <KpiCard label="Ngày làm việc" value={work_days ?? "—"} sub="ngày có phân công" icon={CalendarDays} color="indigo" />
         <KpiCard label="Giờ làm việc" value={work_hours > 0 ? `${work_hours}h` : "—"} sub="ước tính từ ca" icon={Clock} color="amber" />
-        <KpiCard label="Năng suất" value={work_hours > 0 && actual_qty > 0 ? `${(Number(actual_qty)/work_hours).toFixed(1)}/h` : "—"} sub="sản phẩm / giờ" icon={Package} color="green" />
+        <KpiCard label="Năng suất" value={work_hours > 0 && actual_qty > 0 ? `${(Number(actual_qty)/work_hours).toFixed(1)}/h` : "—"} sub="sản phẩm / giờ" icon={TrendingUp} color="green" />
       </div>
 
       {loading ? (
