@@ -517,7 +517,7 @@ export default function EmployeeReport() {
   /* unique option lists */
   const stageOptions = [...new Set(workers.flatMap(w => (w.stages || "").split(", ").filter(Boolean)))];
   const shiftOptions = [...new Set(workers.flatMap(w => (w.shifts || "").split(", ").filter(Boolean)))];
-  const teamOptions  = [...new Set(workers.map(w => w.team).filter(Boolean))];
+  const teamOptions  = [...new Set(workers.flatMap(w => (w.team || "").split(", ")).filter(Boolean))];
 
   /* export */
   const exportExcel = () => {
