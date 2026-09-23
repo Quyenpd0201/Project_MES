@@ -464,12 +464,11 @@ export default function EmployeeReport() {
   /* filters */
   const [from, setFrom]               = useState(monthStart());
   const [to, setTo]                   = useState(today());
-  const [shiftFilter, setShiftFilter] = useState("");
   const [teamFilter, setTeamFilter]   = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [nameFilter, setNameFilter]   = useState("");
 
-  const filterParams = { fromDate: from, toDate: to, shift: shiftFilter, team: teamFilter, orderCode: orderFilter };
+  const filterParams = { fromDate: from, toDate: to, team: teamFilter, orderCode: orderFilter };
 
   /* load worker list */
   const loadWorkers = useCallback(async () => {
@@ -483,7 +482,7 @@ export default function EmployeeReport() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, shiftFilter, teamFilter, orderFilter]);
+  }, [from, to, teamFilter, orderFilter]);
 
   useEffect(() => { loadWorkers(); }, [loadWorkers]);
 
@@ -499,7 +498,7 @@ export default function EmployeeReport() {
     } finally {
       setDetailLoading(false);
     }
-  }, [from, to, shiftFilter, teamFilter]);
+  }, [from, to, teamFilter]);
 
   const handleSelectWorker = (w) => {
     if (selected?.worker === w.worker) { setSelected(null); setDetail(null); return; }
@@ -517,8 +516,7 @@ export default function EmployeeReport() {
 
   /* unique option lists */
   const stageOptions = [...new Set(workers.flatMap(w => (w.stages || "").split(", ").filter(Boolean)))];
-  const shiftOptions = [...new Set(workers.flatMap(w => (w.shifts || "").split(", ").filter(Boolean)))];
-  const teamOptions  = [...new Set(workers.flatMap(w => (w.team || "").split(", ")).filter(Boolean))];
+  const teamOptions  = [...new Set(workers.flatMap(w => (w.team || "").split(", ").filter(Boolean)))];
 
   /* export */
   const exportExcel = () => {
@@ -601,14 +599,6 @@ export default function EmployeeReport() {
                 className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
             </div>
           ))}
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Ca làm việc</label>
-            <select value={shiftFilter} onChange={e => setShiftFilter(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
-              <option value="">Tất cả</option>
-              {shiftOptions.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
           {isManager && (
             <>
               <div>
