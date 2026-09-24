@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   ShieldCheck, Search, Edit, Trash2, X, ChevronRight, ChevronDown,
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
-  BarChart2, Settings, Save, ArrowLeft
+  BarChart2, Settings, Save, ArrowLeft, Recycle
 } from "lucide-react";
 import { ListHeader } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
@@ -93,10 +93,16 @@ export const PERM_TREE = [
       { key: "production",  label: "Lệnh sản xuất",        actions: ["view","create","edit","delete","publish","assign","export"] },
       { key: "orderstatus", label: "Lệnh theo trạng thái", actions: ["view","edit"] },
       { key: "execution",   label: "Thực thi sản xuất",    actions: ["view","execute"] },
-      { key: "scrap",       label: "Ghi nhận phế phẩm",    actions: ["view","create"] },
-      { key: "recycling",   label: "Quản lý tái chế",      actions: ["view","create","edit","approve"] },
       { key: "prod_output", label: "Sản lượng",            actions: ["view","edit","export"] },
       { key: "qrlabels",   label: "In tem xuất xứ",        actions: ["view","create","print"] },
+    ]
+  },
+  {
+    category: "Phế phẩm & Tái chế",
+    icon: Recycle,
+    modules: [
+      { key: "scrap",       label: "Ghi nhận phế phẩm",    actions: ["view","create"] },
+      { key: "recycling",   label: "Quản lý tái chế",      actions: ["view","create","edit","approve"] },
     ]
   },
   {
