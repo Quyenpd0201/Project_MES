@@ -251,27 +251,27 @@ exports.employees = async (req, res) => {
     const taskWhere = [];
     const scrapWhere = [];
 
-    // Dùng COALESCE(t.updated_at::date, t.planned_date, ...) — ưu tiên ngày hoàn thành thực tế
+    // Dùng COALESCE(updated_at::date, planned_date, ...) — ưu tiên ngày hoàn thành thực tế
     // để không bỏ sót lệnh được làm trong kỳ nhưng kế hoạch từ trước
     if (fromDate)  { 
-      taskWhere.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) >= $${i}`); 
+      taskWhere.push(`COALESCE(updated_at::date, planned_date, po_planned_date, po_created_at::date) >= $${i}`); 
       scrapWhere.push(`dsr.record_date >= $${i}`);
       params.push(fromDate); 
       i++; 
     }
     if (toDate)    { 
-      taskWhere.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) <= $${i}`); 
+      taskWhere.push(`COALESCE(updated_at::date, planned_date, po_planned_date, po_created_at::date) <= $${i}`); 
       scrapWhere.push(`dsr.record_date <= $${i}`);
       params.push(toDate); 
       i++; 
     }
-    if (stage)     { taskWhere.push(`t.stage = $${i++}`); params.push(stage); }
-    if (shift)     { taskWhere.push(`t.shift = $${i++}`); params.push(shift); }
-    if (orderCode) { taskWhere.push(`po.order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
+    if (stage)     { taskWhere.push(`stage = $${i++}`); params.push(stage); }
+    if (shift)     { taskWhere.push(`shift = $${i++}`); params.push(shift); }
+    if (orderCode) { taskWhere.push(`order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
     
     // Nếu user bị gán cố định với 1 worker, chỉ được xem báo cáo của worker đó
     if (req.user && req.user.linked_worker) {
-      taskWhere.push(`COALESCE(t.assigned_worker, po.assigned_worker) = $${i}`);
+      taskWhere.push(`final_worker = $${i}`);
       scrapWhere.push(`dsr.worker_name = $${i}`);
       params.push(req.user.linked_worker);
       i++;
@@ -288,15 +288,29 @@ exports.employees = async (req, res) => {
     }
 
     const { rows } = await db.query(`
-      WITH filtered_tasks AS (
-        SELECT t.*,
+      WITH raw_tasks AS (
+        SELECT COALESCE(t.id, po.id) AS id,
+               po.id AS production_order_id,
+               COALESCE(t.quantity, po.quantity) AS quantity,
+               COALESCE(t.status, po.status) AS status,
+               COALESCE(t.actual_qty, po.posted_qty, po.quantity) AS actual_qty,
+               COALESCE(t.updated_at, po.updated_at) AS updated_at,
+               COALESCE(t.planned_date, po.planned_date) AS planned_date,
+               po.planned_date AS po_planned_date,
+               po.created_at AS po_created_at,
+               COALESCE(t.stage, 'Chung') AS stage,
+               COALESCE(t.shift, po.shift) AS shift,
                COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
                po.order_code
-        FROM production_tasks t
-        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
-        WHERE COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL
+        FROM production_orders po
+        LEFT JOIN production_tasks t ON t.production_order_id = po.id
+        WHERE po.is_deleted = FALSE
+          AND COALESCE(t.assigned_worker, po.assigned_worker) IS NOT NULL
           AND COALESCE(t.assigned_worker, po.assigned_worker) != ''
-          ${taskWhereClause}
+      ),
+      filtered_tasks AS (
+        SELECT * FROM raw_tasks
+        WHERE 1=1 ${taskWhereClause}
       ),
       worker_scrap AS (
         SELECT dsr.worker_name, SUM(dsi.scrap_qty) as total_scrap
@@ -355,59 +369,81 @@ exports.employeeTasks = async (req, res) => {
     const params = [worker]; let i = 2;
     // Match task-level OR order-level assigned_worker
     // Dùng updated_at ưu tiên: để tìm task được hoàn thành trong kỳ dù planned_date có thể lệch
-    const where = [`COALESCE(t.assigned_worker, po.assigned_worker) = $1`, `po.is_deleted = FALSE`];
-    if (fromDate) { where.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) >= $${i++}`); params.push(fromDate); }
-    if (toDate)   { where.push(`COALESCE(t.updated_at::date, t.planned_date, po.planned_date, po.created_at::date) <= $${i++}`); params.push(toDate); }
-    if (stage)    { where.push(`t.stage = $${i++}`); params.push(stage); }
-    if (shift)    { where.push(`t.shift = $${i++}`); params.push(shift); }
-    if (team)     { where.push(`COALESCE(t.assigned_team, po.assigned_team) = $${i++}`); params.push(team); }
+    const where = [`final_worker = $1`];
+    if (fromDate) { where.push(`COALESCE(updated_at::date, planned_date, po_planned_date, po_created_at::date) >= $${i++}`); params.push(fromDate); }
+    if (toDate)   { where.push(`COALESCE(updated_at::date, planned_date, po_planned_date, po_created_at::date) <= $${i++}`); params.push(toDate); }
+    if (stage)    { where.push(`stage = $${i++}`); params.push(stage); }
+    if (shift)    { where.push(`shift = $${i++}`); params.push(shift); }
+    if (team)     { where.push(`final_team = $${i++}`); params.push(team); }
     const ws = where.join(' AND ');
 
-    // Params riêng cho scrap query (chỉ cần worker + date range, không lệ thuộc vào thứ tự params chính)
+    // Params riêng cho scrap query
     const scrapParams = [worker];
     const scrapWhere = [`dsr.worker_name = $1`];
     let si = 2;
     if (fromDate) { scrapWhere.push(`dsr.record_date >= $${si++}`); scrapParams.push(fromDate); }
     if (toDate)   { scrapWhere.push(`dsr.record_date <= $${si++}`); scrapParams.push(toDate); }
 
-    const [tasksQ, dailyQ, stagesQ, scrapDailyQ] = await Promise.all([
-      db.query(`
-        SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty,
-               t.status, t.planned_date, t.updated_at, t.shift, t.assigned_team,
+    const rawTasksCTE = `
+      WITH raw_tasks AS (
+        SELECT COALESCE(t.id, po.id) AS id,
+               t.task_code,
+               COALESCE(t.stage, 'Chung') AS stage,
+               COALESCE(t.quantity, po.quantity) AS quantity,
+               COALESCE(t.actual_qty, po.posted_qty, po.quantity) AS actual_qty,
+               COALESCE(t.scrap_qty, 0) AS scrap_qty,
+               COALESCE(t.status, po.status) AS status,
+               COALESCE(t.planned_date, po.planned_date) AS planned_date,
+               po.planned_date AS po_planned_date,
+               po.created_at AS po_created_at,
+               COALESCE(t.updated_at, po.updated_at) AS updated_at,
+               COALESCE(t.shift, po.shift) AS shift,
+               COALESCE(t.assigned_team, po.assigned_team) AS final_team,
+               COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
                po.id AS order_id, po.order_code, po.unit, po.material_type,
                so.order_code AS sales_order_code,
                p.product_name, p.product_code, c.name AS customer_name
-        FROM production_tasks t
-        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        FROM production_orders po
+        LEFT JOIN production_tasks t ON t.production_order_id = po.id
         JOIN products p ON p.id = po.product_id
         LEFT JOIN sales_orders so ON so.id = po.sales_order_id
         LEFT JOIN customers c ON c.id = po.customer_id
+        WHERE po.is_deleted = FALSE
+      )
+    `;
+
+    const [tasksQ, dailyQ, stagesQ, scrapDailyQ] = await Promise.all([
+      db.query(`
+        ${rawTasksCTE}
+        SELECT *
+        FROM raw_tasks
         WHERE ${ws}
-        ORDER BY COALESCE(t.updated_at, t.planned_date::timestamp) DESC NULLS LAST, po.order_code
+        ORDER BY COALESCE(updated_at, planned_date::timestamp) DESC NULLS LAST, order_code
       `, params),
       db.query(`
+        ${rawTasksCTE}
         SELECT
-               COALESCE(t.updated_at::date, t.planned_date) AS planned_date,
-               to_char(COALESCE(t.updated_at::date, t.planned_date), 'DD/MM') AS date_label,
-               COALESCE(SUM(CASE WHEN t.status='Ho\u00e0n th\u00e0nh'
-                 THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
-               COALESCE(SUM(t.quantity),0)::numeric AS planned_qty
-        FROM production_tasks t
-        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
-        WHERE ${ws} AND COALESCE(t.updated_at::date, t.planned_date) IS NOT NULL
-        GROUP BY COALESCE(t.updated_at::date, t.planned_date)
-        ORDER BY COALESCE(t.updated_at::date, t.planned_date)
+               COALESCE(updated_at::date, planned_date) AS planned_date,
+               to_char(COALESCE(updated_at::date, planned_date), 'DD/MM') AS date_label,
+               COALESCE(SUM(CASE WHEN status='Hoàn thành'
+                 THEN COALESCE(actual_qty,quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(quantity),0)::numeric AS planned_qty
+        FROM raw_tasks
+        WHERE ${ws} AND COALESCE(updated_at::date, planned_date) IS NOT NULL
+        GROUP BY COALESCE(updated_at::date, planned_date)
+        ORDER BY COALESCE(updated_at::date, planned_date)
       `, params),
       db.query(`
-        SELECT t.stage,
-               COALESCE(SUM(CASE WHEN t.status='Ho\u00e0n th\u00e0nh'
-                 THEN COALESCE(t.actual_qty,t.quantity) ELSE 0 END),0)::numeric AS actual_qty,
-               COALESCE(SUM(t.quantity),0)::numeric AS planned_qty,
+        ${rawTasksCTE}
+        SELECT stage,
+               COALESCE(SUM(CASE WHEN status='Hoàn thành'
+                 THEN COALESCE(actual_qty,quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(quantity),0)::numeric AS planned_qty,
                COUNT(*)::int AS tasks_count
-        FROM production_tasks t
-        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        FROM raw_tasks
         WHERE ${ws}
-        GROUP BY t.stage
+        GROUP BY stage
+
         ORDER BY actual_qty DESC
       `, params),
       // Scrap query dùng params riêng — tránh phụ thuộc vào thứ tự params chính
