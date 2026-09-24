@@ -17,17 +17,14 @@ exports.getWorkers = async (req, res) => {
 };
 
 // GET /api/scrap/daily-wos?worker_name=...&date=...
-// Trả về lệnh SX hoàn thành trong vòng 3 ngày trước ngày ghi nhận.
-// Lý do: công nhân có thể cân và ghi phế vào ngày hôm sau (hoặc 2 ngày sau)
-// khi đã tập hợp đủ phế từ nhiều ca → không bị mất WO khi lệch ngày.
+// Trả về lệnh SX hoàn thành trong ngày ghi nhận.
 exports.getDailyWos = async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const worker_name = req.query.worker_name;
     if (!worker_name) return res.status(400).json({ message: 'Thiếu worker_name' });
 
-    // Lấy các lệnh SX hoàn thành trong [date-2, date] (cửa sổ 3 ngày)
-    // để tránh lệch ngày giữa ngày hoàn thành task và ngày cân/ghi phế
+    // Lấy các lệnh SX hoàn thành trong đúng ngày ghi nhận
     const { rows } = await db.query(`
       SELECT 
         po.id as order_id,
@@ -44,7 +41,7 @@ exports.getDailyWos = async (req, res) => {
       JOIN products p ON po.product_id = p.id
       WHERE pt.assigned_worker = $1
         AND pt.status = 'Hoàn thành'
-        AND pt.updated_at::date BETWEEN ($2::date - interval '2 days')::date AND $2::date
+        AND pt.updated_at::date = $2::date
       GROUP BY po.id, po.order_code, po.product_id, p.product_name, p.product_code, p.unit
       ORDER BY last_completed_at DESC
     `, [worker_name, date]);

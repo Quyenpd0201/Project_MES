@@ -399,7 +399,7 @@ function ScrapForm({ worker, date, setDate, onOpenOrder }) {
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="font-semibold text-slate-700 flex items-center gap-2">
-                  <List size={18} className="text-slate-400"/> Lệnh SX hoàn thành (3 ngày gần nhất)
+                  <List size={18} className="text-slate-400"/> Lệnh SX hoàn thành
                 </div>
                 <div className="flex items-center gap-3">
                   {wos.length > 0 && (
@@ -407,7 +407,7 @@ function ScrapForm({ worker, date, setDate, onOpenOrder }) {
                       Tổng cộng: <span className="font-bold text-slate-800">{wos.length}</span> lệnh
                     </div>
                   )}
-                  <span className="text-xs text-slate-400 italic">Hiển thị WO từ {new Date(new Date(date) - 2*86400000).toLocaleDateString("vi-VN")} – {new Date(date).toLocaleDateString("vi-VN")}</span>
+                  <span className="text-xs text-slate-400 italic">Hiển thị WO trong ngày {new Date(date).toLocaleDateString("vi-VN")}</span>
                 </div>
               </div>
               <div className="p-4">
