@@ -291,9 +291,18 @@ exports.employees = async (req, res) => {
       WITH raw_tasks AS (
         SELECT COALESCE(t.id, po.id) AS id,
                po.id AS production_order_id,
-               COALESCE(t.quantity, po.quantity) AS quantity,
+               -- Kế hoạch: luôn dùng po.quantity (SL lệnh gốc) thay vì t.quantity
+               -- Đơn gấp (priority='Cao') không có kế hoạch phân công nên t.quantity
+               -- có thể là giá trị cũ/không phản ánh thực tế → dùng po.quantity nhất quán
+               po.quantity AS quantity,
                COALESCE(t.status, po.status) AS status,
-               COALESCE(t.actual_qty, po.posted_qty, po.quantity) AS actual_qty,
+               -- Thực tế: ưu tiên actual_qty của task, fallback posted_qty lệnh (đã xác nhận hoàn thành)
+               -- KHÔNG fallback về po.quantity (tránh tính đơn chưa xong là 100%)
+               CASE
+                 WHEN COALESCE(t.status, po.status) = 'Hoàn thành'
+                   THEN COALESCE(t.actual_qty, po.posted_qty, po.quantity)
+                 ELSE COALESCE(t.actual_qty, po.posted_qty, 0)
+               END AS actual_qty,
                COALESCE(t.updated_at, po.updated_at) AS updated_at,
                COALESCE(t.planned_date, po.planned_date) AS planned_date,
                po.planned_date AS po_planned_date,
@@ -301,7 +310,8 @@ exports.employees = async (req, res) => {
                COALESCE(t.stage, 'Chung') AS stage,
                COALESCE(t.shift, po.shift) AS shift,
                COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
-               po.order_code
+               po.order_code,
+               po.priority
         FROM production_orders po
         LEFT JOIN production_tasks t ON t.production_order_id = po.id
         WHERE po.is_deleted = FALSE
@@ -389,8 +399,16 @@ exports.employeeTasks = async (req, res) => {
         SELECT COALESCE(t.id, po.id) AS id,
                t.task_code,
                COALESCE(t.stage, 'Chung') AS stage,
-               COALESCE(t.quantity, po.quantity) AS quantity,
-               COALESCE(t.actual_qty, po.posted_qty, po.quantity) AS actual_qty,
+               -- Kế hoạch: dùng po.quantity (SL lệnh gốc) nhất quán
+               -- Đơn gấp không có kế hoạch phân công → t.quantity không đáng tin
+               po.quantity AS quantity,
+               -- Thực tế: ưu tiên actual_qty task, fallback posted_qty lệnh
+               -- KHÔNG fallback về po.quantity khi chưa hoàn thành (tránh KPI ảo 100%)
+               CASE
+                 WHEN COALESCE(t.status, po.status) = 'Hoàn thành'
+                   THEN COALESCE(t.actual_qty, po.posted_qty, po.quantity)
+                 ELSE COALESCE(t.actual_qty, po.posted_qty, 0)
+               END AS actual_qty,
                COALESCE(t.scrap_qty, 0) AS scrap_qty,
                COALESCE(t.status, po.status) AS status,
                COALESCE(t.planned_date, po.planned_date) AS planned_date,
@@ -401,6 +419,7 @@ exports.employeeTasks = async (req, res) => {
                COALESCE(t.assigned_team, po.assigned_team) AS final_team,
                COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
                po.id AS order_id, po.order_code, po.unit, po.material_type,
+               po.priority,
                so.order_code AS sales_order_code,
                p.product_name, p.product_code, c.name AS customer_name
         FROM production_orders po

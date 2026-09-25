@@ -183,8 +183,10 @@ function WorkOrdersTable({ tasks }) {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {slice.map((t) => {
-              const actual  = t.status === "Hoàn thành" ? (Number(t.actual_qty) ?? Number(t.quantity) ?? 0) : 0;
+              const isUrgent = t.priority === 'Cao';
+              const actual  = t.status === "Hoàn thành" ? (Number(t.actual_qty) || 0) : (Number(t.actual_qty) || 0);
               const planned = Number(t.quantity) || 0;
+              // Đơn gấp: tỷ lệ tính bình thường (planned = po.quantity đã chuẩn hóa từ backend)
               const p       = pct(actual, planned);
               return (
                 <tr key={t.id} className="hover:bg-slate-50 transition-colors">
@@ -192,7 +194,12 @@ function WorkOrdersTable({ tasks }) {
                     <div className="font-medium text-slate-700">{t.sales_order_code || "—"}</div>
                     {t.customer_name && <div className="text-xs text-slate-400 truncate max-w-[120px]" title={t.customer_name}>{t.customer_name}</div>}
                   </td>
-                  <td className="py-2.5 px-3 font-semibold text-blue-600">{t.order_code}</td>
+                  <td className="py-2.5 px-3 font-semibold text-blue-600">
+                    {t.order_code}
+                    {isUrgent && (
+                      <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-100 text-rose-700 uppercase tracking-wide">Gấp</span>
+                    )}
+                  </td>
                   <td className="py-2.5 px-3">
                     <span className="font-medium text-slate-700">{t.product_code}</span>
                     <span className="block text-slate-400">{t.product_name}</span>
@@ -212,7 +219,10 @@ function WorkOrdersTable({ tasks }) {
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-right font-medium text-slate-600">
-                    {fmt(planned)} <span className="text-slate-400">{t.unit}</span>
+                    {isUrgent
+                      ? <span className="text-rose-500" title="Đơn gấp — kế hoạch = SL đơn hàng gốc">{fmt(planned)} <span className="text-slate-400">{t.unit}</span></span>
+                      : <>{fmt(planned)} <span className="text-slate-400">{t.unit}</span></>
+                    }
                   </td>
                   <td className={`py-2.5 px-3 text-right font-bold ${pctColor(p)}`}>{fmt(actual)}</td>
                   <td className="py-2.5 px-3">
