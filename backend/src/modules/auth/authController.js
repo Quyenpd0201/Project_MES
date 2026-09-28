@@ -58,8 +58,11 @@ function verifyPassword(pw, stored) {
 async function userPayload(id) {
   const { rows } = await db.query(`
     SELECT u.id, u.username, u.full_name, u.status, u.team, u.linked_worker,
+           e.employee_code,
            r.id AS role_id, r.name AS role_name, COALESCE(r.is_admin, FALSE) AS is_admin, COALESCE(r.permissions, '{}'::jsonb) AS permissions
-    FROM users u LEFT JOIN roles r ON r.id = u.role_id
+    FROM users u 
+    LEFT JOIN roles r ON r.id = u.role_id
+    LEFT JOIN employees e ON e.name = u.linked_worker OR e.employee_code = u.linked_worker
     WHERE u.id = $1 AND u.is_deleted = FALSE`, [id]);
   const user = rows[0];
   if (user && user.role_id) {

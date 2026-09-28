@@ -269,13 +269,16 @@ exports.employees = async (req, res) => {
     if (shift)     { taskWhere.push(`shift = $${i++}`); params.push(shift); }
     if (orderCode) { taskWhere.push(`order_code ILIKE $${i++}`); params.push(`%${orderCode}%`); }
     
-    // Nếu user bị gán cố định với 1 worker, chỉ được xem báo cáo của worker đó
+    // Bỏ comment block này nếu muốn giới hạn nhân viên chỉ xem được hiệu suất của chính mình
+    // Tuy nhiên, đối với màn hình Leaderboard (Top 5), thường cho phép xem hiệu suất của tất cả mọi người.
+    /*
     if (req.user && req.user.linked_worker) {
       taskWhere.push(`final_worker = $${i}`);
       scrapWhere.push(`dsr.worker_name = $${i}`);
       params.push(req.user.linked_worker);
       i++;
     }
+    */
     
     const taskWhereClause = taskWhere.length ? `AND ${taskWhere.join(' AND ')}` : '';
     const scrapWhereClause = scrapWhere.length ? `WHERE ${scrapWhere.join(' AND ')}` : '';
