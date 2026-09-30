@@ -328,7 +328,7 @@ export default function ProcessModule({ lookups }) {
   const columns = [
     { key: "process_code", label: "Mã", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.process_code}</button> },
     { key: "name", label: "Tên quy trình", filter: "text", tdClass: "text-slate-800" },
-    { key: "product_name", label: "Thành phẩm", filter: "text", tdClass: "text-slate-600", render: (r) => r.product_name || "—" },
+    { key: "product_name", label: "Thành phẩm", filter: "select", tdClass: "text-slate-600", render: (r) => r.product_name || "—" },
     { key: "step_count", label: "Số bước", align: "center" },
     { key: "status", label: "Trạng thái", filter: "select", render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "_act", label: "", align: "right", render: (r) => (<>

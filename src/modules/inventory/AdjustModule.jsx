@@ -201,7 +201,7 @@ function AdjustHistory() {
     { key: "created_at", label: "Thời gian", render: r => new Date(r.created_at).toLocaleString("vi-VN") },
     { key: "trx_type", label: "Hướng", render: r => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[r.trx_type] || ""}`}>{r.trx_type === "Nhập" ? "Tăng +" : "Giảm −"}</span> },
     { key: "product_code", label: "Mã SP", filter: "text", tdClass: "font-medium text-blue-600" },
-    { key: "product_name", label: "Sản phẩm", filter: "text" },
+    { key: "product_name", label: "Sản phẩm", filter: "select" },
     { key: "quantity", label: "Chênh lệch", align: "right", render: r => <span className={`font-semibold ${r.trx_type === "Nhập" ? "text-emerald-600" : "text-rose-600"}`}>{r.trx_type === "Nhập" ? "+" : "−"}{fmt(r.quantity)}</span> },
     { key: "warehouse_name", label: "Kho/Vị trí", render: r => r.warehouse_name ? `${r.warehouse_name}${r.location_name ? " · " + r.location_name : ""}` : "—" },
     { key: "note", label: "Lý do / Chi tiết", tdClass: "text-slate-500 text-xs" },

@@ -840,8 +840,8 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
 
   const columns = [
     { key: "order_code", label: "Mã lệnh", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },
-    { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
-    { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
+    { key: "product_name", label: "Sản phẩm", filter: "select", tdClass: "text-slate-800" },
+    { key: "customer_name", label: "Khách hàng", filter: "select", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
     { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
     { key: "status", label: "Trạng thái", filter: "select", options: STATUSES, render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },

@@ -345,7 +345,7 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
 
   const columns = [
     { key: "note_code", label: "Số phiếu", filter: "text", render: (r) => <button onClick={() => { setEditId(r.id); setView("form"); }} className="font-medium text-blue-600 hover:underline">{r.note_code}</button> },
-    { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-800" },
+    { key: "customer_name", label: "Khách hàng", filter: "select", tdClass: "text-slate-800" },
     { key: "sales_order_code", label: "Đơn hàng", filter: "text", render: (r) => r.sales_order_code || "—" },
     { key: "delivery_date", label: "Ngày giao", filter: "date", render: (r) => fmtDate(r.delivery_date) },
     { key: "item_count", label: "Số dòng", align: "center" },

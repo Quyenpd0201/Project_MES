@@ -511,7 +511,7 @@ function TransactionsTab() {
     { key: "created_at", label: "Thời gian", filter: "date", tdClass: "text-slate-500", render: (t) => new Date(t.created_at).toLocaleString("vi-VN") },
     { key: "trx_type", label: "Loại", filter: "select", render: (t) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[t.trx_type] || ""}`}>{t.trx_type}</span> },
     { key: "product_code", label: "Mã SP", filter: "text", tdClass: "font-medium text-blue-600" },
-    { key: "product_name", label: "Sản phẩm", filter: "text", tdClass: "text-slate-800" },
+    { key: "product_name", label: "Sản phẩm", filter: "select", tdClass: "text-slate-800" },
     { key: "_specs", label: "Thông số", filter: "text", tdClass: "text-slate-500",
       filterValue: (t) => specShort(t.specs),
       render: (t) => specShort(t.specs) || "—" },

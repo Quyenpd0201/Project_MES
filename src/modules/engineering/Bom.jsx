@@ -232,7 +232,7 @@ export default function BomModule({ lookups }) {
         <span className="inline-flex items-center gap-1.5">{r.name}
           {r.process_id && <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700"><GitBranch size={11} /> từ QT</span>}</span>
       ) },
-    { key: "product_name", label: "Sản phẩm đầu ra", filter: "text", tdClass: "text-slate-600" },
+    { key: "product_name", label: "Sản phẩm đầu ra", filter: "select", tdClass: "text-slate-600" },
     { key: "bom_type", label: "Loại", filter: "select", render: (r) => r.bom_type === "Công thức pha màu"
         ? <span className="inline-flex items-center gap-1 text-blue-600"><FlaskConical size={14} /> {r.bom_type}</span> : r.bom_type },
     { key: "line_count", label: "Số dòng", align: "center" },
