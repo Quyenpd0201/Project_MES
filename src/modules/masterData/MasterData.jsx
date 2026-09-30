@@ -51,8 +51,13 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
     for (const fl of cfg.fields)
       if (fl.required && !f[fl.key]) return toast.error(`Vui lòng nhập ${fl.label}`);
     try {
-      if (isEdit) await api.update(record.id, f); else await api.create(f);
-      toast.success("Đã lưu thành công"); onSaved();
+      if (isEdit) {
+        await api.update(record.id, f);
+        toast.success("Đã lưu thành công"); // ở lại màn chi tiết, không thoát ra list
+      } else {
+        await api.create(f);
+        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+      }
     } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
 
@@ -297,7 +302,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
 
   if (editing)
     return <RecordForm cfg={cfg} record={editing.id ? editing : null} onOpenOrder={onOpenOrder} onOpenProductionOrder={onOpenProductionOrder}
-      onBack={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />;
+      onBack={() => { setEditing(null); load(); }} onSaved={() => { setEditing(null); load(); }} />;
 
   return (
     <div className="space-y-4">

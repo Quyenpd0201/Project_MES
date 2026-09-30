@@ -18,10 +18,14 @@ function RoleForm({ record, onBack, onSaved }) {
   const save = async () => {
     if (!f.name) return toast.error("Vui lòng nhập tên vai trò");
     try {
-      if (isEdit) await roles.update(record.id, f);
-      else await roles.create(f);
-      toast.success("Đã lưu vai trò thành công");
-      onSaved();
+      if (isEdit) {
+        await roles.update(record.id, f);
+        toast.success("Đã lưu vai trò thành công"); // ở lại form
+      } else {
+        await roles.create(f);
+        toast.success("Đã lưu vai trò thành công");
+        onSaved(); // tạo mới → về list
+      }
     } catch (e) {
       toast.error("Lỗi: " + e.message);
     }
@@ -148,7 +152,7 @@ export default function RolesModule() {
   if (editingRole) {
     return (
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-3xl mx-auto mt-6">
-        <RoleForm record={editingRole.id ? editingRole : null} onBack={() => setEditingRole(null)} onSaved={() => { setEditingRole(null); fetchRoles(); }} />
+        <RoleForm record={editingRole.id ? editingRole : null} onBack={() => { setEditingRole(null); fetchRoles(); }} onSaved={() => { setEditingRole(null); fetchRoles(); }} />
       </div>
     );
   }

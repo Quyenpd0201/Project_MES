@@ -15,9 +15,11 @@ exports.list = async (req, res) => {
     const { rows } = await db.query(`
       SELECT so.*, c.name AS customer_name, c.phone AS customer_phone,
              (SELECT COUNT(*)::int FROM sales_order_items it WHERE it.sales_order_id = so.id) AS item_count,
-             (SELECT COALESCE(SUM(it.quantity),0) FROM sales_order_items it WHERE it.sales_order_id = so.id) AS total_qty
+             (SELECT COALESCE(SUM(it.quantity),0) FROM sales_order_items it WHERE it.sales_order_id = so.id) AS total_qty,
+             (SELECT COALESCE(SUM(it.unit_price*it.quantity),0) FROM sales_order_items it WHERE it.sales_order_id = so.id) AS total_amount
       FROM sales_orders so JOIN customers c ON c.id = so.customer_id
       WHERE ${where.join(' AND ')} ORDER BY so.created_at DESC`, params);
+    if (!canViewAmounts(req)) rows.forEach((r) => { delete r.total_amount; }); // ẩn tổng tiền nếu không có quyền
     res.json({ data: rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy danh sách đơn hàng' }); }
 };
@@ -51,6 +53,14 @@ async function lineMaterials(it) {
   }));
 }
 
+// Quyền xem thông tin tiền của Đơn hàng (đơn giá / thành tiền / tổng đơn)
+function canViewAmounts(req) {
+  if (req.user?.is_admin) return true;
+  const p = req.user?.permissions?.orders;
+  const v = p?.view_amounts, f = p?.fields?.amounts;
+  return v === 'ALLOW' || v === true || v?.status === 'ALLOW' || f === 'edit' || f === 'view';
+}
+
 exports.getById = async (req, res) => {
   try {
     const { rows } = await db.query(`
@@ -62,15 +72,20 @@ exports.getById = async (req, res) => {
       SELECT it.*, p.product_name, p.product_code
       FROM sales_order_items it JOIN products p ON p.id = it.product_id
       WHERE it.sales_order_id = $1 ORDER BY p.product_code`, [req.params.id]);
+    const showAmt = canViewAmounts(req);
+    const totalAmount = items.rows.reduce((s, it) => s + Number(it.unit_price || 0) * Number(it.quantity || 0), 0);
     // Làm giàu từng dòng: lệnh SX + tag NVL (định mức / tồn / cần bổ sung / đã dùng)
     const enriched = await Promise.all(items.rows.map(async (it) => {
       const orders = (await db.query(`
         SELECT id, order_code, quantity, unit, status FROM production_orders
         WHERE sales_order_item_id = $1 AND is_deleted = FALSE ORDER BY created_at`, [it.id])).rows;
       const materials = await lineMaterials(it);
-      return { ...it, production_orders: orders, materials };
+      const row = { ...it, production_orders: orders, materials };
+      if (showAmt) row.amount = Number(it.unit_price || 0) * Number(it.quantity || 0);
+      else { delete row.unit_price; row.amount = undefined; } // ẩn giá phía server nếu không có quyền
+      return row;
     }));
-    res.json({ ...rows[0], items: enriched });
+    res.json({ ...rows[0], items: enriched, ...(showAmt ? { total_amount: totalAmount } : {}) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết đơn hàng' }); }
 };
 
@@ -110,21 +125,24 @@ async function saveItems(client, orderId, items) {
   for (const it of list) {
     const specs = specsFromBody(it);
     const a = legacyAttrs(specs);
+    // Đơn giá: undefined/'' (người dùng không có quyền tiền → không gửi) ⇒ null để COALESCE giữ giá cũ, không ghi đè
+    const priceVal = (it.unit_price === undefined || it.unit_price === '' || it.unit_price === null) ? null : Number(it.unit_price);
     const base = [it.product_id, it.quantity, upUnit(it.unit), JSON.stringify(specs), buildSpecKey(specs),
     a.size, a.thickness, a.color, numOrNull(it.core_weight), numOrNull(it.total_weight), it.note || null,
-    it.planned_start_date || null, it.planned_end_date || null, it.material_type || null, JSON.stringify(it.mix_ratio || [])];
+    it.planned_start_date || null, it.planned_end_date || null, it.material_type || null, JSON.stringify(it.mix_ratio || []), priceVal];
     if (it.id) {
       await client.query(
         `UPDATE sales_order_items SET product_id=$1, quantity=$2, unit=$3, specs=$4::jsonb, spec_key=$5,
            attr_size=$6, attr_thickness=$7, attr_color=$8, core_weight=$9, total_weight=$10, note=$11,
-           planned_start_date=$12, planned_end_date=$13, material_type=$14, mix_ratio=$15::jsonb
-         WHERE id=$16 AND sales_order_id=$17`, [...base, it.id, orderId]);
+           planned_start_date=$12, planned_end_date=$13, material_type=$14, mix_ratio=$15::jsonb,
+           unit_price=COALESCE($16, unit_price)
+         WHERE id=$17 AND sales_order_id=$18`, [...base, it.id, orderId]);
     } else {
       await client.query(
         `INSERT INTO sales_order_items
            (sales_order_id, product_id, quantity, unit, specs, spec_key, attr_size, attr_thickness, attr_color,
-            core_weight, total_weight, note, planned_start_date, planned_end_date, material_type, mix_ratio)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb)`,
+            core_weight, total_weight, note, planned_start_date, planned_end_date, material_type, mix_ratio, unit_price)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,COALESCE($17,0))`,
         [orderId, ...base]);
     }
   }

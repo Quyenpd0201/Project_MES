@@ -15,8 +15,10 @@ function UserForm({ record, roleList, teams, employees, onBack, onSaved }) {
   const save = async () => {
     if (!f.username) return toast.error("Nhập tài khoản");
     if (!isEdit && !f.password) return toast.error("Nhập mật khẩu");
-    try { if (isEdit) await users.update(record.id, f); else await users.create(f); toast.success("Đã lưu thành công"); onSaved(); }
-    catch (e) { toast.error("Lỗi: " + e.message); }
+    try {
+      if (isEdit) { await users.update(record.id, f); toast.success("Đã lưu thành công"); } // ở lại form
+      else { await users.create(f); toast.success("Đã lưu thành công"); onSaved(); } // tạo mới → về list
+    } catch (e) { toast.error("Lỗi: " + e.message); }
   };
   return (
     <div className="space-y-5">
@@ -78,7 +80,7 @@ export default function UsersModule({ lookups }) {
 
   if (editing)
     return <UserForm record={editing.id ? editing : null} roleList={roleList} teams={teams} employees={lookups?.employees || []}
-      onBack={() => setEditing(null)} onSaved={() => { setEditing(null); load(); }} />;
+      onBack={() => { setEditing(null); load(); }} onSaved={() => { setEditing(null); load(); }} />;
 
   return (
     <div className="space-y-5">

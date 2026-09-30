@@ -26,3 +26,6 @@ pgadmin-servers.json
 
 # Thư mục dựng PDF tạm
 .pdfbuild/
+
+# Claude Code local settings (per-máy, có thể chứa secrets) — không commit
+.claude/settings.local.json

@@ -80,7 +80,7 @@ export const PERM_TREE = [
     category: "Kinh doanh & Kế hoạch",
     icon: Calendar,
     modules: [
-      { key: "orders",       label: "Đơn hàng",            actions: ["view","create","edit","delete","approve"] },
+      { key: "orders",       label: "Đơn hàng",            actions: ["view","create","edit","delete","approve","view_amounts"] },
       { key: "deliveries",   label: "Phiếu giao hàng",      actions: ["view","create","edit","delete","approve", "view_amounts"] },
       { key: "planning",     label: "Kế hoạch sản xuất",    actions: ["view","create","edit","publish"] },
       { key: "workschedule", label: "Lịch sản xuất",        actions: ["view","create","edit","publish"] },

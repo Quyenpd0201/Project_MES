@@ -4,6 +4,10 @@ const db = require('../../core/db');
 const { calculateEffectivePermissions } = require('./roleController');
 
 const jwt = require('jsonwebtoken');
+// Bắt buộc có JWT_SECRET ở production — không cho âm thầm dùng fallback yếu (fallback có trong code public).
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET is required in production — hãy đặt biến môi trường JWT_SECRET.');
+}
 const JWT_SECRET = process.env.JWT_SECRET || 'mes_fallback_secret_key';
 
 // ── Brute-force protection ────────────────────────────────────────────────────

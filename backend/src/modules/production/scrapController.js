@@ -4,12 +4,12 @@ const db = require('../../core/db');
 exports.getWorkers = async (req, res) => {
   try {
     const { rows } = await db.query(`
-      SELECT DISTINCT name
+      SELECT id, employee_code, name
       FROM employees
       WHERE is_deleted = FALSE
       ORDER BY name
     `);
-    res.json(rows.map(r => r.name));
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy danh sách công nhân' });
@@ -87,7 +87,7 @@ exports.getRecords = async (req, res) => {
 exports.saveRecords = async (req, res) => {
   const client = await db.pool.connect();
   try {
-    const { worker_name, record_date, note, items } = req.body;
+    const { worker_name, record_date, note, items, employee_id } = req.body;
     if (!worker_name || !record_date || !items || !items.length) {
       return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
     }
@@ -103,12 +103,12 @@ exports.saveRecords = async (req, res) => {
 
     // 2. Upsert record
     const rRes = await client.query(`
-      INSERT INTO daily_scrap_records (worker_name, record_date, note, updated_at)
-      VALUES ($1, $2, $3, now())
-      ON CONFLICT (worker_name, record_date) 
-      DO UPDATE SET note = EXCLUDED.note, updated_at = now()
+      INSERT INTO daily_scrap_records (worker_name, record_date, note, employee_id, updated_at)
+      VALUES ($1, $2, $3, $4, now())
+      ON CONFLICT (worker_name, record_date)
+      DO UPDATE SET note = EXCLUDED.note, employee_id = COALESCE(EXCLUDED.employee_id, daily_scrap_records.employee_id), updated_at = now()
       RETURNING id
-    `, [worker_name, record_date, note || null]);
+    `, [worker_name, record_date, note || null, employee_id || null]);
     const recordId = rRes.rows[0].id;
 
     // 3. Process items

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch, Copy } from "lucide-react";
+import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch, Copy, ChevronDown, ChevronRight } from "lucide-react";
 import { production, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
@@ -27,20 +27,28 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   // Phân công (lệnh nhỏ): công đoạn + sản lượng + máy + ca + đội
   const [tasks, setTasks] = useState([]);
   const [taskSeq, setTaskSeq] = useState(1);
-  const addTask = () => {
-    setTasks((a) => [...a, { _k: taskSeq, stage: "Thổi", quantity: "", actual_qty: "", scrap_qty: "", machine_id: "", shift: "", planned_date: "", planned_end_date: "", assigned_team: "", assigned_worker: "", status: "Chờ" }]);
+  const [collapsed, setCollapsed] = useState({}); // { [stage]: true } = đang thu gọn
+  const toggleStage = (s) => setCollapsed((c) => ({ ...c, [s]: !c[s] }));
+  // Thêm 1 "lần làm" (task con) cho một công đoạn (cha)
+  const addTaskFor = (stage) => {
+    setCollapsed((c) => ({ ...c, [stage]: false })); // mở nhóm khi thêm lần mới
+    setTasks((a) => [...a, { _k: taskSeq, stage, quantity: "", actual_qty: "", scrap_qty: "", machine_id: "", shift: "", planned_date: "", planned_end_date: "", assigned_team: "", assigned_worker: "", assigned_worker_id: "", status: "Chờ" }]);
     setTaskSeq((s) => s + 1);
   };
+  const addTask = () => addTaskFor("Thổi");
   const rmTask = (k) => setTasks((a) => a.filter((x) => x._k !== k));
   const upTask = (k, field, v) => setTasks((a) => a.map((x) => (x._k === k ? { ...x, [field]: v } : x)));
   // Đội / Công nhân (chọn từ danh sách, công nhân lọc theo đội)
   const emps = lookups.employees || [];
   const teams = [...new Set(emps.map((e) => e.factory).filter(Boolean))];
   const workersOf = (team) => emps.filter((e) => !team || e.factory === team);
+  // Chọn công nhân theo ID; lưu kèm tên để hiển thị
+  const setTaskWorker = (k, empId) => setTasks((a) => a.map((x) => x._k === k
+    ? { ...x, assigned_worker_id: empId, assigned_worker: emps.find((e) => e.id === empId)?.name || "" } : x));
   const setTaskTeam = (k, v) => setTasks((a) => a.map((x) => {
     if (x._k !== k) return x;
-    const keep = emps.find((e) => e.name === x.assigned_worker && (!v || e.factory === v));
-    return { ...x, assigned_team: v, assigned_worker: keep ? x.assigned_worker : "" };
+    const keep = emps.find((e) => e.id === x.assigned_worker_id && (!v || e.factory === v));
+    return { ...x, assigned_team: v, assigned_worker_id: keep ? x.assigned_worker_id : "", assigned_worker: keep ? x.assigned_worker : "" };
   }));
 
   // Sinh phân công theo Quy trình công nghệ của sản phẩm (silent = tự động, không báo)
@@ -96,6 +104,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             machine_id: chosenMId || "", shift: defaults.shift || "",
             planned_date: defaults.planned_date || "", planned_end_date: "",
             assigned_team: teamMatch ? defaults.assigned_team : "", assigned_worker: teamMatch ? defaults.assigned_worker : "",
+            assigned_worker_id: teamMatch ? (defaults.assigned_worker_id || "") : "",
             status: "Chờ", note: s.name || ""
           });
           seq++;
@@ -109,7 +118,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
     } catch (e) { if (!silent) toast.error("Lỗi: " + e.message); }
   };
   const applyProcess = () => genFromProcess(f.product_id, f.quantity, meta ? {
-    defaults: { shift: meta.shift, assigned_team: meta.assigned_team, assigned_worker: meta.assigned_worker, machine_id: meta.machine_id, planned_date: meta.planned_date?.slice(0, 10) },
+    defaults: { shift: meta.shift, assigned_team: meta.assigned_team, assigned_worker: meta.assigned_worker, assigned_worker_id: meta.assigned_worker_id, machine_id: meta.machine_id, planned_date: meta.planned_date?.slice(0, 10) },
   } : {});
 
   // NVL cần cung cấp (kế hoạch cấp NVL) + trạng thái đã yêu cầu (xuất kho)
@@ -120,7 +129,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const [pmBusy, setPmBusy] = useState(false);
   const nvlOptions = (lookups.products || []).filter((p) => p.product_type === 'Nguyên vật liệu')
     .map((p) => ({ value: p.id, label: `${p.product_name}${p.product_code ? ` (${p.product_code})` : ''}` }));
-  const addMat = () => { setPlannedMats((a) => [...a, { _k: pmSeq, material_id: "", qty: "", unit: "", note: "", on_hand: null }]); setPmSeq((s) => s + 1); };
+  const addMat = () => { setPlannedMats((a) => [...a, { _k: pmSeq, material_id: "", ratio: "", qty: "", unit: "", note: "", on_hand: null }]); setPmSeq((s) => s + 1); };
   const rmMat = (k) => setPlannedMats((a) => a.filter((x) => x._k !== k));
   const upMat = (k, field, v) => setPlannedMats((a) => a.map((x) => {
     if (x._k !== k) return x;
@@ -132,7 +141,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
     try {
       const d = await production.materials(editId);
       if (!d.has_bom || !d.lines?.length) return toast.error('Sản phẩm chưa có BOM để gợi ý.');
-      setPlannedMats(d.lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, qty: Math.round((l.suggested_qty || 0) * 100) / 100, unit: l.unit || '', note: '', on_hand: l.on_hand })));
+      setPlannedMats(d.lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: "", qty: Math.round((l.suggested_qty || 0) * 100) / 100, unit: l.unit || '', note: '', on_hand: l.on_hand })));
       setPmSeq(d.lines.length + 1);
       toast.success(`Đã đổ ${d.lines.length} NVL gợi ý từ BOM. Hãy chỉnh/xóa theo thực tế rồi Lưu.`);
     } catch (e) { toast.error('Lỗi lấy gợi ý BOM: ' + e.message); }
@@ -153,6 +162,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
 
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [meta, setMeta] = useState(null); // dữ liệu lệnh đã nạp (mã lệnh, SP, đơn...) cho tem QR
+  const locked = ['Hoàn thành', 'Đã hủy'].includes(meta?.status); // LSX đã chốt → không cho sửa
 
   // Nạp dữ liệu khi sửa
   const loadData = useCallback(() => {
@@ -174,7 +184,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             _k: i + 1, task_code: t.task_code, stage: t.stage, quantity: t.quantity, actual_qty: t.actual_qty ?? "", scrap_qty: t.scrap_qty ?? "",
             machine_id: t.machine_id || "", shift: t.shift || "",
             planned_date: t.planned_date?.slice(0, 10) || "", planned_end_date: t.planned_end_date?.slice(0, 10) || "",
-            assigned_team: t.assigned_team || "", assigned_worker: t.assigned_worker || "", status: t.status,
+            assigned_team: t.assigned_team || "", assigned_worker: t.assigned_worker || "", assigned_worker_id: t.assigned_worker_id || "", status: t.status,
           })));
           setTaskSeq(rows.length + 1);
         } else {
@@ -182,7 +192,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           // Kế thừa ca/đội/công nhân/máy đã phân bổ ở màn Kế hoạch (lưu ở cấp lệnh)
           genFromProcess(d.product_id, d.quantity, {
             silent: true,
-            defaults: { shift: d.shift, assigned_team: d.assigned_team, assigned_worker: d.assigned_worker, machine_id: d.machine_id, planned_date: d.planned_date?.slice(0, 10) },
+            defaults: { shift: d.shift, assigned_team: d.assigned_team, assigned_worker: d.assigned_worker, assigned_worker_id: d.assigned_worker_id, machine_id: d.machine_id, planned_date: d.planned_date?.slice(0, 10) },
           });
         }
       }).catch(() => {});
@@ -190,8 +200,27 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       production.plannedMaterials(editId).then((pm) => {
         setMatsIssued(!!pm.materials_issued);
         setSlip(pm.slip || null);
-        setPlannedMats((pm.lines || []).map((l, i) => ({ _k: i + 1, material_id: l.material_id, qty: Number(l.qty), unit: l.unit || '', note: l.note || '', on_hand: Number(l.on_hand) })));
-        setPmSeq((pm.lines || []).length + 1);
+        const lines = pm.lines || [];
+        const mix = (d.mix_ratio || []).filter((r) => r.material_id);
+        if (lines.length) {
+          // Đã có NVL cấp → ghép tỷ lệ (%) từ mix_ratio theo material_id
+          const ratioBy = {};
+          mix.forEach((r) => { ratioBy[r.material_id] = r.ratio; });
+          setPlannedMats(lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: ratioBy[l.material_id] ?? '', qty: Number(l.qty), unit: l.unit || '', note: l.note || '', on_hand: Number(l.on_hand) })));
+          setPmSeq(lines.length + 1);
+        } else if (mix.length) {
+          // THỪA HƯỞNG từ đơn hàng: chưa có NVL cấp nhưng LSX đã định NVL (mix_ratio từ dòng đơn)
+          // → dựng sẵn dòng NVL, điền tỷ lệ, số kg để trống cho người dùng nhập.
+          const rows = mix.map((r, i) => {
+            const p = (lookups.products || []).find((pp) => pp.id === r.material_id);
+            return { _k: i + 1, material_id: r.material_id, ratio: r.ratio ?? '', qty: '', unit: p?.unit || '', note: '', on_hand: null };
+          });
+          setPlannedMats(rows);
+          setPmSeq(rows.length + 1);
+        } else {
+          setPlannedMats([]);
+          setPmSeq(1);
+        }
       }).catch(() => {});
     }).catch((e) => toast.error("Lỗi tải lệnh sản xuất: " + e.message));
   }, [editId]); // eslint-disable-line
@@ -204,11 +233,24 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       setF({
         product_id: d.product_id, customer_id: d.customer_id || "", quantity: d.quantity, unit: d.unit || "",
         attr_size: d.attr_size || "", attr_thickness: d.attr_thickness || "", attr_color: d.attr_color || "",
-        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "", priority: d.priority || "Trung bình"
+        due_date: d.due_date?.slice(0, 10) || "", note: d.note || "", priority: d.priority || "Trung bình",
+        material_type: d.material_type || null, mix_ratio: d.mix_ratio || [], status: ""
       });
       const saved = new Map((d.finishing || []).map((x) => [x.name, !!x.checked]));
       const names = [...new Set([...(lookups.finishingOptions || []), ...saved.keys()])];
       setFinishing(names.map((name) => ({ name, checked: saved.get(name) || false })));
+      // Sao chép danh sách NVL + tỷ lệ từ lệnh nguồn (số kg copy theo để chỉnh lại)
+      production.plannedMaterials(copyId).then((pm) => {
+        const ratioBy = {}; (d.mix_ratio || []).forEach((r) => { if (r.material_id) ratioBy[r.material_id] = r.ratio; });
+        const lines = pm.lines || [];
+        const rows = lines.length
+          ? lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: ratioBy[l.material_id] ?? '', qty: Number(l.qty) || '', unit: l.unit || '', note: l.note || '', on_hand: null }))
+          : (d.mix_ratio || []).filter((r) => r.material_id).map((r, i) => {
+              const p = (lookups.products || []).find((pp) => pp.id === r.material_id);
+              return { _k: i + 1, material_id: r.material_id, ratio: r.ratio ?? '', qty: '', unit: p?.unit || '', note: '', on_hand: null };
+            });
+        setPlannedMats(rows); setPmSeq(rows.length + 1);
+      }).catch(() => {});
     }).catch((e) => toast.error("Lỗi tải lệnh nguồn: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
@@ -227,21 +269,42 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const save = async () => {
     if (!f.product_id) return toast.error("Vui lòng chọn Sản phẩm");
     if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Vui lòng nhập Số lượng hợp lệ");
+    const capQty = Number(f.quantity) * 1.1;
+    // Ràng buộc 1: SẢN LƯỢNG (kế hoạch) của TỪNG LẦN không được vượt 110% Số lượng cần sản xuất.
+    const overPlan = tasks.filter((t) => t.stage && (Number(t.quantity) || 0) > capQty + 1e-6);
+    if (overPlan.length) {
+      return toast.error(`Sản lượng một lần không được vượt 110% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Có lần vượt: ${overPlan.map((t) => `${t.stage} (${fmt(Number(t.quantity))})`).join(", ")}. Vui lòng xem xét lại sản lượng.`);
+    }
+    // Ràng buộc 2: Σ SỐ LƯỢNG THỰC TẾ cộng dồn tại dòng cha (mỗi công đoạn) chỉ được vượt
+    // tối đa 10% Số lượng cần sản xuất.
+    const actualByStage = {};
+    tasks.forEach((t) => { if (t.stage) actualByStage[t.stage] = (actualByStage[t.stage] || 0) + (Number(t.actual_qty) || 0); });
+    const over = Object.entries(actualByStage).filter(([, s]) => s > capQty + 1e-6);
+    if (over.length) {
+      return toast.error(`Số lượng thực tế cộng dồn của công đoạn ${over.map(([stg, s]) => `${stg} (${fmt(s)})`).join(", ")} vượt quá 110% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Vui lòng xem xét lại số lượng thực tế.`);
+    }
+    // Tỷ lệ (%) ở bảng NVL gộp → đồng bộ về mix_ratio (cấp lệnh); Số KG lưu riêng ở savePlannedMaterials.
+    const mixRatio = plannedMats.filter((m) => m.material_id).map((m) => ({ material_id: m.material_id, ratio: m.ratio === '' || m.ratio == null ? null : Number(m.ratio) }));
+    const matLines = plannedMats.filter((m) => m.material_id);
     try {
       if (editId) {
         // Status: chỉ áp khi người dùng CHỦ ĐỘNG đổi (khác trạng thái đã nạp).
         const statusChanged = f.status && f.status !== meta?.status;
         const { status, ...rest } = f;
-        await production.update(editId, { ...rest, finishing });          // các trường (kể cả SL mới), chưa đụng status
+        await production.update(editId, { ...rest, mix_ratio: mixRatio, finishing }); // các trường (kể cả SL mới), chưa đụng status
         await production.saveTasks(editId, tasks.filter((t) => t.stage)); // recompute status theo tiến độ + SL mới
         if (statusChanged) await production.update(editId, { status });   // áp status thủ công cuối cùng → thắng recompute
-        if (!matsIssued) await production.savePlannedMaterials(editId, plannedMats.filter((m) => m.material_id));
+        if (!matsIssued) await production.savePlannedMaterials(editId, matLines);
         toast.success("Lưu lệnh sản xuất thành công");
+        setEditing(false); // Ở LẠI màn chi tiết (không thoát ra list)
+        loadData();        // nạp lại dữ liệu vừa lưu
       } else {
-        await production.create({ ...f, finishing });
+        // Tạo mới: lưu NVL (mix_ratio + material_type) cùng lệnh, rồi lưu số kg NVL cấp
+        const created = await production.create({ ...f, mix_ratio: mixRatio, finishing });
+        if (created?.id && matLines.length) await production.savePlannedMaterials(created.id, matLines);
         toast.success("Tạo lệnh sản xuất mới thành công");
+        onSaved(); // tạo mới → về list
       }
-      onSaved();
     } catch (e) { toast.error("Lỗi lưu lệnh sản xuất: " + e.message); }
   };
 
@@ -258,8 +321,9 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           {editId && meta?.status && <span className={`inline-flex px-2.5 py-0.5 rounded-full text-sm font-medium ${statusClass(meta.status)}`}>{meta.status}</span>}
         </span>} onBack={onBack}
         actions={editId && !editing ? (<>
-          {can("production", "edit") && !matsIssued && <button onClick={requestMats} disabled={pmBusy} className="btn-ghost text-amber-700 border-amber-300 hover:bg-amber-50"><PackageCheck size={16} /> Yêu cầu NVL</button>}
-          {can("production", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
+          {locked && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">🔒 Đã {meta?.status} · không thể sửa</span>}
+          {can("production", "edit") && !matsIssued && !locked && <button onClick={requestMats} disabled={pmBusy} className="btn-ghost text-amber-700 border-amber-300 hover:bg-amber-50"><PackageCheck size={16} /> Yêu cầu NVL</button>}
+          {can("production", "edit") && !locked && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("production", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); loadData(); }} className="btn-ghost">Hủy</button>}
@@ -302,141 +366,12 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
               {!f.status && <option value="">-- Chọn trạng thái --</option>}
               {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
-            <p className="text-[11px] text-slate-400 mt-1">Có thể chuyển thủ công (vd sang “Chờ nguyên vật liệu”). Hệ thống vẫn tự cập nhật theo tiến độ SX.</p>
           </Field>}
           <Field label="Ghi chú">
             <input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} />
           </Field>
         </div>
         
-        {/* Loại nguyên liệu & Tỷ lệ pha */}
-        <div className="mt-6 pt-5 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-500 uppercase mb-3">Loại nguyên liệu</p>
-          <div className="flex gap-4">
-            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-              f.material_type === 'zin'
-                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
-              <input type="checkbox" className="hidden" disabled={!editing}
-                checked={f.material_type === 'zin'}
-                onChange={() => set("material_type", f.material_type === 'zin' ? null : 'zin')} />
-              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                f.material_type === 'zin' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
-              }`}>
-                {f.material_type === 'zin' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
-              </span>
-              <span className="text-sm font-medium">Hàng zin</span>
-              <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
-            </label>
-            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
-              f.material_type === 'pha'
-                ? 'border-amber-500 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
-              <input type="checkbox" className="hidden" disabled={!editing}
-                checked={f.material_type === 'pha'}
-                onChange={() => set("material_type", f.material_type === 'pha' ? null : 'pha')} />
-              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                f.material_type === 'pha' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
-              }`}>
-                {f.material_type === 'pha' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
-              </span>
-              <span className="text-sm font-medium">Hàng pha</span>
-              <span className="text-xs text-slate-400">(tái chế)</span>
-            </label>
-            {f.material_type && editing && (
-              <button type="button" onClick={() => set("material_type", null)}
-                className="text-xs text-slate-400 hover:text-slate-600 underline self-center">
-                Bỏ chọn
-              </button>
-            )}
-          </div>
-          {f.material_type === 'pha' && (
-            <div className="mt-4 border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
-                    <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
-                    <th className="px-3 py-2.5 uppercase tracking-wider">Nguyên vật liệu</th>
-                    <th className="px-3 py-2.5 w-32 uppercase tracking-wider">Tỷ lệ (%)</th>
-                    {editing && <th className="px-3 py-2.5 w-10"></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {(f.mix_ratio || []).map((r, i) => (
-                    <tr key={i} className="border-b border-slate-100 last:border-0 bg-white">
-                      <td className="px-3 py-2.5 text-center text-slate-500 font-medium">{i + 1}</td>
-                      <td className="px-3 py-2.5">
-                        {editing ? (
-                          <select
-                            value={r.material_id}
-                            onChange={(e) => {
-                              const newArr = [...f.mix_ratio];
-                              newArr[i].material_id = e.target.value;
-                              set("mix_ratio", newArr);
-                            }}
-                            className={inputCls}
-                          >
-                            <option value="">-- Chọn NVL --</option>
-                            {lookups.products.filter(p => p.product_type === 'Nguyên vật liệu').map(p => (
-                              <option key={p.id} value={p.id}>{p.product_name} {p.product_code ? `(${p.product_code})` : ''}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="font-medium text-slate-700">{lookups.products.find(p => p.id === r.material_id)?.product_name || "—"}</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        {editing ? (
-                          <input
-                            type="number"
-                            className={inputCls}
-                            value={r.ratio}
-                            onChange={(e) => {
-                              const newArr = [...f.mix_ratio];
-                              newArr[i].ratio = e.target.value;
-                              set("mix_ratio", newArr);
-                            }}
-                            placeholder="%"
-                          />
-                        ) : (
-                          <span className="font-medium">{r.ratio}%</span>
-                        )}
-                      </td>
-                      {editing && (
-                        <td className="px-3 py-2.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newArr = [...f.mix_ratio];
-                              newArr.splice(i, 1);
-                              set("mix_ratio", newArr);
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {editing && (
-                <div className="p-3 border-t border-slate-100 bg-white flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => set("mix_ratio", [...(f.mix_ratio || []), { material_id: "", ratio: "" }])}
-                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 px-2 py-1 hover:bg-blue-50 rounded transition-colors"
-                  >
-                    <Plus size={14} /> THÊM NGUYÊN VẬT LIỆU
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       </Section>
 
       {editId && meta && (() => {
@@ -505,7 +440,6 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       </Section>
       )}
 
-      {editId && (
       <Section title="Nguyên vật liệu cần cung cấp"
         action={<div className="flex items-center gap-2">
           {matsIssued
@@ -513,24 +447,61 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                 ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"><PackageCheck size={14} /> Đã xuất kho{slip?.slip_code ? ` · ${slip.slip_code}` : ''}</span>
                 : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200"><PackageCheck size={14} /> Chờ xuất kho{slip?.slip_code ? ` · ${slip.slip_code}` : ''}</span>)
             : (editing && <>
-                <button type="button" onClick={suggestFromBom} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><GitBranch size={16} /> Lấy gợi ý từ BOM</button>
+                {editId && <button type="button" onClick={suggestFromBom} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><GitBranch size={16} /> Lấy gợi ý từ BOM</button>}
                 <button type="button" onClick={addMat} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm NVL</button>
               </>)}
         </div>}>
-        <p className="text-xs text-slate-500 mb-3">
-          NVL dự kiến cấp cho lệnh (kg). Do phối trộn theo kích cỡ/màu/độ dày nên số lượng do người dùng tự điền — có thể lấy gợi ý từ BOM rồi chỉnh/xóa.
-          {!matsIssued
-            ? <> Bấm <b>“Yêu cầu NVL”</b> để tạo <b>phiếu xuất kho (Chờ xuất)</b> gửi sang app Xuất kho; kho xác nhận phiếu mới trừ tồn.</>
-            : (slip?.status === 'Đã xuất'
-                ? <> Đã xuất kho theo phiếu <b>{slip?.slip_code}</b>.</>
-                : <> Đã tạo phiếu <b>{slip?.slip_code}</b> — vào <b>Kho → Xuất kho</b> để xác nhận trừ tồn (hoặc hủy phiếu để mở khóa).</>)}
-        </p>
+        {/* Loại nguyên liệu (gộp vào mục NVL) */}
+        <div className="mb-4">
+          <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Loại nguyên liệu</p>
+          <div className="flex gap-4 flex-wrap">
+            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+              f.material_type === 'zin'
+                ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
+              <input type="checkbox" className="hidden" disabled={!editing}
+                checked={f.material_type === 'zin'}
+                onChange={() => set("material_type", f.material_type === 'zin' ? null : 'zin')} />
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                f.material_type === 'zin' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-300'
+              }`}>
+                {f.material_type === 'zin' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+              </span>
+              <span className="text-sm font-medium">Hàng zin</span>
+              <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
+            </label>
+            <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+              f.material_type === 'pha'
+                ? 'border-amber-500 bg-amber-50 text-amber-800'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+            } ${editing ? '' : 'cursor-default pointer-events-none'}`}>
+              <input type="checkbox" className="hidden" disabled={!editing}
+                checked={f.material_type === 'pha'}
+                onChange={() => set("material_type", f.material_type === 'pha' ? null : 'pha')} />
+              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                f.material_type === 'pha' ? 'border-amber-500 bg-amber-500' : 'border-slate-300'
+              }`}>
+                {f.material_type === 'pha' && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 16 16"><path d="M13.485 1.431a1.473 1.473 0 0 1 2.104 2.062l-7.84 9.801a1.473 1.473 0 0 1-2.12.04L.431 8.138a1.473 1.473 0 0 1 2.084-2.083l4.111 4.112 6.82-8.69a.486.486 0 0 1 .04-.046z"/></svg>}
+              </span>
+              <span className="text-sm font-medium">Hàng pha</span>
+              <span className="text-xs text-slate-400">(tái chế)</span>
+            </label>
+            {f.material_type && editing && (
+              <button type="button" onClick={() => set("material_type", null)}
+                className="text-xs text-slate-400 hover:text-slate-600 underline self-center">
+                Bỏ chọn
+              </button>
+            )}
+          </div>
+        </div>
         <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
                 <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
                 <th className="px-3 py-2.5 uppercase tracking-wider">Nguyên vật liệu</th>
+                <th className="px-3 py-2.5 w-24 uppercase tracking-wider">Tỷ lệ (%)</th>
                 <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Số kg</th>
                 <th className="px-3 py-2.5 w-24 uppercase tracking-wider">ĐVT</th>
                 <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Tồn kho</th>
@@ -540,7 +511,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             </thead>
             <tbody>
               {plannedMats.length === 0 && (
-                <tr><td colSpan={editing && !matsIssued ? 7 : 6} className="px-3 py-4 text-center text-slate-400 bg-white">Chưa có NVL. {editing && !matsIssued ? 'Bấm “Lấy gợi ý từ BOM” hoặc “Thêm NVL”.' : ''}</td></tr>
+                <tr><td colSpan={editing && !matsIssued ? 8 : 7} className="px-3 py-4 text-center text-slate-400 bg-white">Chưa có NVL. {editing && !matsIssued ? 'Bấm “Lấy gợi ý từ BOM” hoặc “Thêm NVL”.' : ''}</td></tr>
               )}
               {plannedMats.map((r, i) => {
                 const short = r.on_hand != null && Number(r.qty) > Number(r.on_hand);
@@ -551,6 +522,11 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                     {editing && !matsIssued
                       ? <SearchSelect value={r.material_id} onChange={(v) => upMat(r._k, 'material_id', v)} options={nvlOptions} placeholder="-- Chọn NVL --" />
                       : <span className="font-medium text-slate-700">{nvlOptions.find((o) => o.value === r.material_id)?.label || '—'}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {editing && !matsIssued
+                      ? <input type="number" min="0" step="any" className={inputCls} value={r.ratio ?? ''} onChange={(e) => upMat(r._k, 'ratio', e.target.value)} placeholder="%" />
+                      : <span className="font-medium">{r.ratio != null && r.ratio !== '' ? `${r.ratio}%` : '—'}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     {editing && !matsIssued
@@ -583,7 +559,6 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           </table>
         </div>
       </Section>
-      )}
 
       {false /* !fhid("finishing") */ && (
       <Section title="Yêu cầu gia công hoàn thiện">
@@ -602,11 +577,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       )}
 
       {editId && !fhid("tasks") && (
-        <Section title="Phân công sản xuất — chia lệnh nhỏ (công đoạn + sản lượng)"
-          action={!fdis("tasks") && <div className="flex gap-2">
-            <button onClick={applyProcess} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><GitBranch size={16} /> Theo quy trình</button>
-            <button onClick={addTask} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Plus size={16} /> Thêm phân công</button>
-          </div>}>
+        <Section title="Phân công sản xuất — chia lệnh nhỏ (công đoạn + sản lượng)">
           <fieldset disabled={fdis("tasks")}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm whitespace-nowrap">
@@ -626,48 +597,79 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                 </tr>
               </thead>
               <tbody>
-                {tasks.map((t) => {
-                  const factory = t.stage === "Thổi" ? "Nhà máy thổi" : "Nhà máy cắt";
-                  const machinesForStage = lookups.machines.filter((m) => m.factory === factory);
-                  return (
-                    <tr key={t._k}>
-                      <td className="py-1.5 pr-2"><select className={inputCls} value={t.stage} onChange={(e) => upTask(t._k, "stage", e.target.value)}><option>Thổi</option><option>Cắt</option></select></td>
-                      <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.quantity} onChange={(e) => upTask(t._k, "quantity", e.target.value)} /></td>
-                      <td className="py-1.5 pr-2"><select className={inputCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{machinesForStage.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
-                      <td className="py-1.5 pr-2"><select className={inputCls} value={t.shift} onChange={(e) => upTask(t._k, "shift", e.target.value)}><option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}</select></td>
-                      <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
-                      <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_end_date} onChange={(e) => upTask(t._k, "planned_end_date", e.target.value)} /></td>
-                      <td className="py-1.5 pr-2">
-                        <select className={inputCls} value={t.assigned_team} onChange={(e) => setTaskTeam(t._k, e.target.value)}>
-                          <option value="">-- Đội --</option>
-                          {teams.map((tm) => <option key={tm}>{tm}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-1.5 pr-2">
-                        <select className={inputCls} value={t.assigned_worker} onChange={(e) => upTask(t._k, "assigned_worker", e.target.value)}>
-                          <option value="">-- Công nhân --</option>
-                          {workersOf(t.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
-                        </select>
-                      </td>
-                      <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.actual_qty} onChange={(e) => upTask(t._k, "actual_qty", e.target.value)} placeholder="SL thực" /></td>
-                      <td className="py-1.5 pr-2"><select className={inputCls} value={t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Hoàn thành</option><option>Đã hủy</option></select></td>
-                      <td className="py-1.5 text-center"><button onClick={() => rmTask(t._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button></td>
-                    </tr>
+                {(() => {
+                  const order = ["Thổi", "Cắt"];
+                  const present = [...new Set(tasks.map((t) => t.stage))].sort(
+                    (a, b) => (order.indexOf(a) < 0 ? 99 : order.indexOf(a)) - (order.indexOf(b) < 0 ? 99 : order.indexOf(b))
                   );
-                })}
-                {!tasks.length && <tr><td colSpan={10} className="py-4 text-center text-slate-400 text-sm">Chưa có phân công. Bấm "Thêm phân công" để chia lệnh nhỏ.</td></tr>}
+                  return present.map((stg) => {
+                    const rows = tasks.filter((t) => t.stage === stg);
+                    const factory = stg === "Thổi" ? "Nhà máy thổi" : "Nhà máy cắt";
+                    const machinesForStage = lookups.machines.filter((m) => m.factory === factory);
+                    const sumQty = rows.reduce((s, t) => s + (Number(t.quantity) || 0), 0);
+                    const sumAct = rows.reduce((s, t) => s + (Number(t.actual_qty) || 0), 0);
+                    const qtyReq = Number(f.quantity);
+                    const capStage = qtyReq * 1.1;             // ngưỡng 110% cho SL THỰC TẾ → chặn khi Lưu
+                    const actOver = sumAct > capStage + 1e-6;  // Σ thực tế vượt 110%
+                    const actMet = !actOver && qtyReq > 0 && sumAct >= qtyReq - 1e-6; // đã đạt SL cần SX
+                    const isOpen = !collapsed[stg];
+                    return (
+                      <React.Fragment key={stg}>
+                        {/* Dòng CHA: công đoạn + tổng sản lượng dồn từ các lần — bấm để gập/mở */}
+                        <tr className="bg-slate-50 border-y border-slate-200">
+                          <td className="py-2 pr-2 font-semibold text-slate-800 cursor-pointer select-none" onClick={() => toggleStage(stg)}>
+                            <span className="inline-flex items-center gap-1.5">
+                              {isOpen ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
+                              {stg}
+                            </span>
+                          </td>
+                          {/* SẢN LƯỢNG (kế hoạch): tổng cho phép các lần — trung tính, không ràng buộc */}
+                          <td className="py-2 pr-2 font-medium text-slate-500 cursor-pointer" onClick={() => toggleStage(stg)} title="Tổng sản lượng cho phép của các lần (kế hoạch)">Σ KH {fmt(sumQty)}</td>
+                          <td colSpan={6} className="cursor-pointer" onClick={() => toggleStage(stg)} />
+                          {/* THỰC TẾ: total cộng dồn so với SL cần SX — ràng buộc ≤ 110% */}
+                          <td className={`py-2 pr-2 font-semibold ${actOver ? "text-rose-600" : actMet ? "text-emerald-600" : "text-slate-600"}`} title={actOver ? `Vượt 110% SL cần SX (tối đa ${fmt(capStage)})` : undefined}>Σ {fmt(sumAct)} / {fmt(qtyReq)}{actOver ? " ⚠ >110%" : actMet ? " ✓" : ""}</td>
+                          <td className="py-2 pr-2 text-right" colSpan={2}>
+                            {!fdis("tasks") && <button type="button" onClick={() => addTaskFor(stg)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-600 text-xs font-medium hover:bg-blue-50 hover:border-blue-300 shadow-sm transition-colors"><Plus size={15} /> Thêm lần {stg.toLowerCase()}</button>}
+                          </td>
+                        </tr>
+                        {/* Các dòng CON: từng lần làm (ẩn khi thu gọn) */}
+                        {isOpen && rows.map((t) => {
+                          const qtyOver = (Number(t.quantity) || 0) > capStage + 1e-6; // sản lượng 1 lần vượt 110%
+                          return (
+                          <tr key={t._k} className="border-b border-slate-100">
+                            <td className="py-1.5 pr-2 pl-8" />
+                            <td className="py-1.5 pr-2"><input type="number" min="0" className={`${inputCls}${qtyOver ? " !border-rose-400 !ring-2 !ring-rose-200" : ""}`} value={t.quantity} onChange={(e) => upTask(t._k, "quantity", e.target.value)} title={qtyOver ? `Sản lượng 1 lần vượt 110% SL cần SX (tối đa ${fmt(capStage)})` : undefined} /></td>
+                            <td className="py-1.5 pr-2"><select className={inputCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{machinesForStage.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
+                            <td className="py-1.5 pr-2"><select className={inputCls} value={t.shift} onChange={(e) => upTask(t._k, "shift", e.target.value)}><option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}</select></td>
+                            <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
+                            <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_end_date} onChange={(e) => upTask(t._k, "planned_end_date", e.target.value)} /></td>
+                            <td className="py-1.5 pr-2">
+                              <select className={inputCls} value={t.assigned_team} onChange={(e) => setTaskTeam(t._k, e.target.value)}>
+                                <option value="">-- Đội --</option>
+                                {teams.map((tm) => <option key={tm}>{tm}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1.5 pr-2">
+                              <select className={inputCls} value={t.assigned_worker_id || ""} onChange={(e) => setTaskWorker(t._k, e.target.value)}>
+                                <option value="">-- Công nhân --</option>
+                                {workersOf(t.assigned_team).map((e) => <option key={e.id} value={e.id}>{e.employee_code ? `${e.employee_code} · ` : ""}{e.name}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={t.actual_qty} onChange={(e) => upTask(t._k, "actual_qty", e.target.value)} placeholder="SL thực" /></td>
+                            <td className="py-1.5 pr-2"><select className={inputCls} value={t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Hoàn thành</option><option>Đã hủy</option></select></td>
+                            <td className="py-1.5 text-center"><button onClick={() => rmTask(t._k)} className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={16} /></button></td>
+                          </tr>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  });
+                })()}
+                {!tasks.length && <tr><td colSpan={11} className="py-4 text-center text-slate-400 text-sm">Chưa có phân công. Bấm "＋ Thổi" hoặc "＋ Cắt" để thêm lần làm.</td></tr>}
               </tbody>
             </table>
           </div>
           <datalist id="emp-dl">{(lookups.employees || []).map((e) => <option key={e.id} value={e.name} />)}</datalist>
-          <div className="mt-3 text-sm flex gap-6">
-            {["Thổi", "Cắt"].map((stg) => {
-              const sum = tasks.filter((t) => t.stage === stg).reduce((s, t) => s + (Number(t.quantity) || 0), 0);
-              if (!sum) return null;
-              const ok = sum === Number(f.quantity);
-              return <span key={stg} className={ok ? "text-emerald-600 font-medium" : "text-amber-600"}>Σ {stg}: {fmt(sum)} / {fmt(f.quantity)} {ok ? "✓" : "(≠ SL lệnh)"}</span>;
-            })}
-          </div>
           </fieldset>
         </Section>
       )}
@@ -821,6 +823,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
   const backFromForm = () => {
     setCopyId(null);
+    load(); // làm mới danh sách để phản ánh thay đổi vừa lưu ở màn chi tiết
     if (cameFromFocus && onExit) { setCameFromFocus(false); setEditId(null); onExit(); }
     else { setView("list"); setEditId(null); }
   };

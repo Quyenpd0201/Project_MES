@@ -43,6 +43,9 @@ export function usePerm() {
     if (app === "deliveries" && field === "amounts" && can("deliveries", "view_amounts")) {
       return "edit"; // Hoặc view tuỳ logic, nhưng thường là edit/view đều show được
     }
+    if (app === "orders" && field === "amounts" && can("orders", "view_amounts")) {
+      return "edit"; // Đơn giá / thành tiền / tổng đơn — chỉ role được cấp view_amounts
+    }
     return "hidden";
   };
   return { isAdmin, can, fperm, fpermSecret, user };

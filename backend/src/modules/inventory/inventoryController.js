@@ -3,6 +3,7 @@ const db = require('../../core/db');
 const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/specs');
 const { upUnit } = require('../../core/lib/units');
 const { getDataScope } = require('../../core/dataScope');
+const { applyStock } = require('../../core/lib/stock');
 
 // GET /api/inventory/tree — tồn kho (trả về dữ liệu phẳng để frontend tự nhóm)
 exports.tree = async (req, res) => {
@@ -210,24 +211,14 @@ exports.adjust = async (req, res) => {
 
     const delta = b.trx_type === 'Xuất' ? -Math.abs(Number(b.quantity)) : Number(b.quantity);
     const specs = specsFromBody(b);
-    const a = legacyAttrs(specs);
-    const specKey = buildSpecKey(specs);
-    const lot = b.lot_code || '';
 
     await client.query('BEGIN');
-    await client.query(
-      `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color, quantity, unit)
-       VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (product_id, location_id, spec_key, lot_code)
-       DO UPDATE SET quantity = GREATEST(0, inventory_stock.quantity + EXCLUDED.quantity),
-                     specs = EXCLUDED.specs,
-                     unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
-                     updated_at = now()`,
-      [b.product_id, b.location_id || null, JSON.stringify(specs), specKey, lot, a.size, a.thickness, a.color, delta, upUnit(b.unit)]);
-    await client.query(
-      `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color, ref_code, note)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12)`,
-      [b.product_id, b.location_id || null, b.trx_type, Math.abs(Number(b.quantity)), JSON.stringify(specs), specKey, lot, a.size, a.thickness, a.color, b.ref_code || null, b.note || null]);
+    await applyStock(client, {
+      product_id: b.product_id, location_id: b.location_id || null,
+      delta, unit: b.unit, specs, lot_code: b.lot_code || '',
+      trx_type: b.trx_type, ref_code: b.ref_code || null, note: b.note || null,
+      clampZero: true,
+    });
     await client.query('COMMIT');
     res.status(201).json({ message: 'Đã cập nhật tồn kho' });
   } catch (err) {
@@ -330,7 +321,7 @@ exports.confirmOutboundSlip = async (req, res) => {
       
       // Lấy danh sách các lô có tồn > 0 của sản phẩm tại vị trí xuất, ưu tiên FIFO (id ASC)
       const { rows: stockRows } = await client.query(
-        `SELECT lot_code, quantity, unit
+        `SELECT lot_code, quantity, unit, spec_key, specs
          FROM inventory_stock
          WHERE product_id = $1 AND location_id = $2 AND quantity > 0
          ORDER BY id ASC`,
@@ -351,6 +342,8 @@ exports.confirmOutboundSlip = async (req, res) => {
           allocations.push({
             product_id: l.product_id,
             lot_code: sr.lot_code || '',
+            spec_key: sr.spec_key,
+            specs: sr.specs || {},
             quantity: qtyToTake,
             unit: l.unit || sr.unit,
           });
@@ -367,16 +360,14 @@ exports.confirmOutboundSlip = async (req, res) => {
 
     await client.query('BEGIN');
     for (const alloc of allocations) {
-      await client.query(
-        `INSERT INTO inventory_stock (product_id, location_id, spec_key, lot_code, quantity, unit)
-         VALUES ($1,$2,'',$3,$4,$5)
-         ON CONFLICT (product_id, location_id, spec_key, lot_code)
-         DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, unit = COALESCE(EXCLUDED.unit, inventory_stock.unit), updated_at = now()`,
-        [alloc.product_id, s.location_id, alloc.lot_code, -alloc.quantity, upUnit(alloc.unit)]);
-      await client.query(
-        `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
-         VALUES ($1,$2,'Xuất',$3,$4,$5,$6)`,
-        [alloc.product_id, s.location_id, alloc.quantity, alloc.lot_code, s.slip_code, s.purpose || 'Xuất kho']);
+      // Trừ ĐÚNG dòng tồn đã phân bổ (giữ nguyên spec_key của lô) → không tạo dòng '' ảo
+      await applyStock(client, {
+        product_id: alloc.product_id, location_id: s.location_id,
+        delta: -alloc.quantity, unit: alloc.unit,
+        specs: alloc.specs, spec_key: alloc.spec_key, lot_code: alloc.lot_code,
+        clampZero: false, trx_type: 'Xuất',
+        ref_code: s.slip_code, note: s.purpose || 'Xuất kho',
+      });
     }
     await client.query(`UPDATE outbound_slips SET status = 'Đã xuất', confirmed_at = now() WHERE id = $1`, [req.params.id]);
     await client.query('COMMIT');
@@ -450,33 +441,22 @@ exports.transfer = async (req, res) => {
 
     await client.query('BEGIN');
 
-    // 1. Xuất khỏi kho nguồn
-    await client.query(
-      `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, quantity, unit)
-       VALUES ($1, $2, '{}'::jsonb, '', $3, $4, $5)
-       ON CONFLICT (product_id, location_id, spec_key, lot_code)
-       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
-                     unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
-                     updated_at = now()`,
-      [b.product_id, b.from_location_id, lot, -qty, unit]);
-    await client.query(
-      `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
-       VALUES ($1, $2, 'Xuất', $3, $4, NULL, $5)`,
-      [b.product_id, b.from_location_id, qty, lot, `Chuyển kho → ${toLabel}${b.note ? ' | ' + b.note : ''}`]);
-
-    // 2. Nhập vào kho đích
-    await client.query(
-      `INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, quantity, unit)
-       VALUES ($1, $2, '{}'::jsonb, '', $3, $4, $5)
-       ON CONFLICT (product_id, location_id, spec_key, lot_code)
-       DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity,
-                     unit = COALESCE(EXCLUDED.unit, inventory_stock.unit),
-                     updated_at = now()`,
-      [b.product_id, b.to_location_id, lot, qty, unit]);
-    await client.query(
-      `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
-       VALUES ($1, $2, 'Nhập', $3, $4, NULL, $5)`,
-      [b.product_id, b.to_location_id, qty, lot, `Chuyển kho ← ${fromLabel}${b.note ? ' | ' + b.note : ''}`]);
+    // Chuyển theo FIFO các lô nguồn thật (giữ nguyên spec_key + lô để không tạo dòng '' ảo)
+    const { rows: srcRows } = await client.query(
+      `SELECT spec_key, specs, lot_code, quantity, unit FROM inventory_stock
+       WHERE product_id = $1 AND location_id = $2 AND quantity > 0 ORDER BY id ASC`,
+      [b.product_id, b.from_location_id]);
+    let remain = qty;
+    for (const sr of srcRows) {
+      if (remain <= 0) break;
+      const take = Math.min(remain, Number(sr.quantity));
+      const common = { product_id: b.product_id, unit: sr.unit || unit, specs: sr.specs || {}, spec_key: sr.spec_key, lot_code: sr.lot_code || '', clampZero: false };
+      // 1. Xuất khỏi kho nguồn
+      await applyStock(client, { ...common, location_id: b.from_location_id, delta: -take, trx_type: 'Xuất', note: `Chuyển kho → ${toLabel}${b.note ? ' | ' + b.note : ''}` });
+      // 2. Nhập vào kho đích (cùng spec_key + lô)
+      await applyStock(client, { ...common, location_id: b.to_location_id, delta: take, trx_type: 'Nhập', note: `Chuyển kho ← ${fromLabel}${b.note ? ' | ' + b.note : ''}` });
+      remain -= take;
+    }
 
     await client.query('COMMIT');
     res.status(201).json({ message: `Đã chuyển ${qty} ${unit} từ ${fromLabel} → ${toLabel}` });

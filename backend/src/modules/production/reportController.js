@@ -296,9 +296,12 @@ exports.employees = async (req, res) => {
                -- có thể là giá trị cũ/không phản ánh thực tế → dùng po.quantity nhất quán
                po.quantity AS quantity,
                COALESCE(t.status, po.status) AS status,
-               -- Thực tế: ưu tiên actual_qty của task, fallback posted_qty lệnh (đã xác nhận hoàn thành)
-               -- KHÔNG fallback về po.quantity (tránh tính đơn chưa xong là 100%)
+               -- Sản lượng CHỈ tính khi LSX đã/đang sản xuất: Hoàn thành, Đang sản xuất,
+               -- Chờ nguyên vật liệu, Tạm dừng. KHÔNG tính khi LSX Chờ duyệt / Đã lên kế hoạch /
+               -- Đã hủy, hoặc khi chính lần (task) đó đã hủy.
                CASE
+                 WHEN po.status IN ('Chờ duyệt', 'Đã lên kế hoạch', 'Đã hủy') THEN 0
+                 WHEN t.status = 'Đã hủy' THEN 0
                  WHEN COALESCE(t.status, po.status) = 'Hoàn thành'
                    THEN COALESCE(t.actual_qty, po.posted_qty, po.quantity)
                  ELSE COALESCE(t.actual_qty, po.posted_qty, 0)
@@ -310,6 +313,7 @@ exports.employees = async (req, res) => {
                COALESCE(t.stage, 'Chung') AS stage,
                COALESCE(t.shift, po.shift) AS shift,
                COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
+               COALESCE(t.assigned_worker_id, po.assigned_worker_id) AS final_worker_id,
                po.order_code,
                po.priority
         FROM production_orders po
@@ -323,17 +327,20 @@ exports.employees = async (req, res) => {
         WHERE 1=1 ${taskWhereClause}
       ),
       worker_scrap AS (
-        SELECT dsr.worker_name, SUM(dsi.scrap_qty) as total_scrap
+        SELECT COALESCE(dsr.employee_id,
+                 (SELECT e2.id FROM employees e2 WHERE e2.is_deleted=false AND e2.name = dsr.worker_name
+                    AND (SELECT count(*) FROM employees e3 WHERE e3.is_deleted=false AND e3.name = dsr.worker_name)=1 LIMIT 1)
+               ) AS emp_id,
+               SUM(dsi.scrap_qty) as total_scrap
         FROM daily_scrap_records dsr
         JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
         ${scrapWhereClause}
-        GROUP BY dsr.worker_name
+        GROUP BY 1
       ),
       dedup_employees AS (
-        SELECT name, STRING_AGG(DISTINCT factory, ', ') AS factory
+        SELECT id, name, factory
         FROM employees e
         WHERE ${empWhere.join(' AND ')}
-        GROUP BY name
       )
       SELECT
         e.name                                                                        AS worker,
@@ -341,8 +348,9 @@ exports.employees = async (req, res) => {
         COUNT(t.id)::int                                                              AS tasks_count,
         COUNT(DISTINCT t.production_order_id)::int                                    AS orders_count,
         COALESCE(SUM(t.quantity), 0)::numeric                                         AS planned_qty,
-        COALESCE(SUM(CASE WHEN t.status = 'Ho\u00e0n th\u00e0nh'
-          THEN COALESCE(t.actual_qty, t.quantity) ELSE 0 END), 0)::numeric            AS actual_qty,
+        -- S\u1ea3n l\u01b0\u1ee3ng l\u00e0m \u0111\u01b0\u1ee3c: c\u1ed9ng SL th\u1ef1c c\u1ee7a T\u1eeaNG l\u1ea7n, t\u00ednh c\u1ea3 LSX \u0111ang SX (l\u00e0m d\u1edf nhi\u1ec1u ng\u00e0y).
+        -- raw_tasks.actual_qty \u0111\u00e3 x\u1eed l\u00fd: Ho\u00e0n th\u00e0nh\u2192actual|posted|k\u1ebf ho\u1ea1ch; \u0111ang l\u00e0m\u2192actual|posted|0.
+        COALESCE(SUM(t.actual_qty), 0)::numeric                                        AS actual_qty,
         COALESCE(MAX(ws.total_scrap), 0)::numeric                                     AS scrap_qty,
         -- work_days: s\u1ed1 ng\u00e0y l\u00e0m vi\u1ec7c th\u1ef1c t\u1ebf (d\u00f9ng updated_at n\u1ebfu c\u00f3, fallback planned_date)
         COUNT(DISTINCT COALESCE(t.updated_at::date, t.planned_date))::int             AS work_days,
@@ -355,9 +363,9 @@ exports.employees = async (req, res) => {
         STRING_AGG(DISTINCT t.shift, ', ')
           FILTER (WHERE t.shift IS NOT NULL AND t.shift != '')                        AS shifts
       FROM dedup_employees e
-      LEFT JOIN filtered_tasks t ON t.final_worker = e.name
-      LEFT JOIN worker_scrap ws ON ws.worker_name = e.name
-      GROUP BY e.name, e.factory
+      LEFT JOIN filtered_tasks t ON (t.final_worker_id = e.id OR (t.final_worker_id IS NULL AND t.final_worker = e.name))
+      LEFT JOIN worker_scrap ws ON ws.emp_id = e.id
+      GROUP BY e.id, e.name, e.factory
       ORDER BY actual_qty DESC, planned_qty DESC, e.name
     `, params);
     res.json({ data: rows });
@@ -402,9 +410,12 @@ exports.employeeTasks = async (req, res) => {
                -- Kế hoạch: dùng po.quantity (SL lệnh gốc) nhất quán
                -- Đơn gấp không có kế hoạch phân công → t.quantity không đáng tin
                po.quantity AS quantity,
-               -- Thực tế: ưu tiên actual_qty task, fallback posted_qty lệnh
-               -- KHÔNG fallback về po.quantity khi chưa hoàn thành (tránh KPI ảo 100%)
+               -- Sản lượng CHỈ tính khi LSX đã/đang sản xuất: Hoàn thành, Đang sản xuất,
+               -- Chờ nguyên vật liệu, Tạm dừng. KHÔNG tính khi LSX Chờ duyệt / Đã lên kế hoạch /
+               -- Đã hủy, hoặc khi chính lần (task) đó đã hủy.
                CASE
+                 WHEN po.status IN ('Chờ duyệt', 'Đã lên kế hoạch', 'Đã hủy') THEN 0
+                 WHEN t.status = 'Đã hủy' THEN 0
                  WHEN COALESCE(t.status, po.status) = 'Hoàn thành'
                    THEN COALESCE(t.actual_qty, po.posted_qty, po.quantity)
                  ELSE COALESCE(t.actual_qty, po.posted_qty, 0)
@@ -444,8 +455,7 @@ exports.employeeTasks = async (req, res) => {
         SELECT
                COALESCE(updated_at::date, planned_date) AS planned_date,
                to_char(COALESCE(updated_at::date, planned_date), 'DD/MM') AS date_label,
-               COALESCE(SUM(CASE WHEN status='Hoàn thành'
-                 THEN COALESCE(actual_qty,quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(actual_qty),0)::numeric AS actual_qty, -- tính cả LSX đang SX
                COALESCE(SUM(quantity),0)::numeric AS planned_qty
         FROM raw_tasks
         WHERE ${ws} AND COALESCE(updated_at::date, planned_date) IS NOT NULL
@@ -455,8 +465,7 @@ exports.employeeTasks = async (req, res) => {
       db.query(`
         ${rawTasksCTE}
         SELECT stage,
-               COALESCE(SUM(CASE WHEN status='Hoàn thành'
-                 THEN COALESCE(actual_qty,quantity) ELSE 0 END),0)::numeric AS actual_qty,
+               COALESCE(SUM(actual_qty),0)::numeric AS actual_qty, -- tính cả LSX đang SX
                COALESCE(SUM(quantity),0)::numeric AS planned_qty,
                COUNT(*)::int AS tasks_count
         FROM raw_tasks

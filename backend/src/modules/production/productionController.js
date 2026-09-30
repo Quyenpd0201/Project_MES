@@ -4,6 +4,7 @@ const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/spe
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete } = require('../../core/lib/deleteGuard');
 const { getDataScope } = require('../../core/dataScope');
+const { applyStock } = require('../../core/lib/stock');
 
 // Công đoạn cuối của 1 lệnh: 'Cắt' nếu có task Cắt, ngược lại 'Thổi'
 const FINAL_STAGE = `(CASE WHEN EXISTS (SELECT 1 FROM production_tasks tf WHERE tf.production_order_id = po.id AND tf.stage = 'Cắt') THEN 'Cắt' ELSE 'Thổi' END)`;
@@ -101,23 +102,13 @@ async function syncOrderInventory(client, poId) {
   const locOf = async (whType) => (await client.query(
     `SELECT l.id FROM locations l JOIN warehouses w ON w.id = l.warehouse_id
      WHERE w.warehouse_type = $1 AND l.is_deleted = FALSE ORDER BY l.created_at LIMIT 1`, [whType])).rows[0]?.id || null;
-  // Kho theo LÔ: mỗi lệnh SX = 1 lô (lot_code = mã LSX), gom theo spec_key; BTP và TP khác vị trí kho
-  const upsertStock = async (locId, qty) => {
-    await client.query(`
-      INSERT INTO inventory_stock (product_id, location_id, specs, spec_key, lot_code, prod_order_id, attr_size, attr_thickness, attr_color, quantity, unit)
-      VALUES ($1,$2,$3::jsonb,$4,$5,$6,$7,$8,$9,$10,$11)
-      ON CONFLICT (product_id, location_id, spec_key, lot_code)
-      DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, updated_at = now()`,
-      [o.product_id, locId, JSON.stringify(o.specs || {}), o.spec_key || '', o.order_code, o.id,
-       o.attr_size || '', o.attr_thickness || '', o.attr_color || '', qty, o.unit || null]);
-  };
-  const logTrx = async (locId, type, qty, note) => {
-    await client.query(`
-      INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color, ref_code, note)
-      VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12)`,
-      [o.product_id, locId, type, qty, JSON.stringify(o.specs || {}), o.spec_key || '', o.order_code,
-       o.attr_size || '', o.attr_thickness || '', o.attr_color || '', o.order_code, note]);
-  };
+  // Kho theo LÔ: mỗi lệnh SX = 1 lô (lot_code = mã LSX), gom theo spec_key (chuẩn hoá qua applyStock);
+  // BTP và TP khác vị trí kho. Mọi thay đổi tồn đi qua applyStock → nhất quán + tự ghi giao dịch.
+  const stockOpts = (locId, delta, note) => ({
+    product_id: o.product_id, location_id: locId, delta, unit: o.unit,
+    specs: o.specs || {}, lot_code: o.order_code, prod_order_id: o.id,
+    clampZero: false, ref_code: o.order_code, note,
+  });
 
   const btpLoc = await locOf('BTP');
   const tpLoc = await locOf('TP');
@@ -132,15 +123,9 @@ async function syncOrderInventory(client, poId) {
     if (delta !== 0) {
       // (a) Nhập kho ĐẦU RA của công đoạn này
       const outLoc = t.stage === finalStage ? finalLoc : btpLoc;
-      if (outLoc) {
-        await upsertStock(outLoc, delta);
-        await logTrx(outLoc, delta > 0 ? 'Nhập' : 'Xuất', Math.abs(delta), `Nhập kho ${t.stage} (tự động)`);
-      }
+      if (outLoc) await applyStock(client, stockOpts(outLoc, delta, `Nhập kho ${t.stage} (tự động)`));
       // (b) TIÊU HAO BTP của công đoạn trước (mọi công đoạn trừ công đoạn đầu)
-      if (t.stage !== firstStage && btpLoc) {
-        await upsertStock(btpLoc, -delta);
-        await logTrx(btpLoc, delta > 0 ? 'Xuất' : 'Nhập', Math.abs(delta), `Tiêu hao BTP cho ${t.stage} (tự động)`);
-      }
+      if (t.stage !== firstStage && btpLoc) await applyStock(client, stockOpts(btpLoc, -delta, `Tiêu hao BTP cho ${t.stage} (tự động)`));
       await client.query(`UPDATE production_tasks SET posted_qty = $2 WHERE id = $1`, [t.id, producedT]);
     }
     if (t.stage === finalStage) totalFinal += producedT;
@@ -288,6 +273,14 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const b = req.body;
+    // Không cho sửa NỘI DUNG lệnh đã Hoàn thành/Đã hủy (vẫn cho cập nhật chỉ-mỗi-trạng-thái).
+    const contentKeys = Object.keys(b).filter((k) => k !== 'status');
+    if (contentKeys.length) {
+      const cur = (await db.query(`SELECT status FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [req.params.id])).rows[0];
+      if (cur && ['Hoàn thành', 'Đã hủy'].includes(cur.status)) {
+        return res.status(400).json({ message: `Lệnh đã ${cur.status} — không thể sửa.` });
+      }
+    }
     const fields = ['sales_order_id','customer_id','product_id','quantity','unit',
       'machine_id','planned_date','shift','assigned_team','assigned_worker','due_date','status','note','priority','mix_ratio','material_type'];
     const cols = [], vals = []; let i = 1;
@@ -690,6 +683,25 @@ exports.updateTask = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const b = req.body;
+    const taskId = req.params.taskId;
+    // Ràng buộc SL thực: Σ thực tế cộng dồn theo công đoạn ≤ 110% SL cần sản xuất.
+    // Áp ở backend nên mọi đường vào đều bị chặn (màn Thực thi + Sửa LSX).
+    if (b.actual_qty !== undefined && b.actual_qty !== '' && b.actual_qty !== null) {
+      const chk = (await client.query(`
+        SELECT t.stage, po.quantity AS order_qty,
+               COALESCE((SELECT SUM(t2.actual_qty) FROM production_tasks t2
+                         WHERE t2.production_order_id = t.production_order_id
+                           AND t2.stage = t.stage AND t2.id <> t.id), 0) AS others_actual
+        FROM production_tasks t JOIN production_orders po ON po.id = t.production_order_id
+        WHERE t.id = $1`, [taskId])).rows[0];
+      if (chk) {
+        const cap = Number(chk.order_qty) * 1.1;
+        const newSum = Number(chk.others_actual) + Number(b.actual_qty);
+        if (newSum > cap + 1e-6) {
+          return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${chk.stage} (${newSum}) vượt quá 110% SL cần sản xuất (${chk.order_qty} → tối đa ${cap}). Vui lòng xem xét lại số lượng thực tế.` });
+        }
+      }
+    }
     const cols = [], vals = []; let i = 1;
     const add = (c, v) => { cols.push(`${c} = $${i++}`); vals.push(v); };
     if (b.status !== undefined) add('status', b.status);
@@ -711,9 +723,21 @@ exports.saveTasks = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const poId = req.params.id;
-    const po = (await client.query(`SELECT order_code FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [poId])).rows[0];
+    const po = (await client.query(`SELECT order_code, quantity, status FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [poId])).rows[0];
     if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    if (['Hoàn thành', 'Đã hủy'].includes(po.status)) return res.status(400).json({ message: `Lệnh đã ${po.status} — không thể sửa phân công.` });
     const tasks = Array.isArray(req.body.tasks) ? req.body.tasks.filter(t => t && t.stage) : [];
+
+    // Ràng buộc 110% (đồng bộ với frontend, chặn cả khi gọi API trực tiếp):
+    const cap = Number(po.quantity) * 1.1;
+    // 1) SẢN LƯỢNG kế hoạch từng lần không vượt 110%
+    const badPlan = tasks.find(t => (Number(t.quantity) || 0) > cap + 1e-6);
+    if (badPlan) return res.status(400).json({ message: `Sản lượng một lần (${badPlan.stage} ${Number(badPlan.quantity)}) vượt quá 110% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
+    // 2) Σ SL thực cộng dồn mỗi công đoạn không vượt 110%
+    const actByStage = {};
+    tasks.forEach(t => { actByStage[t.stage] = (actByStage[t.stage] || 0) + (Number(t.actual_qty) || 0); });
+    const badAct = Object.entries(actByStage).find(([, s]) => s > cap + 1e-6);
+    if (badAct) return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 110% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
 
     await client.query('BEGIN');
     await client.query(`DELETE FROM production_tasks WHERE production_order_id = $1`, [poId]);
@@ -721,13 +745,13 @@ exports.saveTasks = async (req, res) => {
     for (const t of tasks) {
       await client.query(`
         INSERT INTO production_tasks
-          (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+          (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note, assigned_worker_id)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [poId, `${po.order_code}-${n}`, t.stage, t.quantity || 0,
          t.actual_qty === '' || t.actual_qty == null ? null : t.actual_qty, t.scrap_qty || 0,
          t.machine_id || null, t.shift || null,
          t.planned_date || null, t.planned_end_date || t.planned_date || null,
-         t.assigned_team || null, t.assigned_worker || null, t.status || 'Chờ', n, t.note || null]);
+         t.assigned_team || null, t.assigned_worker || null, t.status || 'Chờ', n, t.note || null, t.assigned_worker_id || null]);
       n++;
     }
     await recomputeOrder(client, poId);

@@ -358,14 +358,16 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
 
 /* ---- Form đơn hàng ---- */
 function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreateDelivery, onOpenProductionOrder }) {
-  const { can, fperm } = usePerm();
+  const { can, fperm, fpermSecret } = usePerm();
   const fhid = (k) => fperm("orders", k) === "hidden";
   const fdis = (k) => fperm("orders", k) !== "edit";
+  const moneyPerm = fpermSecret("orders", "amounts"); // 'edit' | 'view' | 'hidden'
+  const showMoney = moneyPerm !== "hidden";
   const today = new Date().toISOString().slice(0, 10);
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [allocating, setAllocating] = useState(false);
   const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", priority: "Trung bình", mix_ratio: [] });
-  const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null }]);
+  const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null, unit_price: "" }]);
   const [seq, setSeq] = useState(2);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
 
@@ -373,7 +375,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
       setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
-      setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [], material_type: it.material_type || null, mix_ratio: it.mix_ratio || [] })));
+      setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [], material_type: it.material_type || null, mix_ratio: it.mix_ratio || [], unit_price: it.unit_price ?? "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
   }, [editId]); // eslint-disable-line
@@ -384,12 +386,12 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
     if (editId || !copyId) return;
     ordersApi.get(copyId).then((d) => {
       setF({ customer_id: d.customer_id, order_date: today, due_date: "", status: "Mới", note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [] });
-      setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "", material_type: it.material_type || null, mix_ratio: it.mix_ratio || [] })));
+      setItems((d.items || []).map((it, i) => ({ _k: i + 1, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: "", planned_end_date: "", material_type: it.material_type || null, mix_ratio: it.mix_ratio || [], unit_price: it.unit_price ?? "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn nguồn để sao chép: " + e.message));
   }, [copyId, editId]); // eslint-disable-line
 
-  const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null, mix_ratio: [] }]); setSeq((s) => s + 1); };
+  const addItem = () => { setItems((a) => [...a, { _k: seq, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null, mix_ratio: [], unit_price: "" }]); setSeq((s) => s + 1); };
   const rmItem = (k) => setItems((a) => a.filter((x) => x._k !== k));
   const upItem = (k, fld, v) => setItems((a) => a.map((x) => {
     if (x._k !== k) return x;
@@ -410,8 +412,14 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
     const valid = items.filter((it) => it.product_id && it.quantity);
     if (!valid.length) return toast.error("Cần ít nhất 1 dòng hàng");
     try {
-      if (editId) await ordersApi.update(editId, { ...f, items: valid }); else await ordersApi.create({ ...f, items: valid });
-      toast.success("Đã lưu thành công"); onSaved();
+      if (editId) {
+        await ordersApi.update(editId, { ...f, items: valid });
+        toast.success("Đã lưu thành công");
+        setEditing(false); loadData(); // ở lại màn chi tiết, không thoát ra list
+      } else {
+        await ordersApi.create({ ...f, items: valid });
+        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+      }
     } catch (e) { toast.error("Lỗi lưu đơn hàng: " + e.message); }
   };
 
@@ -504,6 +512,24 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   </label>
                 </div>
               </div>
+              {showMoney && (
+              <div className="pl-8">
+                <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Giá</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <label>
+                    <span className="block text-xs font-medium text-slate-500 mb-1">Đơn giá</span>
+                    <input type="number" min="0" className={inputCls} disabled={fdis("items") || moneyPerm !== "edit"} value={it.unit_price ?? ""}
+                      placeholder="0" onChange={(e) => upItem(it._k, "unit_price", e.target.value)} />
+                  </label>
+                  <label>
+                    <span className="block text-xs font-medium text-slate-500 mb-1">Thành tiền = đơn giá × SL</span>
+                    <div className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold">
+                      {fmt((Number(it.unit_price) || 0) * (Number(it.quantity) || 0))} đ
+                    </div>
+                  </label>
+                </div>
+              </div>
+              )}
               <div className="pl-8">
                 <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Loại nguyên liệu</div>
                 <div className="flex gap-4">
@@ -668,6 +694,14 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
               {editId && <LsxLinks orders={it.production_orders} onOpenProductionOrder={onOpenProductionOrder} />}
             </div>
           ))}
+          {showMoney && (
+            <div className="flex justify-end items-baseline gap-3 pt-3 border-t border-slate-200">
+              <span className="text-sm text-slate-500">Tổng giá trị đơn hàng:</span>
+              <span className="text-lg font-bold text-blue-700">
+                {fmt(items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0))} đ
+              </span>
+            </div>
+          )}
         </div>
       </Section>
       )}
@@ -687,10 +721,13 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
 
 /* ---- Phiếu đặt hàng (in được) ---- */
 function OrderVoucher({ id, onBack }) {
+  const { fpermSecret } = usePerm();
+  const showMoney = fpermSecret("orders", "amounts") !== "hidden";
   const [o, setO] = useState(null);
   useEffect(() => { ordersApi.get(id).then(setO).catch((e) => toast.error("Lỗi: " + e.message)); }, [id]);
   if (!o) return <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
   const totalQty = (o.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0);
+  const totalAmount = (o.items || []).reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -722,7 +759,7 @@ function OrderVoucher({ id, onBack }) {
         <table className="w-full text-sm border border-slate-300 border-collapse">
           <thead className="bg-slate-100">
             <tr>
-              {["STT", "Sản phẩm", "Thông số kỹ thuật", "SL", "ĐVT"].map((h) =>
+              {["STT", "Sản phẩm", "Thông số kỹ thuật", "SL", "ĐVT", ...(showMoney ? ["Đơn giá", "Thành tiền"] : [])].map((h) =>
                 <th key={h} className="border border-slate-300 px-2 py-1.5 text-left">{h}</th>)}
             </tr>
           </thead>
@@ -743,13 +780,24 @@ function OrderVoucher({ id, onBack }) {
                 <td className="border border-slate-300 px-2 py-1.5">{specShort(it.specs) || "—"}</td>
                 <td className="border border-slate-300 px-2 py-1.5 text-right">{fmt(it.quantity)}</td>
                 <td className="border border-slate-300 px-2 py-1.5">{it.unit}</td>
+                {showMoney && <>
+                  <td className="border border-slate-300 px-2 py-1.5 text-right">{fmt(it.unit_price || 0)}</td>
+                  <td className="border border-slate-300 px-2 py-1.5 text-right">{fmt((Number(it.unit_price) || 0) * (Number(it.quantity) || 0))}</td>
+                </>}
               </tr>
             ))}
             <tr className="font-semibold bg-slate-50">
               <td colSpan={3} className="border border-slate-300 px-2 py-1.5 text-right">Tổng số lượng</td>
               <td className="border border-slate-300 px-2 py-1.5 text-right">{fmt(totalQty)}</td>
               <td className="border border-slate-300 px-2 py-1.5" />
+              {showMoney && <><td className="border border-slate-300 px-2 py-1.5" /><td className="border border-slate-300 px-2 py-1.5" /></>}
             </tr>
+            {showMoney && (
+              <tr className="font-bold bg-blue-50">
+                <td colSpan={6} className="border border-slate-300 px-2 py-1.5 text-right">Tổng tiền</td>
+                <td className="border border-slate-300 px-2 py-1.5 text-right">{fmt(o.total_amount ?? totalAmount)} đ</td>
+              </tr>
+            )}
           </tbody>
         </table>
 
@@ -1010,7 +1058,8 @@ function ExcelImportModal({ onClose, onDone }) {
 }
 
 export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCreateDelivery, onOpenProductionOrder }) {
-  const { can } = usePerm();
+  const { can, fpermSecret } = usePerm();
+  const showMoney = fpermSecret("orders", "amounts") !== "hidden";
   const [view, setView] = useState("list");
   const [editId, setEditId] = useState(null);
   const [copyId, setCopyId] = useState(null);
@@ -1032,7 +1081,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
   const del = async (id) => { if (!confirm("Xóa đơn hàng này?")) return; try { await ordersApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   if (view === "form") return <OrderForm lookups={lookups} editId={editId} copyId={copyId}
-    onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
+    onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
     onPrint={(id) => { setVoucherId(id); setView("voucher"); }} onCreateDelivery={onCreateDelivery} onOpenProductionOrder={onOpenProductionOrder} />;
   if (view === "voucher") return <OrderVoucher id={voucherId} onBack={() => setView("list")} />;
 
@@ -1048,6 +1097,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
       } },
     { key: "item_count", label: "Số dòng", align: "center" },
     { key: "total_qty", label: "Tổng SL", align: "right", render: (r) => fmt(r.total_qty) },
+    ...(showMoney ? [{ key: "total_amount", label: "Giá trị đơn", align: "right", render: (r) => <span className="font-medium text-slate-700">{fmt(r.total_amount || 0)} đ</span> }] : []),
     { key: "priority", label: "Ưu tiên", filter: "select", options: ["Cao", "Trung bình", "Thấp"], render: (r) => {
         if (r.priority === 'Cao') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-rose-100 text-rose-700 whitespace-nowrap">Cao</span>;
         if (r.priority === 'Thấp') return <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-500 whitespace-nowrap">Thấp</span>;

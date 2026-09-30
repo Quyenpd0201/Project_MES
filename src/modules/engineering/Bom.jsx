@@ -83,8 +83,14 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
     if (!f.name) return toast.error("Nhập tên định mức");
     const payload = { ...f, lines: lines.filter((l) => l.material_id) };
     try {
-      if (editId) await bomApi.update(editId, payload); else await bomApi.create(payload);
-      toast.success("Đã lưu thành công"); onSaved();
+      if (editId) {
+        await bomApi.update(editId, payload);
+        toast.success("Đã lưu thành công");
+        setEditing(false); loadData(); // ở lại màn chi tiết
+      } else {
+        await bomApi.create(payload);
+        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+      }
     } catch (e) { toast.error("Lỗi lưu định mức: " + e.message); }
   };
 
@@ -217,7 +223,7 @@ export default function BomModule({ lookups }) {
   };
 
   if (view === "form")
-    return <BomForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }}
+    return <BomForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
       onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
 
   const columns = [

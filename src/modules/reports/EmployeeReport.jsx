@@ -470,6 +470,7 @@ export default function EmployeeReport() {
   );
   const [workers, setWorkers]         = useState([]);
   const [loading, setLoading]         = useState(false);
+  const [reportTab, setReportTab]     = useState("overview"); // 'overview' | 'detail'
   const [selected, setSelected]       = useState(null);
   const [detail, setDetail]           = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -477,10 +478,10 @@ export default function EmployeeReport() {
 
   const isManager = isAdmin || can('reports', 'view_all');
 
-  /* filters */
-  const [from, setFrom]               = useState(weekStart());
+  /* filters — mặc định 1 tháng gần nhất để mở màn là thấy số ngay */
+  const [from, setFrom]               = useState(monthStart());
   const [to, setTo]                   = useState(today());
-  const [timeRange, setTimeRange]     = useState("week");
+  const [timeRange, setTimeRange]     = useState("month");
   const [teamFilter, setTeamFilter]   = useState("");
   const [orderFilter, setOrderFilter] = useState("");
   const [nameFilter, setNameFilter]   = useState("");
@@ -542,6 +543,13 @@ export default function EmployeeReport() {
   const empTotalPages = Math.ceil(filteredWorkers.length / EMP_PER_PAGE);
   const empSlice = filteredWorkers.slice((empPage - 1) * EMP_PER_PAGE, empPage * EMP_PER_PAGE);
 
+  // Vào tab "chi tiết" mà chưa chọn ai → tự chọn nhân viên đầu tiên (đừng để bên phải trống)
+  useEffect(() => {
+    if (reportTab === "detail" && !selected && filteredWorkers.length > 0) {
+      handleSelectWorker(filteredWorkers[0]);
+    }
+  }, [reportTab, filteredWorkers.length, selected]); // eslint-disable-line
+
   /* unique option lists */
   const stageOptions = [...new Set(workers.flatMap(w => (w.stages || "").split(", ").filter(Boolean)))];
   const teamOptions  = [...new Set(workers.flatMap(w => (w.team || "").split(", ").filter(Boolean)))];
@@ -594,11 +602,10 @@ export default function EmployeeReport() {
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-center gap-2">
             <Users size={20} className="text-indigo-600" />
             <h1 className="text-xl font-bold text-slate-800">Hiệu suất nhân viên sản xuất</h1>
           </div>
-          <p className="text-sm text-slate-500">Chọn nhân viên ở bảng bên trái để xem chi tiết</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button onClick={loadWorkers} disabled={loading}
@@ -613,9 +620,6 @@ export default function EmployeeReport() {
 
       {/* ── Filters ── */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center gap-1.5 mb-3 text-xs text-slate-400 font-semibold uppercase tracking-wider">
-          <Filter size={12} /> Bộ lọc
-        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {!isManager ? (
             <div>
@@ -650,20 +654,28 @@ export default function EmployeeReport() {
                   {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1">Mã đơn hàng</label>
-                <input value={orderFilter} onChange={e => setOrderFilter(e.target.value)} placeholder="LSX-00001…"
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
-              </div>
             </>
           )}
         </div>
       </div>
 
+      {/* ── Chuyển giữa 2 báo cáo ── */}
+      <div className="flex items-center gap-1 border-b border-slate-200">
+        <button onClick={() => setReportTab("overview")}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "overview" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          <Users size={16} /> Báo cáo chung
+        </button>
+        <button onClick={() => setReportTab("detail")}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "detail" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          <User size={16} /> Báo cáo chi tiết từng nhân viên
+        </button>
+      </div>
+
       {/* ── Master-Detail two-column layout ── */}
       <div className="flex gap-4 items-start">
 
-        {/* LEFT — Employee list (sticky) */}
+        {/* LEFT — Employee list (chỉ ở tab "chi tiết") */}
+        {reportTab === "detail" && (
         <div className="w-80 xl:w-96 shrink-0 sticky top-4 self-start">
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             {/* List header */}
@@ -761,10 +773,104 @@ export default function EmployeeReport() {
             </div>
           </div>
         </div>
+        )}
 
-        {/* RIGHT — Detail panel */}
+        {/* RIGHT — Nội dung báo cáo */}
         <div className="flex-1 min-w-0">
-          {selected ? (
+          {reportTab === "overview" ? (
+            <div className="space-y-6">
+              {/* Tổng quan KPI toàn xưởng */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <h2 className="font-bold text-slate-800 mb-3">Báo cáo chung — hiệu suất toàn xưởng</h2>
+                {(() => {
+                  const totSL = workers.reduce((s, w) => s + Number(w.actual_qty), 0);
+                  const totPhe = workers.reduce((s, w) => s + Number(w.scrap_qty), 0);
+                  const totLenh = workers.reduce((s, w) => s + (w.tasks_count || 0), 0);
+                  const nSX = workers.filter(w => Number(w.actual_qty) > 0).length;
+                  const ratio = totSL > 0 ? (totPhe / totSL) : 0;
+                  const tile = (label, val, cls, sub) => (
+                    <div className="bg-slate-50 rounded-lg border border-slate-100 px-3 py-2.5">
+                      <div className="text-[11px] text-slate-500">{label}</div>
+                      <div className={`text-lg font-bold ${cls || "text-slate-800"}`} style={{ fontVariantNumeric: "tabular-nums" }}>{val}</div>
+                      {sub && <div className="text-[10px] text-slate-400">{sub}</div>}
+                    </div>
+                  );
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
+                      {tile("Nhân viên", workers.length, "text-slate-800")}
+                      {tile("Lệnh / việc", totLenh)}
+                      {tile("Tổng sản lượng", fmt(totSL) + " kg", "text-indigo-600")}
+                      {tile("Tổng phế", fmt(totPhe) + " kg", "text-rose-600")}
+                      {tile("Phế / 1kg (TB)", ratio.toFixed(3), "text-amber-600")}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* 3 tiêu chí — mỗi cột: biểu đồ Top 5 + bảng xếp hạng (đồng hướng) */}
+              {workers.length > 0 && (() => {
+                const aw = workers.filter(w => Number(w.actual_qty) > 0);
+                const shortNm = (n) => (n && n.length > 17) ? n.slice(0, 16) + '…' : n;
+                const ratioOf = (w) => Number(w.actual_qty) > 0 ? Number(w.scrap_qty) / Number(w.actual_qty) : 0;
+                const bySL = [...aw].sort((a, b) => Number(b.actual_qty) - Number(a.actual_qty));       // cao nhất trước
+                const byPhe = [...aw].sort((a, b) => Number(a.scrap_qty) - Number(b.scrap_qty));         // ít phế nhất trước
+                const byRatio = [...aw].sort((a, b) => ratioOf(a) - ratioOf(b));                          // tỷ lệ thấp nhất trước
+
+                const Criterion = ({ title, sub, color, rows, valOf, fmtVal }) => {
+                  const chartData = rows.slice(0, 5).map(w => ({ name: shortNm(w.worker), full: w.worker, v: valOf(w) }));
+                  return (
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                      <div className="px-4 py-3 border-b border-slate-100">
+                        <h3 className="font-semibold text-slate-700 text-sm">{title}</h3>
+                      </div>
+                      {/* Biểu đồ Top 5 */}
+                      <div style={{ height: 190 }} className="p-2">
+                        {chartData.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={chartData} layout="vertical" margin={{ left: 4, right: 18, top: 6, bottom: 4 }}>
+                              <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                              <XAxis type="number" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                              <YAxis type="category" dataKey="name" width={128} interval={0}
+                                tick={({ x, y, payload }) => (
+                                  <text x={x} y={y} dy={3} textAnchor="end" fontSize={11} fill="#475569">{payload.value}</text>
+                                )} />
+                              <Tooltip formatter={(v) => fmtVal(v)} labelFormatter={(l, p) => p?.[0]?.payload?.full || l} />
+                              <Bar dataKey="v" fill={color} radius={[0, 3, 3, 0]} maxBarSize={11} />
+                            </ComposedChart>
+                          </ResponsiveContainer>
+                        ) : <div className="h-full flex items-center justify-center text-sm text-slate-400">Không có dữ liệu</div>}
+                      </div>
+                      {/* Bảng xếp hạng đầy đủ (đồng hướng với biểu đồ) */}
+                      <div className="border-t border-slate-100 divide-y divide-slate-50 max-h-72 overflow-y-auto">
+                        {rows.map((w, i) => (
+                          <div key={w.worker}
+                            className={`px-4 py-2 flex items-center justify-between gap-2 ${i === 0 ? "font-semibold" : ""}`}
+                            style={i === 0 ? { backgroundColor: color + "16", boxShadow: `inset 3px 0 0 ${color}` } : undefined}>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-5 text-center text-sm font-bold shrink-0" style={{ color: i === 0 ? color : "#94a3b8" }}>{i + 1}</span>
+                              <span className={`text-sm truncate ${i === 0 ? "text-slate-900" : "text-slate-700"}`}>{w.worker}</span>
+                            </div>
+                            <span className="text-sm font-semibold shrink-0" style={{ color }}>{fmtVal(valOf(w))}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                };
+
+                return (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+                    <Criterion title="Sản lượng" sub="kg thành phẩm — cao nhất dẫn đầu" color="#6366f1"
+                      rows={bySL} valOf={(w) => Number(w.actual_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
+                    <Criterion title="Ít phế nhất" sub="kg phế — ít nhất được vinh danh" color="#10b981"
+                      rows={byPhe} valOf={(w) => Number(w.scrap_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
+                    <Criterion title="Phế / 1kg thấp nhất" sub="kg phế / kg TP — ít nhất được vinh danh" color="#f59e0b"
+                      rows={byRatio} valOf={(w) => ratioOf(w)} fmtVal={(v) => Number(v).toFixed(3)} />
+                  </div>
+                );
+              })()}
+            </div>
+          ) : selected ? (
             <EmployeeDetail
               key={selected.worker}
               workerData={selected}
@@ -773,106 +879,12 @@ export default function EmployeeReport() {
               onClose={() => { setSelected(null); setDetail(null); }}
             />
           ) : (
-            <div className="space-y-6">
-              <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col items-center justify-center text-center">
-                <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
-                  <Users size={24} className="text-indigo-400" />
-                </div>
-                <p className="text-slate-600 font-semibold mb-1">Báo cáo chung</p>
-                <p className="text-sm text-slate-400">Chọn một nhân viên bên trái để xem chi tiết hiệu suất cá nhân</p>
-                {workers.length > 0 && (
-                  <div className="mt-4 flex items-center gap-4 text-xs text-slate-400 bg-slate-50 px-4 py-2 rounded-full border border-slate-100">
-                    <span>🏭 {workers.length} nhân viên</span>
-                    <span>📦 {workers.reduce((s, w) => s + w.tasks_count, 0)} lệnh</span>
-                    <span>📈 {fmt(workers.reduce((s, w) => s + Number(w.actual_qty), 0))} TT</span>
-                    <span>⚠ {fmt(workers.reduce((s, w) => s + Number(w.scrap_qty), 0))} Phế</span>
-                  </div>
-                )}
+            <div className="bg-white rounded-xl border border-slate-200 p-10 flex flex-col items-center justify-center text-center text-slate-400 min-h-[300px]">
+              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
+                <User size={24} className="text-indigo-400" />
               </div>
-
-              {workers.length > 0 && (() => {
-                const activeWorkers = workers.filter(w => Number(w.actual_qty) > 0);
-                const mostScrap = [...activeWorkers].filter(w => Number(w.scrap_qty) > 0).sort((a,b) => Number(b.scrap_qty) - Number(a.scrap_qty)).slice(0, 5);
-                const leastScrap = [...activeWorkers].sort((a,b) => Number(a.scrap_qty) - Number(b.scrap_qty)).slice(0, 5);
-                
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Top 5 Most Scrap */}
-                    <div className="bg-white rounded-xl border border-rose-100 shadow-sm overflow-hidden">
-                      <div className="px-4 py-3 bg-rose-50/50 border-b border-rose-100 flex items-center gap-2">
-                        <AlertCircle size={16} className="text-rose-500" />
-                        <h3 className="font-semibold text-rose-800 text-sm">Top 5 Nhiều phế phẩm nhất</h3>
-                      </div>
-                      <div className="divide-y divide-slate-50">
-                        {mostScrap.length > 0 ? mostScrap.map((w, i) => (
-                          <div key={w.worker} className="px-4 py-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
-                              <span className="text-sm font-medium text-slate-700">{w.worker}</span>
-                            </div>
-                            <span className="font-bold text-rose-600 text-sm">{fmt(w.scrap_qty)} kg</span>
-                          </div>
-                        )) : <div className="px-4 py-6 text-center text-sm text-slate-400">Không có dữ liệu phế phẩm</div>}
-                      </div>
-                    </div>
-
-                    {/* Top 5 Least Scrap */}
-                    <div className="bg-white rounded-xl border border-emerald-100 shadow-sm overflow-hidden">
-                      <div className="px-4 py-3 bg-emerald-50/50 border-b border-emerald-100 flex items-center gap-2">
-                        <Target size={16} className="text-emerald-500" />
-                        <h3 className="font-semibold text-emerald-800 text-sm">Top 5 Ít phế phẩm nhất</h3>
-                      </div>
-                      <div className="divide-y divide-slate-50">
-                        {leastScrap.length > 0 ? leastScrap.map((w, i) => (
-                          <div key={w.worker} className="px-4 py-3 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
-                              <span className="text-sm font-medium text-slate-700">{w.worker}</span>
-                            </div>
-                            <span className="font-bold text-emerald-600 text-sm">{fmt(w.scrap_qty)} kg</span>
-                          </div>
-                        )) : <div className="px-4 py-6 text-center text-sm text-slate-400">Không có dữ liệu sản xuất</div>}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Scrap Ratio List for Managers */}
-              {isManager && workers.length > 0 && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100">
-                    <h3 className="font-semibold text-slate-700 text-sm">Danh sách Tỷ lệ Phế / 1kg thành phẩm</h3>
-                  </div>
-                  <div className="overflow-x-auto max-h-80">
-                    <table className="w-full text-sm text-left">
-                      <thead className="text-xs text-slate-500 bg-white sticky top-0 border-b border-slate-100">
-                        <tr>
-                          <th className="px-4 py-2 font-medium">Nhân viên</th>
-                          <th className="px-4 py-2 font-medium text-right">Tổng thành phẩm</th>
-                          <th className="px-4 py-2 font-medium text-right">Tổng phế phẩm</th>
-                          <th className="px-4 py-2 font-medium text-right">Phế / 1kg</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {workers.filter(w => Number(w.actual_qty) > 0)
-                          .sort((a,b) => (Number(b.scrap_qty)/Number(b.actual_qty)) - (Number(a.scrap_qty)/Number(a.actual_qty)))
-                          .map(w => {
-                          const ratio = (Number(w.scrap_qty) / Number(w.actual_qty)).toFixed(4);
-                          return (
-                            <tr key={w.worker} className="hover:bg-slate-50">
-                              <td className="px-4 py-2 font-medium text-slate-700">{w.worker}</td>
-                              <td className="px-4 py-2 text-right text-slate-600">{fmt(w.actual_qty)} kg</td>
-                              <td className="px-4 py-2 text-right text-rose-600 font-medium">{fmt(w.scrap_qty)} kg</td>
-                              <td className="px-4 py-2 text-right font-bold text-amber-600">{ratio}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              <p className="font-semibold text-slate-600 mb-1">Chọn một nhân viên</p>
+              <p className="text-sm">Bấm một nhân viên ở danh sách bên trái để xem báo cáo chi tiết cá nhân</p>
             </div>
           )}
         </div>

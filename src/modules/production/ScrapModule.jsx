@@ -250,7 +250,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
 }
 
 // ----- RECORDING COMPONENT -----
-function ScrapForm({ worker, date, setDate, onOpenOrder }) {
+function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -342,6 +342,7 @@ function ScrapForm({ worker, date, setDate, onOpenOrder }) {
     try {
       await scrap.save({
         worker_name: worker,
+        employee_id: workerId || null,
         record_date: date,
         note,
         items
@@ -529,6 +530,9 @@ export default function ScrapModule({ onOpenOrder }) {
     }).catch(e => toast.error("Lỗi lấy danh sách công nhân: " + e.message));
   }, []);
 
+  // worker = id nhân viên; suy ra tên để các màn đọc (theo tên) vẫn chạy
+  const workerName = workerList.find(x => x.id === worker)?.name || "";
+
   return (
     <div className="space-y-6">
       <PageHeader 
@@ -543,11 +547,11 @@ export default function ScrapModule({ onOpenOrder }) {
           <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
           <div className="relative">
             <Users className="absolute left-3 top-2.5 text-blue-500" size={18} />
-            <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"} 
+            <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"}
               value={worker} onChange={e => setWorker(e.target.value)}>
               <option value="">-- Vui lòng chọn công nhân --</option>
               {workerList.map(w => (
-                <option key={w} value={w}>{w}</option>
+                <option key={w.id} value={w.id}>{w.employee_code ? `${w.employee_code} · ` : ""}{w.name}</option>
               ))}
             </select>
           </div>
@@ -577,9 +581,9 @@ export default function ScrapModule({ onOpenOrder }) {
 
       <div className="py-2">
         {activeTab === "record" ? (
-          <ScrapForm worker={worker} date={date} setDate={setDate} onOpenOrder={onOpenOrder} />
+          <ScrapForm worker={workerName} workerId={worker} date={date} setDate={setDate} onOpenOrder={onOpenOrder} />
         ) : (
-          <ScrapStatistics worker={worker} onOpenOrder={onOpenOrder} />
+          <ScrapStatistics worker={workerName} onOpenOrder={onOpenOrder} />
         )}
       </div>
     </div>

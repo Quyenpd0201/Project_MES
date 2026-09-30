@@ -119,7 +119,7 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
   const complete = () => {
     const need = Number(t.quantity) || 0, act = Number(actual) || 0;
     if (act < need) return toast.error(`Chưa thể Hoàn thành: SL thực tế (${fmt(act)}) phải ≥ SL đơn hàng (${fmt(need)}).`);
-    setMatMode("complete"); setShowMat(true); // bắt cập nhật NVL trước khi hoàn thành
+    finishComplete(); // NVL cấp xuống coi như dùng hết → không cần ghi NVL thực tế để hoàn thành
   };
   const finishComplete = () => doUpdate({ status: "Hoàn thành", actual_qty: actual });
 
@@ -208,7 +208,7 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
             <input type="number" min="0" className={inputCls + (editable ? "" : " bg-slate-50")} disabled={!editable} value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0" />
           </div>
         </div>
-        {!isRunning && !isDone && <div className="text-[11px] text-slate-400">Bấm <b>"Bắt đầu sản xuất"</b> để mở nhập số lượng & NVL.</div>}
+        {!isRunning && !isDone && <div className="text-[11px] text-slate-400">Bấm <b>"Bắt đầu sản xuất"</b> để mở nhập số lượng.</div>}
 
         {/* Nút điều khiển sản xuất theo trạng thái */}
         {canEdit && (
@@ -223,7 +223,9 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
               <button onClick={pause} disabled={saving} className="btn-ghost text-amber-600 border-amber-200 hover:bg-amber-50"><Pause size={16} /> Tạm dừng</button>
               <button onClick={complete} disabled={saving} className="btn-primary flex-1 justify-center" style={{ background: "#059669" }}><CheckCircle2 size={16} /> Hoàn thành sản xuất</button>
             </>)}
-            <button onClick={() => { setMatMode("view"); setShowMat(true); }} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Boxes size={16} /> NVL thực tế</button>
+            {/* Ẩn nút ghi NVL thực tế — NVL cấp xuống coi như dùng hết (trừ kho qua phiếu xuất kho).
+                Đổi false → true để bật lại khi cần dùng sau này. */}
+            {false && <button onClick={() => { setMatMode("view"); setShowMat(true); }} className="btn-ghost text-blue-600 border-blue-200 hover:bg-blue-50"><Boxes size={16} /> NVL thực tế</button>}
           </div>
         )}
       </div>
