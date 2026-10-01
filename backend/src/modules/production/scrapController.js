@@ -24,7 +24,7 @@ exports.getDailyWos = async (req, res) => {
     const worker_name = req.query.worker_name;
     if (!worker_name) return res.status(400).json({ message: 'Thiếu worker_name' });
 
-    // Lấy các lệnh SX hoàn thành trong đúng ngày ghi nhận
+    // Lấy các lệnh SX liên quan đến nhân viên trong ngày ghi nhận (bao gồm đang sản xuất hoặc đã cập nhật trong ngày)
     const { rows } = await db.query(`
       SELECT 
         po.id as order_id,
@@ -40,8 +40,12 @@ exports.getDailyWos = async (req, res) => {
       JOIN production_orders po ON pt.production_order_id = po.id
       JOIN products p ON po.product_id = p.id
       WHERE pt.assigned_worker = $1
-        AND pt.status = 'Hoàn thành'
-        AND pt.updated_at::date = $2::date
+        AND pt.status != 'Đã hủy'
+        AND po.is_deleted = FALSE
+        AND (
+          pt.status IN ('Chờ', 'Đang sản xuất', 'Tạm dừng', 'Chờ nguyên vật liệu')
+          OR pt.updated_at::date = $2::date
+        )
       GROUP BY po.id, po.order_code, po.product_id, p.product_name, p.product_code, p.unit
       ORDER BY last_completed_at DESC
     `, [worker_name, date]);

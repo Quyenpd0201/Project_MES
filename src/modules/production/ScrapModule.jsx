@@ -367,8 +367,8 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
     { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600", render: r => onOpenOrder && r.order_id ? <button onClick={(e) => { e.stopPropagation(); onOpenOrder(r.order_id); }} className="hover:underline">{r.order_code}</button> : r.order_code },
     { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
     { key: "total_qty", label: "Thành phẩm", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.total_qty)} {r.unit}</span> },
-    { key: "completed_date", label: "Ngày hoàn thành", align: "center", render: r => r.completed_date ? <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{new Date(r.completed_date).toLocaleDateString("vi-VN")}</span> : "—" },
-    { key: "last_completed_at", label: "TG hoàn thành (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
+    { key: "completed_date", label: "Ngày cập nhật", align: "center", render: r => r.completed_date ? <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{new Date(r.completed_date).toLocaleDateString("vi-VN")}</span> : "—" },
+    { key: "last_completed_at", label: "TG cập nhật (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
   ];
 
   return (
@@ -400,7 +400,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="font-semibold text-slate-700 flex items-center gap-2">
-                  <List size={18} className="text-slate-400"/> Lệnh SX hoàn thành
+                  <List size={18} className="text-slate-400"/> Lệnh SX liên quan
                 </div>
                 <div className="flex items-center gap-3">
                   {wos.length > 0 && (
@@ -419,7 +419,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
                     <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                       <CheckCircle2 className="text-slate-300" size={32} />
                     </div>
-                    <p className="text-slate-500">Công nhân chưa có lệnh hoàn thành nào trong ngày này.</p>
+                    <p className="text-slate-500">Công nhân chưa có lệnh sản xuất nào trong ngày này.</p>
                   </div>
                 ) : (
                   <DataTable rows={wos} columns={woCols} rowKey={r => r.order_code + r.product_id} dense />
