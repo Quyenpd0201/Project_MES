@@ -2208,4 +2208,6 @@ INSERT INTO public.locations (warehouse_id, location_code, name)
   WHERE w.warehouse_type = 'Phế liệu'
     AND NOT EXISTS (SELECT 1 FROM public.locations l WHERE l.warehouse_id = w.id);
 
+-- 4) Đơn giá dòng hàng đơn bán (tính tổng tiền đơn hàng)
+ALTER TABLE public.sales_order_items ADD COLUMN IF NOT EXISTS unit_price numeric DEFAULT 0;
 
