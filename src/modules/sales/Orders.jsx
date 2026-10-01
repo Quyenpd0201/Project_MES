@@ -1080,11 +1080,6 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
 
   const del = async (id) => { if (!confirm("Xóa đơn hàng này?")) return; try { await ordersApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
-  if (view === "form") return <OrderForm lookups={lookups} editId={editId} copyId={copyId}
-    onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
-    onPrint={(id) => { setVoucherId(id); setView("voucher"); }} onCreateDelivery={onCreateDelivery} onOpenProductionOrder={onOpenProductionOrder} />;
-  if (view === "voucher") return <OrderVoucher id={voucherId} onBack={() => setView("list")} />;
-
   const columns = [
     { key: "order_code", label: "Mã đơn", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },
     { key: "customer_name", label: "Khách hàng", filter: "select", tdClass: "text-slate-800" },
@@ -1113,18 +1108,32 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
   ];
 
   return (
-    <div className="space-y-5">
-      {showImport && <ExcelImportModal onClose={() => setShowImport(false)} onDone={() => { load(); }} />}
-      <ListHeader title="Đơn hàng" actions={<>
-        <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
-        {can("orders", "create") && (
-          <button onClick={() => setShowImport(true)} className="btn-ghost border border-green-300 text-green-700 hover:bg-green-50">
-            <Upload size={16} /> Nhập Excel
-          </button>
-        )}
-        {can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>}
-      </>} />
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
-    </div>
+    <>
+      <div className={view === "list" ? "space-y-5" : "hidden"}>
+        {showImport && <ExcelImportModal onClose={() => setShowImport(false)} onDone={() => { load(); }} />}
+        <ListHeader title="Đơn hàng" actions={<>
+          <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
+          {can("orders", "create") && (
+            <button onClick={() => setShowImport(true)} className="btn-ghost border border-green-300 text-green-700 hover:bg-green-50">
+              <Upload size={16} /> Nhập Excel
+            </button>
+          )}
+          {can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>}
+        </>} />
+        <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
+      </div>
+
+      {view === "form" && (
+        <OrderForm lookups={lookups} editId={editId} copyId={copyId}
+          onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} 
+          onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
+          onPrint={(id) => { setVoucherId(id); setView("voucher"); }} 
+          onCreateDelivery={onCreateDelivery} 
+          onOpenProductionOrder={onOpenProductionOrder} 
+        />
+      )}
+      
+      {view === "voucher" && <OrderVoucher id={voucherId} onBack={() => setView("list")} />}
+    </>
   );
 }
