@@ -62,7 +62,11 @@ async function userPayload(id) {
            r.id AS role_id, r.name AS role_name, COALESCE(r.is_admin, FALSE) AS is_admin, COALESCE(r.permissions, '{}'::jsonb) AS permissions
     FROM users u 
     LEFT JOIN roles r ON r.id = u.role_id
-    LEFT JOIN employees e ON e.name = u.linked_worker OR e.employee_code = u.linked_worker
+    LEFT JOIN LATERAL (
+      SELECT employee_code FROM employees
+      WHERE name = u.linked_worker OR employee_code = u.linked_worker
+      LIMIT 1
+    ) e ON TRUE
     WHERE u.id = $1 AND u.is_deleted = FALSE`, [id]);
   const user = rows[0];
   if (user && user.role_id) {
