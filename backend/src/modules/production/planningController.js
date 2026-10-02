@@ -146,6 +146,30 @@ exports.generate = async (req, res) => {
     // Máy/trạng thái cấp lệnh: nếu phân bổ theo công đoạn thì lấy máy của công đoạn đầu để hiển thị
     const headMachine = machine_id || (stages[0] && stages[0].machine_id) || null;
     const status = (headMachine || stages.length) ? 'Đã lên kế hoạch' : 'Chờ duyệt';
+
+    // Cache quy trình theo product_id để tránh query nhiều lần khi tạo nhiều lệnh
+    const processCache = {};
+    const getProcessStages = async (productId) => {
+      if (processCache[productId] !== undefined) return processCache[productId];
+      try {
+        const procs = (await client.query(
+          'SELECT id FROM tech_processes WHERE product_id = $1 AND is_deleted = FALSE ORDER BY created_at DESC LIMIT 1',
+          [productId])).rows;
+        if (!procs.length) { processCache[productId] = []; return []; }
+        const steps = (await client.query(
+          'SELECT name, workshop, machine_id FROM process_steps WHERE process_id = $1 ORDER BY seq',
+          [procs[0].id])).rows;
+        const mapStage = (s) => /c[ắa]t/i.test(`${s.name || ''} ${s.workshop || ''}`) ? 'Cắt' : 'Thổi';
+        processCache[productId] = steps.map((s) => ({
+          stage: mapStage(s),
+          name: s.name || mapStage(s),
+          assigned_team: s.workshop || (mapStage(s) === 'Cắt' ? 'Nhà máy cắt' : 'Nhà máy thổi'),
+          machine_id: s.machine_id || null, shift: null, assigned_worker: null,
+        }));
+      } catch (e) { console.warn('getProcessStages error:', e.message); processCache[productId] = []; }
+      return processCache[productId];
+    };
+
     const created = [];
     for (const it of items) {
       const remaining = Number(it.quantity) - Number(it.planned_qty || 0);
@@ -165,9 +189,12 @@ exports.generate = async (req, res) => {
          shift || null, assigned_team || null, gk, it.due_date, status, assigned_worker || null, it.material_type || null, JSON.stringify(it.mix_ratio || []), it.priority || 'Trung bình', it.note || null]);
       const po = r.rows[0];
       created.push(po.order_code);
+
       // Tạo sẵn công đoạn (production_tasks) theo phân bổ từng công đoạn — mỗi công đoạn làm đủ SL (nối tiếp)
+      // Nếu không truyền stages từ frontend → tự tìm quy trình sản phẩm để tạo tasks
+      const effectiveStages = stages.length > 0 ? stages : await getProcessStages(it.product_id);
       let n = 1;
-      for (const s of stages) {
+      for (const s of effectiveStages) {
         await client.query(`
           INSERT INTO production_tasks
             (production_order_id, task_code, stage, quantity, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note)
