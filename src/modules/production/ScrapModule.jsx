@@ -251,6 +251,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
 }
 
 function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
+  const { user } = usePerm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
@@ -258,6 +259,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
   const [record, setRecord] = useState(null); // existing record
   const [scrapQty, setScrapQty] = useState("");
   const [note, setNote] = useState("");
+  const [recorderName, setRecorderName] = useState("");
 
   // Load WOs and existing record for selected worker + date
   const loadData = useCallback(async () => {
@@ -276,6 +278,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
       setWos(wosData || []);
       setRecord(recordData);
       setNote(recordData?.note || "");
+      setRecorderName(recordData?.recorder_name || user?.name || "");
       
       let totalScrap = "";
       if (recordData && recordData.items && recordData.items.length > 0) {
@@ -329,6 +332,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
         record_date: date,
         note,
         scrap_qty: Number(scrapQty) || 0,
+        recorder_name: recorderName || worker,
       });
       toast.success("Ghi nhận phế phẩm thành công!");
       await loadData();
@@ -424,7 +428,16 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
                 ) : (
                   <>
                     <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/80 shadow-sm">
-                      <div className="font-semibold text-slate-800 mb-2">Người ghi nhận: <span className="text-blue-600">{worker}</span></div>
+                      <div className="mb-4">
+                        <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Người ghi nhận <span className="text-rose-500">*</span></label>
+                        <input 
+                          type="text"
+                          className={inputCls + " font-semibold text-blue-700"} 
+                          value={recorderName}
+                          onChange={e => setRecorderName(e.target.value)}
+                          placeholder="Nhập tên người ghi nhận (hoặc để mặc định)"
+                        />
+                      </div>
                       
                       <div className="mt-4">
                         <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Số lượng phế thực nhận (Kg) <span className="text-rose-500">*</span></label>
@@ -511,7 +524,8 @@ function ScrapManagement({ onEdit }) {
 
   const cols = [
     { key: "record_date", label: "Ngày ghi nhận", render: r => new Date(r.record_date).toLocaleDateString("vi-VN") },
-    { key: "worker_name", label: "Người ghi nhận", tdClass: "font-medium text-blue-600" },
+    { key: "worker_name", label: "Công nhân SX", tdClass: "font-medium text-slate-700" },
+    { key: "recorder_name", label: "Người ghi nhận", render: r => r.recorder_name || r.worker_name, tdClass: "font-medium text-blue-600" },
     { key: "total_scrap", label: "Số lượng phế (Kg)", align: "right", render: r => <span className="font-bold text-rose-600">{fmt(r.total_scrap)}</span> },
     { key: "note", label: "Ghi chú", tdClass: "text-slate-500 text-sm" },
     { key: "updated_at", label: "Cập nhật lúc", render: r => new Date(r.updated_at).toLocaleTimeString("vi-VN") },

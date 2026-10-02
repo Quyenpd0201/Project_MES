@@ -96,8 +96,9 @@ exports.saveRecords = async (req, res) => {
       return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
     }
 
-    // Đảm bảo cột employee_id tồn tại để không gây lỗi 500 (hotfix)
+    // Đảm bảo cột employee_id và recorder_name tồn tại để không gây lỗi
     await db.pool.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id)`);
+    await db.pool.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS recorder_name character varying`);
 
     await client.query('BEGIN');
 
@@ -116,12 +117,12 @@ exports.saveRecords = async (req, res) => {
 
     // 3. Upsert record
     const rRes = await client.query(`
-      INSERT INTO daily_scrap_records (worker_name, record_date, note, employee_id, updated_at)
-      VALUES ($1, $2, $3, $4, now())
+      INSERT INTO daily_scrap_records (worker_name, record_date, note, employee_id, recorder_name, updated_at)
+      VALUES ($1, $2, $3, $4, $5, now())
       ON CONFLICT (worker_name, record_date)
-      DO UPDATE SET note = EXCLUDED.note, employee_id = COALESCE(EXCLUDED.employee_id, daily_scrap_records.employee_id), updated_at = now()
+      DO UPDATE SET note = EXCLUDED.note, employee_id = COALESCE(EXCLUDED.employee_id, daily_scrap_records.employee_id), recorder_name = EXCLUDED.recorder_name, updated_at = now()
       RETURNING id
-    `, [worker_name, record_date, note || null, employee_id || null]);
+    `, [worker_name, record_date, note || null, employee_id || null, req.body.recorder_name || worker_name]);
     const recordId = rRes.rows[0].id;
 
     // 4. Process item (generic scrap)
@@ -281,23 +282,23 @@ exports.getDailyDetails = async (req, res) => {
 };
 
 // GET /api/scrap/all-records
-// GET /api/scrap/all-records
 exports.getAllRecords = async (req, res) => {
   try {
-    // Đảm bảo cột employee_id tồn tại để không gây lỗi 500 (hotfix)
+    // Đảm bảo cột employee_id và recorder_name tồn tại
     await db.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id)`);
+    await db.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS recorder_name character varying`);
     
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const { rows } = await db.query(`
       SELECT 
-        dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at,
+        dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at, dsr.recorder_name,
         e.employee_code, e.name as employee_name,
         COALESCE(SUM(dsi.scrap_qty), 0)::numeric as total_scrap
       FROM daily_scrap_records dsr
       LEFT JOIN employees e ON dsr.employee_id = e.id
       LEFT JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
       WHERE dsr.record_date = $1
-      GROUP BY dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at, e.employee_code, e.name
+      GROUP BY dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at, dsr.recorder_name, e.employee_code, e.name
       ORDER BY dsr.updated_at DESC
     `, [date]);
     res.json(rows);
