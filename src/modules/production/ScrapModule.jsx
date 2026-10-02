@@ -442,10 +442,11 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                         <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Người ghi nhận <span className="text-rose-500">*</span></label>
                         <input 
                           type="text"
-                          className={inputCls + " font-semibold text-blue-700"} 
+                          className={inputCls + " font-semibold text-blue-700 disabled:opacity-70 disabled:bg-slate-100"} 
                           value={recorderName}
                           onChange={e => setRecorderName(e.target.value)}
                           placeholder="Nhập tên người ghi nhận (hoặc để mặc định)"
+                          disabled={record && !cameFromManage}
                         />
                       </div>
                       
@@ -453,10 +454,11 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                         <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Số lượng phế thực nhận (Kg) <span className="text-rose-500">*</span></label>
                         <input 
                           type="number" min="0" step="0.1"
-                          className={inputCls + " text-2xl text-right font-bold text-rose-600"} 
+                          className={inputCls + " text-2xl text-right font-bold text-rose-600 disabled:opacity-70 disabled:bg-slate-100"} 
                           value={scrapQty}
                           onChange={e => setScrapQty(e.target.value)}
                           placeholder="0.0"
+                          disabled={record && !cameFromManage}
                         />
                       </div>
                     </div>
@@ -464,22 +466,34 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 uppercase mb-1.5">Ghi chú thêm</label>
                       <textarea 
-                        className={inputCls + " resize-none"} 
+                        className={inputCls + " resize-none disabled:opacity-70 disabled:bg-slate-100"} 
                         rows={2}
                         value={note}
                         onChange={e => setNote(e.target.value)}
                         placeholder="Nguyên nhân phế, lỗi kỹ thuật..."
+                        disabled={record && !cameFromManage}
                       />
                     </div>
 
-                    <button 
-                      onClick={handleSave} 
-                      disabled={saving || loading}
-                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Save size={18} /> {saving ? "Đang lưu..." : (record ? "Cập nhật dữ liệu" : "Xác nhận ghi nhận")}
-                    </button>
-                    {record && (
+                    {(!record || cameFromManage) ? (
+                      <button 
+                        onClick={handleSave} 
+                        disabled={saving || loading}
+                        className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <Save size={18} /> {saving ? "Đang lưu..." : (record ? "Cập nhật dữ liệu" : "Xác nhận ghi nhận")}
+                      </button>
+                    ) : (
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-4 rounded-lg text-sm text-center flex flex-col items-center gap-2">
+                        <CheckCircle2 size={24} className="text-emerald-500" />
+                        <div>
+                          <p className="font-semibold">Đã ghi nhận phế phẩm hôm nay.</p>
+                          <p className="text-emerald-600/90 mt-1">Vui lòng liên hệ Quản lý (vào tab Điều chỉnh phế) để sửa nếu có sai sót.</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {(record && cameFromManage) && (
                       <p className="text-xs text-center text-slate-400 mt-2">
                         Đã ghi nhận lần cuối lúc {new Date(record.updated_at).toLocaleTimeString("vi-VN")}
                       </p>
