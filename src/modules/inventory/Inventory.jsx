@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, UnitSelect } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -85,10 +85,12 @@ function AdjustModal({ lookups, onClose, onSaved }) {
         <h3 className="text-lg font-bold text-slate-800">Nhập / Xuất / Điều chỉnh tồn</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <Field label="Sản phẩm" required>
-            <select className={inputCls} value={f.product_id} onChange={(e) => onProduct(e.target.value)}>
-              <option value="">-- Chọn --</option>
-              {lookups.products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-            </select>
+            <SearchSelect
+              value={f.product_id}
+              onChange={onProduct}
+              options={lookups.products.map((p) => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
+              placeholder="-- Chọn --"
+            />
           </Field>
           <Field label="Loại giao dịch" required>
             <select className={inputCls} value={f.trx_type} onChange={(e) => set("trx_type", e.target.value)}>

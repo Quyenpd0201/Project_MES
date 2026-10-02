@@ -695,10 +695,10 @@ exports.updateTask = async (req, res) => {
         FROM production_tasks t JOIN production_orders po ON po.id = t.production_order_id
         WHERE t.id = $1`, [taskId])).rows[0];
       if (chk) {
-        const cap = Number(chk.order_qty) * 1.1;
+        const cap = Number(chk.order_qty) * 1.5;
         const newSum = Number(chk.others_actual) + Number(b.actual_qty);
         if (newSum > cap + 1e-6) {
-          return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${chk.stage} (${newSum}) vượt quá 110% SL cần sản xuất (${chk.order_qty} → tối đa ${cap}). Vui lòng xem xét lại số lượng thực tế.` });
+          return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${chk.stage} (${newSum}) vượt quá 150% SL cần sản xuất (${chk.order_qty} → tối đa ${cap}). Vui lòng xem xét lại số lượng thực tế.` });
         }
       }
     }
@@ -728,16 +728,16 @@ exports.saveTasks = async (req, res) => {
     if (['Hoàn thành', 'Đã hủy'].includes(po.status)) return res.status(400).json({ message: `Lệnh đã ${po.status} — không thể sửa phân công.` });
     const tasks = Array.isArray(req.body.tasks) ? req.body.tasks.filter(t => t && t.stage) : [];
 
-    // Ràng buộc 110% (đồng bộ với frontend, chặn cả khi gọi API trực tiếp):
-    const cap = Number(po.quantity) * 1.1;
-    // 1) SẢN LƯỢNG kế hoạch từng lần không vượt 110%
+    // Ràng buộc 150% (đồng bộ với frontend, chặn cả khi gọi API trực tiếp):
+    const cap = Number(po.quantity) * 1.5;
+    // 1) SẢN LƯỢNG kế hoạch từng lần không vượt 150%
     const badPlan = tasks.find(t => (Number(t.quantity) || 0) > cap + 1e-6);
-    if (badPlan) return res.status(400).json({ message: `Sản lượng một lần (${badPlan.stage} ${Number(badPlan.quantity)}) vượt quá 110% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
-    // 2) Σ SL thực cộng dồn mỗi công đoạn không vượt 110%
+    if (badPlan) return res.status(400).json({ message: `Sản lượng một lần (${badPlan.stage} ${Number(badPlan.quantity)}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
+    // 2) Σ SL thực cộng dồn mỗi công đoạn không vượt 150%
     const actByStage = {};
     tasks.forEach(t => { actByStage[t.stage] = (actByStage[t.stage] || 0) + (Number(t.actual_qty) || 0); });
     const badAct = Object.entries(actByStage).find(([, s]) => s > cap + 1e-6);
-    if (badAct) return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 110% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
+    if (badAct) return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
 
     await client.query('BEGIN');
     await client.query(`DELETE FROM production_tasks WHERE production_order_id = $1`, [poId]);

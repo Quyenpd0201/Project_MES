@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Upload, Save, Plus, Trash2, RefreshCcw, History, AlertTriangle, PackageCheck, Check, Ban, ChevronRight, ChevronDown, ClipboardList } from "lucide-react";
-import { DataTable, PageHeader, UnitSelect } from "../../components.jsx";
+import { DataTable, PageHeader, UnitSelect, SearchSelect } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, toast } from "../../ui.js";
@@ -210,12 +210,12 @@ function OutboundForm({ lookups, onSaved }) {
                   return (
                     <tr key={l._k} className={`hover:bg-slate-50/50 ${overQty ? "bg-rose-50/40" : ""}`}>
                       <td className="px-3 py-2">
-                        <select className={inputCls} value={l.product_id} onChange={e => onProductChange(l._k, e.target.value)}>
-                          <option value="">-- Chọn sản phẩm --</option>
-                          {(lookups.products || []).map(p => (
-                            <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>
-                          ))}
-                        </select>
+                        <SearchSelect
+                          value={l.product_id}
+                          onChange={v => onProductChange(l._k, v)}
+                          options={(lookups.products || []).map(p => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
+                          placeholder="-- Chọn sản phẩm --"
+                        />
                       </td>
                       <td className="px-3 py-2 text-right">
                         {l.available !== null

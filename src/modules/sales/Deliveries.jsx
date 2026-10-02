@@ -6,7 +6,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
 
 const STATUSES = ["Đã xuất hóa đơn", "Chờ thanh toán", "Đã thanh toán 1 phần", "Đã thanh toán", "Đã hủy"];
 const today = () => new Date().toISOString().slice(0, 10);
@@ -159,10 +159,12 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                 return (
                   <tr key={it._k}>
                     <td className="px-4 py-1.5">
-                      <select className={inputCls} value={it.product_id} onChange={(e) => upItem(it._k, "product_id", e.target.value)}>
-                        <option value="">{it.product_name || "-- Chọn --"}</option>
-                        {lookups.products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-                      </select>
+                      <SearchSelect
+                        value={it.product_id}
+                        onChange={(v) => upItem(it._k, "product_id", v)}
+                        options={lookups.products.map((p) => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
+                        placeholder={it.product_name || "-- Chọn --"}
+                      />
                     </td>
                     <td className="px-4 py-1.5 text-slate-500">{specShort(it.specs) || "—"}</td>
                     <td className="px-4 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upItem(it._k, "quantity", e.target.value)} /></td>

@@ -269,19 +269,19 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   const save = async () => {
     if (!f.product_id) return toast.error("Vui lòng chọn Sản phẩm");
     if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Vui lòng nhập Số lượng hợp lệ");
-    const capQty = Number(f.quantity) * 1.1;
-    // Ràng buộc 1: SẢN LƯỢNG (kế hoạch) của TỪNG LẦN không được vượt 110% Số lượng cần sản xuất.
+    const capQty = Number(f.quantity) * 1.5;
+    // Ràng buộc 1: SẢN LƯỢNG (kế hoạch) của TỪNG LẦN không được vượt 150% Số lượng cần sản xuất.
     const overPlan = tasks.filter((t) => t.stage && (Number(t.quantity) || 0) > capQty + 1e-6);
     if (overPlan.length) {
-      return toast.error(`Sản lượng một lần không được vượt 110% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Có lần vượt: ${overPlan.map((t) => `${t.stage} (${fmt(Number(t.quantity))})`).join(", ")}. Vui lòng xem xét lại sản lượng.`);
+      return toast.error(`Sản lượng một lần không được vượt 150% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Có lần vượt: ${overPlan.map((t) => `${t.stage} (${fmt(Number(t.quantity))})`).join(", ")}. Vui lòng xem xét lại sản lượng.`);
     }
     // Ràng buộc 2: Σ SỐ LƯỢNG THỰC TẾ cộng dồn tại dòng cha (mỗi công đoạn) chỉ được vượt
-    // tối đa 10% Số lượng cần sản xuất.
+    // tối đa 50% Số lượng cần sản xuất.
     const actualByStage = {};
     tasks.forEach((t) => { if (t.stage) actualByStage[t.stage] = (actualByStage[t.stage] || 0) + (Number(t.actual_qty) || 0); });
     const over = Object.entries(actualByStage).filter(([, s]) => s > capQty + 1e-6);
     if (over.length) {
-      return toast.error(`Số lượng thực tế cộng dồn của công đoạn ${over.map(([stg, s]) => `${stg} (${fmt(s)})`).join(", ")} vượt quá 110% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Vui lòng xem xét lại số lượng thực tế.`);
+      return toast.error(`Số lượng thực tế cộng dồn của công đoạn ${over.map(([stg, s]) => `${stg} (${fmt(s)})`).join(", ")} vượt quá 150% Số lượng cần sản xuất (${fmt(f.quantity)} → tối đa ${fmt(capQty)}). Vui lòng xem xét lại số lượng thực tế.`);
     }
     // Tỷ lệ (%) ở bảng NVL gộp → đồng bộ về mix_ratio (cấp lệnh); Số KG lưu riêng ở savePlannedMaterials.
     const mixRatio = plannedMats.filter((m) => m.material_id).map((m) => ({ material_id: m.material_id, ratio: m.ratio === '' || m.ratio == null ? null : Number(m.ratio) }));
@@ -334,10 +334,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
       <Section title="Thông tin sản xuất cơ bản">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           {!fhid("product_id") && <Field label="Sản phẩm" required>
-            <select className={inputCls} disabled={fdis("product_id")} value={f.product_id} onChange={(e) => onProduct(e.target.value)}>
-              <option value="">-- Chọn sản phẩm --</option>
-              {lookups.products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-            </select>
+            <SearchSelect
+              value={f.product_id}
+              onChange={onProduct}
+              options={lookups.products.map((p) => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
+              placeholder="-- Chọn sản phẩm --"
+              disabled={fdis("product_id")}
+            />
           </Field>}
           {!fhid("customer_id") && <Field label="Khách hàng">
             <select className={inputCls} disabled={fdis("customer_id")} value={f.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
@@ -609,8 +612,8 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                     const sumQty = rows.reduce((s, t) => s + (Number(t.quantity) || 0), 0);
                     const sumAct = rows.reduce((s, t) => s + (Number(t.actual_qty) || 0), 0);
                     const qtyReq = Number(f.quantity);
-                    const capStage = qtyReq * 1.1;             // ngưỡng 110% cho SL THỰC TẾ → chặn khi Lưu
-                    const actOver = sumAct > capStage + 1e-6;  // Σ thực tế vượt 110%
+                    const capStage = qtyReq * 1.5;             // ngưỡng 150% cho SL THỰC TẾ → chặn khi Lưu
+                    const actOver = sumAct > capStage + 1e-6;  // Σ thực tế vượt 150%
                     const actMet = !actOver && qtyReq > 0 && sumAct >= qtyReq - 1e-6; // đã đạt SL cần SX
                     const isOpen = !collapsed[stg];
                     return (
@@ -626,19 +629,19 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                           {/* SẢN LƯỢNG (kế hoạch): tổng cho phép các lần — trung tính, không ràng buộc */}
                           <td className="py-2 pr-2 font-medium text-slate-500 cursor-pointer" onClick={() => toggleStage(stg)} title="Tổng sản lượng cho phép của các lần (kế hoạch)">Σ KH {fmt(sumQty)}</td>
                           <td colSpan={6} className="cursor-pointer" onClick={() => toggleStage(stg)} />
-                          {/* THỰC TẾ: total cộng dồn so với SL cần SX — ràng buộc ≤ 110% */}
-                          <td className={`py-2 pr-2 font-semibold ${actOver ? "text-rose-600" : actMet ? "text-emerald-600" : "text-slate-600"}`} title={actOver ? `Vượt 110% SL cần SX (tối đa ${fmt(capStage)})` : undefined}>Σ {fmt(sumAct)} / {fmt(qtyReq)}{actOver ? " ⚠ >110%" : actMet ? " ✓" : ""}</td>
+                          {/* THỰC TẾ: total cộng dồn so với SL cần SX — ràng buộc ≤ 150% */}
+                          <td className={`py-2 pr-2 font-semibold ${actOver ? "text-rose-600" : actMet ? "text-emerald-600" : "text-slate-600"}`} title={actOver ? `Vượt 150% SL cần SX (tối đa ${fmt(capStage)})` : undefined}>Σ {fmt(sumAct)} / {fmt(qtyReq)}{actOver ? " ⚠ >150%" : actMet ? " ✓" : ""}</td>
                           <td className="py-2 pr-2 text-right" colSpan={2}>
                             {!fdis("tasks") && <button type="button" onClick={() => addTaskFor(stg)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-white text-blue-600 text-xs font-medium hover:bg-blue-50 hover:border-blue-300 shadow-sm transition-colors"><Plus size={15} /> Thêm lần {stg.toLowerCase()}</button>}
                           </td>
                         </tr>
                         {/* Các dòng CON: từng lần làm (ẩn khi thu gọn) */}
                         {isOpen && rows.map((t) => {
-                          const qtyOver = (Number(t.quantity) || 0) > capStage + 1e-6; // sản lượng 1 lần vượt 110%
+                          const qtyOver = (Number(t.quantity) || 0) > capStage + 1e-6; // sản lượng 1 lần vượt 150%
                           return (
                           <tr key={t._k} className="border-b border-slate-100">
                             <td className="py-1.5 pr-2 pl-8" />
-                            <td className="py-1.5 pr-2"><input type="number" min="0" className={`${inputCls}${qtyOver ? " !border-rose-400 !ring-2 !ring-rose-200" : ""}`} value={t.quantity} onChange={(e) => upTask(t._k, "quantity", e.target.value)} title={qtyOver ? `Sản lượng 1 lần vượt 110% SL cần SX (tối đa ${fmt(capStage)})` : undefined} /></td>
+                            <td className="py-1.5 pr-2"><input type="number" min="0" className={`${inputCls}${qtyOver ? " !border-rose-400 !ring-2 !ring-rose-200" : ""}`} value={t.quantity} onChange={(e) => upTask(t._k, "quantity", e.target.value)} title={qtyOver ? `Sản lượng 1 lần vượt 150% SL cần SX (tối đa ${fmt(capStage)})` : undefined} /></td>
                             <td className="py-1.5 pr-2"><select className={inputCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{machinesForStage.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
                             <td className="py-1.5 pr-2"><select className={inputCls} value={t.shift} onChange={(e) => upTask(t._k, "shift", e.target.value)}><option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}</select></td>
                             <td className="py-1.5 pr-2"><input type="date" className={inputCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
@@ -841,7 +844,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   const columns = [
     { key: "order_code", label: "Mã lệnh", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },
     { key: "product_name", label: "Sản phẩm", filter: "select", tdClass: "text-slate-800" },
-    { key: "customer_name", label: "Khách hàng", filter: "select", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
+    { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-600", render: (r) => r.customer_name || "—" },
     { key: "quantity", label: "SL", align: "right", render: (r) => `${fmt(r.quantity)} ${r.unit || ""}` },
     { key: "status", label: "Trạng thái", filter: "select", options: STATUSES, render: (r) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span> },
     { key: "attr_color", label: "Màu", filter: "select", render: (r) => r.attr_color || "—" },
