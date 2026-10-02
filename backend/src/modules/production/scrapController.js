@@ -290,7 +290,7 @@ exports.getAllRecords = async (req, res) => {
       LEFT JOIN employees e ON dsr.employee_id = e.id
       LEFT JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
       WHERE dsr.record_date = $1
-      GROUP BY dsr.id, e.id
+      GROUP BY dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at, e.employee_code, e.name
       ORDER BY dsr.updated_at DESC
     `, [date]);
     res.json(rows);
