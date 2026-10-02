@@ -96,6 +96,9 @@ exports.saveRecords = async (req, res) => {
       return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
     }
 
+    // Đảm bảo cột employee_id tồn tại để không gây lỗi 500 (hotfix)
+    await db.pool.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id)`);
+
     await client.query('BEGIN');
 
     // 1. Get Kho Phế Phẩm and its default location
@@ -278,8 +281,12 @@ exports.getDailyDetails = async (req, res) => {
 };
 
 // GET /api/scrap/all-records
+// GET /api/scrap/all-records
 exports.getAllRecords = async (req, res) => {
   try {
+    // Đảm bảo cột employee_id tồn tại để không gây lỗi 500 (hotfix)
+    await db.query(`ALTER TABLE daily_scrap_records ADD COLUMN IF NOT EXISTS employee_id uuid REFERENCES public.employees(id)`);
+    
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     const { rows } = await db.query(`
       SELECT 
