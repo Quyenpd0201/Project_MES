@@ -165,6 +165,7 @@ export const scrap = {
 
   dailyWos: (worker_name, date) => http(`/scrap/daily-wos?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),
   records: (worker_name, date) => http(`/scrap/records?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),
+  allRecords: (date) => http(`/scrap/all-records?date=${date}`).then(r => r),
   save: (data) => http(`/scrap/records`, body("POST", data)),
   stats: (worker_name, end_date) => http(`/scrap/statistics?worker_name=${encodeURIComponent(worker_name)}&end_date=${end_date}`).then(r => r),
   dailyDetails: (worker_name, date) => http(`/scrap/daily-details?worker_name=${encodeURIComponent(worker_name)}&date=${date}`).then(r => r),

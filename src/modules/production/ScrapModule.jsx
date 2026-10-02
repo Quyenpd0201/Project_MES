@@ -7,6 +7,7 @@ import {
 import { PageHeader, DataTable } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast } from "../../ui.js";
+import { usePerm } from "../../perm.jsx";
 
 // ----- STATISTICS COMPONENT -----
 function ScrapStatistics({ worker, onOpenOrder }) {
@@ -249,14 +250,13 @@ function ScrapStatistics({ worker, onOpenOrder }) {
   );
 }
 
-// ----- RECORDING COMPONENT -----
 function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [wos, setWos] = useState([]);
   const [record, setRecord] = useState(null); // existing record
-  const [inputs, setInputs] = useState({}); // { product_id: { scrap_qty: 0 } }
+  const [scrapQty, setScrapQty] = useState("");
   const [note, setNote] = useState("");
 
   // Load WOs and existing record for selected worker + date
@@ -264,7 +264,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
     if (!worker || !date) {
       setWos([]);
       setRecord(null);
-      setInputs({});
+      setScrapQty("");
       return;
     }
     setLoading(true);
@@ -277,22 +277,11 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
       setRecord(recordData);
       setNote(recordData?.note || "");
       
-      const newInputs = {};
-      (wosData || []).forEach(wo => {
-        if (!newInputs[wo.product_id]) {
-          newInputs[wo.product_id] = { scrap_qty: "" };
-        }
-      });
-      if (recordData && recordData.items) {
-        recordData.items.forEach(it => {
-          if (newInputs[it.product_id]) {
-            newInputs[it.product_id].scrap_qty = it.scrap_qty || "";
-          } else {
-            newInputs[it.product_id] = { scrap_qty: it.scrap_qty || "" };
-          }
-        });
+      let totalScrap = "";
+      if (recordData && recordData.items && recordData.items.length > 0) {
+        totalScrap = recordData.items.reduce((s, it) => s + (Number(it.scrap_qty) || 0), 0);
       }
-      setInputs(newInputs);
+      setScrapQty(totalScrap);
     } catch (e) {
       toast.error("Lỗi tải dữ liệu: " + e.message);
     } finally {
@@ -328,14 +317,8 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
     if (!worker) return toast.error("Vui lòng chọn công nhân");
     if (!productGroups.length) return toast.error("Không có thành phẩm nào để ghi phế");
 
-    const items = productGroups.map(g => ({
-      product_id: g.product_id,
-      finished_qty: g.total_qty,
-      scrap_qty: Number(inputs[g.product_id]?.scrap_qty) || 0
-    }));
-
-    if (items.every(i => i.scrap_qty <= 0)) {
-      if (!window.confirm("Tất cả phế phẩm đều = 0. Bạn có chắc chắn muốn lưu?")) return;
+    if (!scrapQty || Number(scrapQty) < 0) {
+      if (!window.confirm("Số lượng phế = 0 hoặc chưa nhập. Bạn có chắc chắn muốn lưu?")) return;
     }
 
     setSaving(true);
@@ -345,7 +328,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
         employee_id: workerId || null,
         record_date: date,
         note,
-        items
+        scrap_qty: Number(scrapQty) || 0,
       });
       toast.success("Ghi nhận phế phẩm thành công!");
       await loadData();
@@ -354,13 +337,6 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
     } finally {
       setSaving(false);
     }
-  };
-
-  const setScrapVal = (prodId, val) => {
-    setInputs(prev => ({
-      ...prev,
-      [prodId]: { ...prev[prodId], scrap_qty: val }
-    }));
   };
 
   const woCols = [
@@ -447,33 +423,19 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
                   <p className="text-sm text-slate-500 italic text-center py-4">Chưa có thành phẩm nào.</p>
                 ) : (
                   <>
-                    <div className="space-y-4">
-                      {productGroups.map((g, idx) => {
-                        const sq = Number(inputs[g.product_id]?.scrap_qty) || 0;
-                        const ratio = g.total_qty > 0 ? (sq / g.total_qty * 100).toFixed(2) : 0;
-                        return (
-                          <div key={g.product_id} className="p-4 rounded-lg border border-slate-100 bg-slate-50/50">
-                            <div className="font-medium text-slate-800 mb-1">Sản phẩm {idx + 1}: {g.product_name}</div>
-                            <div className="text-xs text-slate-500 mb-3">Tổng thành phẩm: <span className="font-semibold text-emerald-600">{fmt(g.total_qty)} {g.unit}</span></div>
-                            
-                            <div>
-                              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1.5">Phế {g.product_name} ({g.unit})</label>
-                              <div className="flex items-center gap-3">
-                                <input 
-                                  type="number" min="0" step="0.1"
-                                  className={inputCls + " text-right font-medium"} 
-                                  value={inputs[g.product_id]?.scrap_qty !== undefined ? inputs[g.product_id]?.scrap_qty : ""}
-                                  onChange={e => setScrapVal(g.product_id, e.target.value)}
-                                  placeholder="0"
-                                />
-                                <div className="w-20 shrink-0 text-sm font-medium text-rose-500 bg-rose-50 px-2 py-2 rounded-md text-center border border-rose-100">
-                                  {ratio}%
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                    <div className="p-5 rounded-xl border border-slate-200 bg-slate-50/80 shadow-sm">
+                      <div className="font-semibold text-slate-800 mb-2">Người ghi nhận: <span className="text-blue-600">{worker}</span></div>
+                      
+                      <div className="mt-4">
+                        <label className="block text-sm font-bold text-slate-700 uppercase mb-2">Số lượng phế thực nhận (Kg) <span className="text-rose-500">*</span></label>
+                        <input 
+                          type="number" min="0" step="0.1"
+                          className={inputCls + " text-2xl text-right font-bold text-rose-600"} 
+                          value={scrapQty}
+                          onChange={e => setScrapQty(e.target.value)}
+                          placeholder="0.0"
+                        />
+                      </div>
                     </div>
 
                     <div>
@@ -515,7 +477,82 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
   );
 }
 
+// ----- MANAGEMENT COMPONENT -----
+function ScrapManagement({ onEdit }) {
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await scrap.allRecords(date);
+      setRecords(res || []);
+    } catch (e) {
+      toast.error("Lỗi lấy danh sách ghi nhận phế: " + e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filtered = useMemo(() => {
+    if (!search) return records;
+    const lower = search.toLowerCase();
+    return records.filter(r => 
+      (r.worker_name || "").toLowerCase().includes(lower) || 
+      (r.employee_name || "").toLowerCase().includes(lower)
+    );
+  }, [search, records]);
+
+  const cols = [
+    { key: "record_date", label: "Ngày ghi nhận", render: r => new Date(r.record_date).toLocaleDateString("vi-VN") },
+    { key: "worker_name", label: "Người ghi nhận", tdClass: "font-medium text-blue-600" },
+    { key: "total_scrap", label: "Số lượng phế (Kg)", align: "right", render: r => <span className="font-bold text-rose-600">{fmt(r.total_scrap)}</span> },
+    { key: "note", label: "Ghi chú", tdClass: "text-slate-500 text-sm" },
+    { key: "updated_at", label: "Cập nhật lúc", render: r => new Date(r.updated_at).toLocaleTimeString("vi-VN") },
+    { 
+      key: "actions", label: "", align: "right", 
+      render: r => (
+        <button 
+          onClick={() => onEdit(r)}
+          className="text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded text-sm font-medium transition-colors"
+        >
+          Điều chỉnh phế
+        </button>
+      )
+    }
+  ];
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center bg-slate-50">
+        <div className="flex items-center gap-4">
+          <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
+          <input 
+            type="text" 
+            className={inputCls + " w-64"} 
+            placeholder="Tìm theo tên công nhân..." 
+            value={search} onChange={e => setSearch(e.target.value)} 
+          />
+        </div>
+        <button onClick={loadData} className="btn-ghost flex items-center gap-1.5 text-sm">
+          <RefreshCcw size={14} className={loading ? "animate-spin" : ""} /> Làm mới
+        </button>
+      </div>
+      <div className="p-0">
+        <DataTable rows={filtered} columns={cols} rowKey={r => r.id} />
+      </div>
+    </div>
+  );
+}
+
 export default function ScrapModule({ onOpenOrder }) {
+  const { can } = usePerm();
   const [activeTab, setActiveTab] = useState("record");
   
   // GLOBAL STATE
@@ -542,24 +579,26 @@ export default function ScrapModule({ onOpenOrder }) {
       />
       
       {/* GLOBAL WORKER FILTER */}
-      <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm bg-gradient-to-r from-blue-50 to-white">
-        <div className="max-w-md">
-          <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
-          <div className="relative">
-            <Users className="absolute left-3 top-2.5 text-blue-500" size={18} />
-            <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"}
-              value={worker} onChange={e => setWorker(e.target.value)}>
-              <option value="">-- Vui lòng chọn công nhân --</option>
-              {workerList.map(w => (
-                <option key={w.id} value={w.id}>{w.employee_code ? `${w.employee_code} · ` : ""}{w.name}</option>
-              ))}
-            </select>
+      {activeTab !== "manage" && (
+        <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm bg-gradient-to-r from-blue-50 to-white">
+          <div className="max-w-md">
+            <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
+            <div className="relative">
+              <Users className="absolute left-3 top-2.5 text-blue-500" size={18} />
+              <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"}
+                value={worker} onChange={e => setWorker(e.target.value)}>
+                <option value="">-- Vui lòng chọn công nhân --</option>
+                {workerList.map(w => (
+                  <option key={w.id} value={w.id}>{w.employee_code ? `${w.employee_code} · ` : ""}{w.name}</option>
+                ))}
+              </select>
+            </div>
+            {workerList.length === 0 && (
+              <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">Chưa có công nhân nào phát sinh dữ liệu gần đây.</p>
+            )}
           </div>
-          {workerList.length === 0 && (
-            <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">Chưa có công nhân nào phát sinh dữ liệu gần đây.</p>
-          )}
         </div>
-      </div>
+      )}
 
       {/* TABS */}
       <div className="flex items-center gap-1 border-b border-slate-200">
@@ -577,11 +616,28 @@ export default function ScrapModule({ onOpenOrder }) {
         >
           <TrendingUp size={16} /> Thống kê 7 Ngày
         </button>
+        {can("scrap", "edit") && (
+          <button
+            onClick={() => setActiveTab("manage")}
+            className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2
+              ${activeTab === "manage" ? "border-amber-600 text-amber-600 bg-amber-50/50" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}
+          >
+            <Settings2 size={16} /> Quản lý / Điều chỉnh phế
+          </button>
+        )}
       </div>
 
       <div className="py-2">
         {activeTab === "record" ? (
           <ScrapForm worker={workerName} workerId={worker} date={date} setDate={setDate} onOpenOrder={onOpenOrder} />
+        ) : activeTab === "manage" ? (
+          <ScrapManagement onEdit={(r) => {
+             // Map worker_name back to worker ID
+             const found = workerList.find(w => w.name === r.worker_name);
+             if (found) setWorker(found.id);
+             setDate(r.record_date.slice(0, 10));
+             setActiveTab("record");
+          }} />
         ) : (
           <ScrapStatistics worker={workerName} onOpenOrder={onOpenOrder} />
         )}

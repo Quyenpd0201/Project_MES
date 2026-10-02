@@ -91,8 +91,8 @@ exports.getRecords = async (req, res) => {
 exports.saveRecords = async (req, res) => {
   const client = await db.pool.connect();
   try {
-    const { worker_name, record_date, note, items, employee_id } = req.body;
-    if (!worker_name || !record_date || !items || !items.length) {
+    const { worker_name, record_date, note, employee_id, scrap_qty } = req.body;
+    if (!worker_name || !record_date) {
       return res.status(400).json({ message: 'Thiếu thông tin bắt buộc' });
     }
 
@@ -105,7 +105,13 @@ exports.saveRecords = async (req, res) => {
     const lRes = await client.query(`SELECT id FROM locations WHERE warehouse_id = $1 LIMIT 1`, [scrapWarehouseId]);
     const scrapLocationId = lRes.rows.length ? lRes.rows[0].id : null;
 
-    // 2. Upsert record
+    // 2. Get SP-PHE product
+    const pRes = await client.query(`SELECT id, unit FROM products WHERE product_code = 'SP-PHE'`);
+    if (!pRes.rows.length) throw new Error("Không tìm thấy sản phẩm Phế phẩm (SP-PHE) trong hệ thống");
+    const pId = pRes.rows[0].id;
+    const unit = pRes.rows[0].unit || 'kg';
+
+    // 3. Upsert record
     const rRes = await client.query(`
       INSERT INTO daily_scrap_records (worker_name, record_date, note, employee_id, updated_at)
       VALUES ($1, $2, $3, $4, now())
@@ -115,44 +121,35 @@ exports.saveRecords = async (req, res) => {
     `, [worker_name, record_date, note || null, employee_id || null]);
     const recordId = rRes.rows[0].id;
 
-    // 3. Process items
-    for (const it of items) {
-      // Find difference if updating
-      const oldItem = await client.query(`SELECT scrap_qty FROM daily_scrap_items WHERE record_id = $1 AND product_id = $2`, [recordId, it.product_id]);
-      const oldQty = oldItem.rows.length ? Number(oldItem.rows[0].scrap_qty) : 0;
-      const newQty = Number(it.scrap_qty) || 0;
-      const diff = newQty - oldQty;
+    // 4. Process item (generic scrap)
+    const oldItem = await client.query(`SELECT scrap_qty FROM daily_scrap_items WHERE record_id = $1 AND product_id = $2`, [recordId, pId]);
+    const oldQty = oldItem.rows.length ? Number(oldItem.rows[0].scrap_qty) : 0;
+    const newQty = Number(scrap_qty) || 0;
+    const diff = newQty - oldQty;
 
-      // Upsert item
+    await client.query(`
+      INSERT INTO daily_scrap_items (record_id, product_id, finished_qty, scrap_qty)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (record_id, product_id)
+      DO UPDATE SET scrap_qty = EXCLUDED.scrap_qty
+    `, [recordId, pId, 0, newQty]);
+
+    if (diff !== 0 && scrapLocationId) {
       await client.query(`
-        INSERT INTO daily_scrap_items (record_id, product_id, finished_qty, scrap_qty)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (record_id, product_id)
-        DO UPDATE SET finished_qty = EXCLUDED.finished_qty, scrap_qty = EXCLUDED.scrap_qty
-      `, [recordId, it.product_id, it.finished_qty || 0, newQty]);
+        INSERT INTO inventory_stock (product_id, location_id, quantity, unit, lot_code, spec_key, specs, attr_size, attr_thickness, attr_color)
+        VALUES ($1, $2, $3, $4, '', '||||', '{}'::jsonb, '', '', '')
+        ON CONFLICT (product_id, location_id, spec_key, lot_code)
+        DO UPDATE SET quantity = GREATEST(0, inventory_stock.quantity + EXCLUDED.quantity), updated_at = now()
+      `, [pId, scrapLocationId, diff, unit]);
 
-      // If there is a difference in scrap qty, adjust inventory
-      if (diff !== 0 && scrapLocationId) {
-        // Find product unit
-        const pRes = await client.query(`SELECT unit FROM products WHERE id = $1`, [it.product_id]);
-        const unit = pRes.rows[0]?.unit || 'Kg';
-        
-        await client.query(`
-          INSERT INTO inventory_stock (product_id, location_id, quantity, unit, lot_code, spec_key, specs, attr_size, attr_thickness, attr_color)
-          VALUES ($1, $2, $3, $4, '', '||||', '{}'::jsonb, '', '', '')
-          ON CONFLICT (product_id, location_id, spec_key, lot_code)
-          DO UPDATE SET quantity = GREATEST(0, inventory_stock.quantity + EXCLUDED.quantity), updated_at = now()
-        `, [it.product_id, scrapLocationId, diff, unit]);
-
-        await client.query(`
-          INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, ref_code, note, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color)
-          VALUES ($1, $2, $3, $4, $5, $6, '{}'::jsonb, '||||', '', '', '', '')
-        `, [it.product_id, scrapLocationId, diff > 0 ? 'Nhập' : 'Xuất', Math.abs(diff), 'Ghi phế ' + record_date, 'Ghi nhận phế từ CN: ' + worker_name]);
-      }
+      await client.query(`
+        INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, ref_code, note, specs, spec_key, lot_code, attr_size, attr_thickness, attr_color)
+        VALUES ($1, $2, $3, $4, $5, $6, '{}'::jsonb, '||||', '', '', '', '')
+      `, [pId, scrapLocationId, diff > 0 ? 'Nhập' : 'Xuất', Math.abs(diff), 'Ghi phế ' + record_date, 'Ghi nhận phế từ CN: ' + worker_name]);
     }
 
     await client.query('COMMIT');
-    res.json({ message: 'Đã lưu ghi nhận phế phẩm', recordId });
+    res.json({ message: 'Đã lưu ghi nhận phế phẩm chung', recordId });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err);
@@ -269,14 +266,36 @@ exports.getDailyDetails = async (req, res) => {
 
     const tasks = tasksQuery.rows.map(t => ({
       ...t,
-      // We pass the total scrap for this product on this day.
-      // (Since scrap is recorded per product, not per task)
-      product_scrap_qty: scrapMap[t.product_id] || 0
+      // Since scrap is generic, product_scrap_qty no longer applies per task.
+      product_scrap_qty: 0
     }));
 
     res.json(tasks);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi lấy chi tiết ngày' });
+  }
+};
+
+// GET /api/scrap/all-records
+exports.getAllRecords = async (req, res) => {
+  try {
+    const date = req.query.date || new Date().toISOString().slice(0, 10);
+    const { rows } = await db.query(`
+      SELECT 
+        dsr.id, dsr.worker_name, dsr.record_date, dsr.note, dsr.updated_at,
+        e.employee_code, e.name as employee_name,
+        COALESCE(SUM(dsi.scrap_qty), 0)::numeric as total_scrap
+      FROM daily_scrap_records dsr
+      LEFT JOIN employees e ON dsr.employee_id = e.id
+      LEFT JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+      WHERE dsr.record_date = $1
+      GROUP BY dsr.id, e.id
+      ORDER BY dsr.updated_at DESC
+    `, [date]);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Lỗi khi lấy danh sách phiếu ghi nhận' });
   }
 };
