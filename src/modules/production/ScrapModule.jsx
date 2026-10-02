@@ -250,7 +250,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
   );
 }
 
-function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
+function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManage, onBack }) {
   const { user } = usePerm();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -336,6 +336,9 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
       });
       toast.success("Ghi nhận phế phẩm thành công!");
       await loadData();
+      if (cameFromManage && onBack) {
+        onBack();
+      }
     } catch (e) {
       toast.error("Lỗi khi lưu: " + e.message);
     } finally {
@@ -411,15 +414,22 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder }) {
           {/* RIGHT: SCRAP INPUT FORM */}
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm sticky top-6">
-              <div className={`px-5 py-4 border-b flex items-center gap-2 ${record ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
-                {record ? (
-                  <Edit2 size={18} className="text-amber-600" />
-                ) : (
-                  <FileText size={18} className="text-blue-600" />
+              <div className={`px-5 py-4 border-b flex items-center justify-between gap-2 ${record ? 'bg-amber-50 border-amber-100' : 'bg-slate-50 border-slate-100'}`}>
+                <div className="flex items-center gap-2">
+                  {record ? (
+                    <Edit2 size={18} className="text-amber-600" />
+                  ) : (
+                    <FileText size={18} className="text-blue-600" />
+                  )}
+                  <h3 className={`font-semibold ${record ? 'text-amber-800' : 'text-slate-800'}`}>
+                    {record ? "Cập nhật Phế Phẩm" : "Ghi nhận Phế Phẩm"}
+                  </h3>
+                </div>
+                {cameFromManage && onBack && (
+                  <button onClick={onBack} className="text-sm font-medium text-slate-500 hover:text-slate-700 underline">
+                    Quay lại danh sách
+                  </button>
                 )}
-                <h3 className={`font-semibold ${record ? 'text-amber-800' : 'text-slate-800'}`}>
-                  {record ? "Cập nhật Phế Phẩm" : "Ghi nhận Phế Phẩm"}
-                </h3>
               </div>
               
               <div className="p-5 space-y-6">
@@ -568,6 +578,7 @@ function ScrapManagement({ onEdit }) {
 export default function ScrapModule({ onOpenOrder }) {
   const { can } = usePerm();
   const [activeTab, setActiveTab] = useState("record");
+  const [cameFromManage, setCameFromManage] = useState(false);
   
   // GLOBAL STATE
   const [worker, setWorker] = useState("");
@@ -617,7 +628,10 @@ export default function ScrapModule({ onOpenOrder }) {
       {/* TABS */}
       <div className="flex items-center gap-1 border-b border-slate-200">
         <button
-          onClick={() => setActiveTab("record")}
+          onClick={() => {
+            setActiveTab("record");
+            setCameFromManage(false);
+          }}
           className={`px-5 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2
             ${activeTab === "record" ? "border-blue-600 text-blue-600 bg-blue-50/50" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}
         >
@@ -643,13 +657,25 @@ export default function ScrapModule({ onOpenOrder }) {
 
       <div className="py-2">
         {activeTab === "record" ? (
-          <ScrapForm worker={workerName} workerId={worker} date={date} setDate={setDate} onOpenOrder={onOpenOrder} />
+          <ScrapForm 
+            worker={workerName} 
+            workerId={worker} 
+            date={date} 
+            setDate={setDate} 
+            onOpenOrder={onOpenOrder} 
+            cameFromManage={cameFromManage}
+            onBack={() => {
+              setActiveTab("manage");
+              setCameFromManage(false);
+            }}
+          />
         ) : activeTab === "manage" ? (
           <ScrapManagement onEdit={(r) => {
              // Map worker_name back to worker ID
              const found = workerList.find(w => w.name === r.worker_name);
              if (found) setWorker(found.id);
              setDate(r.record_date.slice(0, 10));
+             setCameFromManage(true);
              setActiveTab("record");
           }} />
         ) : (
