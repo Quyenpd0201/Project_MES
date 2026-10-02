@@ -1082,7 +1082,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
 
   const columns = [
     { key: "order_code", label: "Mã đơn", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },
-    { key: "customer_name", label: "Khách hàng", filter: "select", tdClass: "text-slate-800" },
+    { key: "customer_name", label: "Khách hàng", filter: "text", tdClass: "text-slate-800" },
     { key: "order_date", label: "Ngày đặt", filter: "date", render: (r) => fmtDate(r.order_date) },
     { key: "due_date", label: "Ngày giao", filter: "date", render: (r) => {
         const done = ["Hoàn thành", "Đã hủy"].includes(r.status);
