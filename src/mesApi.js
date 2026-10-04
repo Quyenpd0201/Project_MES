@@ -41,6 +41,7 @@ export function resource(name) {
 export const getLookups = () => http(`/lookups`);
 export const getDashboard = () => http(`/dashboard`);
 export const customerOrders = (id) => http(`/customers/${id}/orders`).then((r) => r.data);
+export const deliverableOrders = (id) => http(`/customers/${id}/deliverable-orders`).then((r) => r.data);
 export const nextCode = (entity) => http(`/next-code/${entity}`).then((r) => r.code);
 export const productRelated = (id) => http(`/products/${id}/related`);
 export const productFiles = {

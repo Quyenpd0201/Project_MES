@@ -2211,3 +2211,7 @@ INSERT INTO public.locations (warehouse_id, location_code, name)
 -- 4) Đơn giá dòng hàng đơn bán (tính tổng tiền đơn hàng)
 ALTER TABLE public.sales_order_items ADD COLUMN IF NOT EXISTS unit_price numeric DEFAULT 0;
 
+-- 5) Phiếu giao hàng: SL thực tế giao + liên kết dòng đơn (để tính SL đã giao/còn lại, cập nhật trạng thái đơn)
+ALTER TABLE public.delivery_note_items ADD COLUMN IF NOT EXISTS actual_quantity numeric;
+ALTER TABLE public.delivery_note_items ADD COLUMN IF NOT EXISTS sales_order_item_id uuid REFERENCES public.sales_order_items(id);
+
