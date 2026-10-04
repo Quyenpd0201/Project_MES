@@ -112,6 +112,27 @@ exports.byCustomer = async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy đơn hàng của khách' }); }
 };
 
+// Đơn hàng của 1 khách CÓ THỂ GIAO: trạng thái đang/đã SX hoặc đang giao dở, và còn SL chưa giao > 0
+exports.deliverableOrders = async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT so.id, so.order_code, so.order_date, so.due_date, so.status,
+             (SELECT COALESCE(SUM(it.quantity),0) FROM sales_order_items it WHERE it.sales_order_id = so.id) AS ordered_total,
+             (SELECT COALESCE(SUM(di.quantity),0) FROM delivery_note_items di
+                JOIN delivery_notes dn ON dn.id = di.delivery_note_id
+                JOIN sales_order_items it2 ON it2.id = di.sales_order_item_id
+                WHERE it2.sales_order_id = so.id AND dn.is_deleted = FALSE AND dn.status <> 'Đã hủy') AS delivered_total
+      FROM sales_orders so
+      WHERE so.customer_id = $1 AND so.is_deleted = FALSE
+        AND so.status IN ('Đang sản xuất','Hoàn thành sản xuất','Chuyển hàng 1 phần','Đang vận chuyển')
+      ORDER BY so.created_at DESC`, [req.params.id]);
+    const data = rows
+      .map((r) => ({ ...r, remaining_total: Number(r.ordered_total) - Number(r.delivered_total) }))
+      .filter((r) => r.remaining_total > 1e-6);
+    res.json({ data });
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy đơn giao được' }); }
+};
+
 const numOrNull = (v) => (v === '' || v == null ? null : v);
 
 // UPSERT dòng hàng: giữ id cũ (không xóa-tạo lại) để bảo toàn ngày thực tế + liên kết lệnh SX.

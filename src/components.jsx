@@ -301,11 +301,13 @@ export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "K
               {columns.map((c) => (
                 <th key={c.key} className={`${pad} align-top font-normal`}>
                   {c.filter === "select" ? (
-                    <select value={filters[c.key] || "__ph"} onChange={(e) => setF(c.key, e.target.value === "__ph" ? "" : e.target.value)} className={inputCls + " bg-white"}>
-                      <option value="__ph" hidden>{c.label}</option>
-                      <option value="">---</option>
-                      {distinct(c).map((v) => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                    <SearchSelect
+                      value={filters[c.key] || ""}
+                      onChange={(v) => setF(c.key, v === "__all__" ? "" : v)}
+                      placeholder={c.label}
+                      className={inputCls + " bg-white"}
+                      options={[{ value: "__all__", label: "— Tất cả —" }, ...distinct(c).map((v) => ({ value: String(v), label: String(v) }))]}
+                    />
                   ) : c.filter === "date" ? (
                     <DateInput value={filters[c.key] || ""} onChange={(e) => setF(c.key, e.target.value)} className={inputCls} />
                   ) : c.filter === "text" ? (

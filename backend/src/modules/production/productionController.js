@@ -605,75 +605,29 @@ exports.requestMaterials = async (req, res) => {
     const nvlLoc = (await client.query(
       `SELECT l.id FROM locations l JOIN warehouses w ON w.id = l.warehouse_id
        WHERE w.warehouse_type = 'NVL' AND l.is_deleted = FALSE ORDER BY l.created_at LIMIT 1`)).rows[0]?.id || null;
-       
     if (!nvlLoc) { await client.query('ROLLBACK'); return res.status(400).json({ message: 'Hệ thống chưa có Kho Nguyên vật liệu.' }); }
-
-    // Kiểm tra tồn kho và phân bổ FIFO
-    const shortages = [];
-    const allocations = [];
-    for (const l of plan) {
-      const requiredQty = Number(l.qty);
-      const { rows: stockRows } = await client.query(
-        `SELECT lot_code, quantity, unit FROM inventory_stock
-         WHERE product_id = $1 AND location_id = $2 AND quantity > 0
-         ORDER BY id ASC`, [l.material_id, nvlLoc]
-      );
-      const totalOnHand = stockRows.reduce((sum, r) => sum + Number(r.quantity), 0);
-      if (requiredQty > totalOnHand) {
-        const p = (await client.query(`SELECT product_code, product_name, unit FROM products WHERE id = $1`, [l.material_id])).rows[0] || {};
-        shortages.push({ code: p.product_code, name: p.product_name, unit: l.unit || p.unit || '', on_hand: totalOnHand, need: requiredQty, buy: requiredQty - totalOnHand });
-      } else {
-        let remain = requiredQty;
-        for (const sr of stockRows) {
-          if (remain <= 0) break;
-          const qtyToTake = Math.min(remain, Number(sr.quantity));
-          allocations.push({
-            product_id: l.material_id, lot_code: sr.lot_code || '', quantity: qtyToTake, unit: l.unit || sr.unit, note: l.note
-          });
-          remain -= qtyToTake;
-        }
-      }
-    }
-
-    if (shortages.length) {
-      const msg = 'Không đủ tồn kho NVL để xuất — vui lòng nhập thêm:\n' +
-        shortages.map((x) => `• ${x.code} ${x.name}: tồn ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → thiếu ${x.buy} ${x.unit}`).join('\n');
-      await client.query('ROLLBACK');
-      return res.status(400).json({ message: msg, shortages });
-    }
 
     // Sinh mã phiếu PXK00001…
     const slipCode = (await client.query(
       `SELECT 'PXK' || LPAD((COALESCE(MAX(NULLIF(regexp_replace(slip_code,'\\D','','g'),''))::int,0)+1)::text,5,'0') AS code
        FROM outbound_slips WHERE slip_code ~ '^PXK[0-9]+$'`)).rows[0].code;
 
+    // 2 BƯỚC: tạo phiếu "CHỜ XUẤT" — CHƯA trừ kho. App Kho xác nhận (confirmOutboundSlip)
+    // mới kiểm đủ tồn + trừ NVL; thiếu thì chặn, không cho xuất.
     const slip = (await client.query(
-      `INSERT INTO outbound_slips (slip_code, purpose, location_id, prod_order_id, status, note, created_by, confirmed_at)
-       VALUES ($1,'Xuất cho sản xuất',$2,$3,'Đã xuất',$4,$5,now()) RETURNING id, slip_code`,
+      `INSERT INTO outbound_slips (slip_code, purpose, location_id, prod_order_id, status, note, created_by)
+       VALUES ($1,'Xuất cho sản xuất',$2,$3,'Chờ xuất',$4,$5) RETURNING id, slip_code`,
       [slipCode, nvlLoc, poId, `Xuất NVL cho lệnh ${po.order_code}`, req.userId || null])).rows[0];
 
-    // Ghi nhận dòng phiếu, trừ tồn kho và ghi lịch sử giao dịch
-    for (const alloc of allocations) {
-      await client.query(
-        `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [slip.id, alloc.product_id, alloc.quantity, alloc.unit, alloc.lot_code, alloc.note || null]);
-      
-      await client.query(
-        `INSERT INTO inventory_stock (product_id, location_id, spec_key, lot_code, quantity, unit)
-         VALUES ($1,$2,'',$3,$4,$5)
-         ON CONFLICT (product_id, location_id, spec_key, lot_code)
-         DO UPDATE SET quantity = inventory_stock.quantity + EXCLUDED.quantity, unit = COALESCE(EXCLUDED.unit, inventory_stock.unit), updated_at = now()`,
-        [alloc.product_id, nvlLoc, alloc.lot_code, -alloc.quantity, upUnit(alloc.unit)]);
-      
-      await client.query(
-        `INSERT INTO inventory_transactions (product_id, location_id, trx_type, quantity, lot_code, ref_code, note)
-         VALUES ($1,$2,'Xuất',$3,$4,$5,$6)`,
-        [alloc.product_id, nvlLoc, alloc.quantity, alloc.lot_code, slip.slip_code, 'Xuất cho sản xuất']);
-    }
+    // Ghi dòng phiếu theo SL YÊU CẦU (lúc xác nhận sẽ FIFO + trừ kho)
+    for (const l of plan) await client.query(
+      `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,'',$5)`,
+      [slip.id, l.material_id, Number(l.qty), upUnit(l.unit), l.note || null]);
 
+    // Khóa danh sách NVL của lệnh (đã gửi yêu cầu). Hủy phiếu sẽ mở khóa lại.
     await client.query(`UPDATE production_orders SET materials_issued = TRUE WHERE id = $1`, [poId]);
     await client.query('COMMIT');
-    res.json({ message: `Đã xuất kho NVL thành công (Phiếu ${slip.slip_code}).`, slip_code: slip.slip_code, slip_id: slip.id, count: allocations.length });
+    res.json({ message: `Đã tạo phiếu xuất kho ${slip.slip_code} (Chờ xuất). Vào Kho → Xuất kho để xác nhận trừ tồn.`, slip_code: slip.slip_code, slip_id: slip.id, count: plan.length });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi yêu cầu NVL' }); }
   finally { client.release(); }
 };
@@ -699,6 +653,20 @@ exports.updateTask = async (req, res) => {
         const newSum = Number(chk.others_actual) + Number(b.actual_qty);
         if (newSum > cap + 1e-6) {
           return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${chk.stage} (${newSum}) vượt quá 150% SL cần sản xuất (${chk.order_qty} → tối đa ${cap}). Vui lòng xem xét lại số lượng thực tế.` });
+        }
+      }
+    }
+    // Phương án 2: lần TỰ "Hoàn thành" khi SL thực ≥ SL kế hoạch của lần (trừ khi đã hủy / đang tạm dừng)
+    {
+      const task = (await client.query(`SELECT quantity, actual_qty, status FROM production_tasks WHERE id = $1`, [taskId])).rows[0];
+      if (task) {
+        const effActual = (b.actual_qty !== undefined)
+          ? (b.actual_qty === '' || b.actual_qty == null ? null : Number(b.actual_qty))
+          : (task.actual_qty == null ? null : Number(task.actual_qty));
+        const plan = Number(task.quantity) || 0;
+        const effStatus = (b.status !== undefined) ? b.status : task.status;
+        if (effActual != null && plan > 0 && effActual >= plan - 1e-6 && effStatus !== 'Đã hủy' && effStatus !== 'Dừng sản xuất') {
+          b.status = 'Hoàn thành';
         }
       }
     }
@@ -743,15 +711,20 @@ exports.saveTasks = async (req, res) => {
     await client.query(`DELETE FROM production_tasks WHERE production_order_id = $1`, [poId]);
     let n = 1;
     for (const t of tasks) {
+      const plan = Number(t.quantity) || 0;
+      const act = t.actual_qty === '' || t.actual_qty == null ? null : Number(t.actual_qty);
+      let st = t.status || 'Chờ';
+      // Phương án 2: lần TỰ "Hoàn thành" khi SL thực ≥ SL kế hoạch (trừ khi đã hủy / đang tạm dừng)
+      if (act != null && plan > 0 && act >= plan - 1e-6 && st !== 'Đã hủy' && st !== 'Dừng sản xuất') st = 'Hoàn thành';
       await client.query(`
         INSERT INTO production_tasks
           (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note, assigned_worker_id)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [poId, `${po.order_code}-${n}`, t.stage, t.quantity || 0,
-         t.actual_qty === '' || t.actual_qty == null ? null : t.actual_qty, t.scrap_qty || 0,
+        [poId, `${po.order_code}-${n}`, t.stage, plan,
+         act, t.scrap_qty || 0,
          t.machine_id || null, t.shift || null,
          t.planned_date || null, t.planned_end_date || t.planned_date || null,
-         t.assigned_team || null, t.assigned_worker || null, t.status || 'Chờ', n, t.note || null, t.assigned_worker_id || null]);
+         t.assigned_team || null, t.assigned_worker || null, st, n, t.note || null, t.assigned_worker_id || null]);
       n++;
     }
     await recomputeOrder(client, poId);

@@ -8,6 +8,7 @@ const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 router.get('/customers/:id/orders', salesOrders.byCustomer);
+router.get('/customers/:id/deliverable-orders', salesOrders.deliverableOrders);
 router.get('/sales-orders', salesOrders.list);
 router.post('/sales-orders', requirePerm('orders:create'), salesOrders.create);
 router.get('/sales-orders/:id', salesOrders.getById);
