@@ -316,7 +316,7 @@ exports.employees = async (req, res) => {
                COALESCE(t.stage, 'Chung') AS stage,
                COALESCE(t.shift, po.shift) AS shift,
                COALESCE(t.assigned_worker, po.assigned_worker) AS final_worker,
-               COALESCE(t.assigned_worker_id, po.assigned_worker_id) AS final_worker_id,
+               t.assigned_worker_id AS final_worker_id,
                po.order_code,
                po.priority
         FROM production_orders po
