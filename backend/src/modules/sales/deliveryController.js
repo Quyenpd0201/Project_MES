@@ -2,6 +2,7 @@
 const db = require('../../core/db');
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete } = require('../../core/lib/deleteGuard');
+const { applyStock } = require('../../core/lib/stock');
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v) || 0);
 
@@ -67,7 +68,7 @@ exports.fromOrder = async (req, res) => {
                        WHERE po.sales_order_item_id = it.id AND po.is_deleted = FALSE), 0) AS produced,
              COALESCE((SELECT SUM(di.quantity) FROM delivery_note_items di
                        JOIN delivery_notes dn ON dn.id = di.delivery_note_id
-                       WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status <> 'Đã hủy'), 0) AS delivered
+                       WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status NOT IN ('Bản nháp','Đã hủy')), 0) AS delivered
       FROM sales_order_items it JOIN products p ON p.id = it.product_id
       WHERE it.sales_order_id = $1 ORDER BY p.product_code`, [req.params.orderId])).rows;
     const showAmt = canViewAmounts(req);
@@ -90,7 +91,7 @@ async function updateOrderStatusAfterDelivery(client, salesOrderId) {
     SELECT it.quantity AS ordered,
            COALESCE((SELECT SUM(di.quantity) FROM delivery_note_items di
                      JOIN delivery_notes dn ON dn.id = di.delivery_note_id
-                     WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status <> 'Đã hủy'), 0) AS delivered
+                     WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status NOT IN ('Bản nháp','Đã hủy')), 0) AS delivered
     FROM sales_order_items it WHERE it.sales_order_id = $1`, [salesOrderId])).rows;
   if (!rows.length) return;
   const anyDelivered = rows.some((r) => Number(r.delivered) > 0);
@@ -136,7 +137,7 @@ exports.create = async (req, res) => {
     const { rows } = await client.query(
       `INSERT INTO delivery_notes (sales_order_id, customer_id, delivery_date, status, note, paid_amount)
        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [b.sales_order_id || null, b.customer_id, b.delivery_date || new Date(), b.status || 'Đã xuất hóa đơn', b.note || null, num(b.paid_amount)]);
+      [b.sales_order_id || null, b.customer_id, b.delivery_date || new Date(), b.status || 'Bản nháp', b.note || null, num(b.paid_amount)]);
     const total = await saveItems(client, rows[0].id, b.items);
     await client.query(`UPDATE delivery_notes SET total_amount = $1 WHERE id = $2`, [total, rows[0].id]);
     await updateOrderStatusAfterDelivery(client, b.sales_order_id || null);
@@ -168,6 +169,100 @@ exports.update = async (req, res) => {
     await client.query('COMMIT');
     res.json({ message: 'Đã cập nhật phiếu' });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi cập nhật phiếu' }); }
+  finally { client.release(); }
+};
+
+// POST /api/deliveries/:id/ship — XÁC NHẬN GIAO HÀNG
+// Tự tạo 1 phiếu xuất kho (mục đích "Giao hàng cho khách") từ Kho Thành phẩm, trừ tồn (FIFO),
+// chặn nếu tồn TP không đủ, rồi chuyển phiếu giao sang trạng thái "Giao hàng".
+exports.ship = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const dn = (await client.query(
+      `SELECT d.*, c.name AS customer_name, so.order_code AS sales_order_code
+       FROM delivery_notes d
+       LEFT JOIN customers c ON c.id = d.customer_id
+       LEFT JOIN sales_orders so ON so.id = d.sales_order_id
+       WHERE d.id = $1 AND d.is_deleted = FALSE`, [req.params.id])).rows[0];
+    if (!dn) return res.status(404).json({ message: 'Không tìm thấy phiếu giao hàng' });
+    if (dn.status === 'Đã hủy') return res.status(400).json({ message: 'Phiếu đã hủy, không thể giao hàng.' });
+    if (dn.status !== 'Bản nháp') return res.status(400).json({ message: `Phiếu đã ở trạng thái "${dn.status}" — chỉ giao hàng được từ "Bản nháp".` });
+
+    const items = (await client.query(
+      `SELECT product_id, product_name, unit,
+              COALESCE(actual_quantity, quantity) AS qty
+       FROM delivery_note_items WHERE delivery_note_id = $1`, [req.params.id])).rows;
+    // Gộp theo sản phẩm (số lượng giao)
+    const byProduct = new Map();
+    for (const it of items) {
+      if (!it.product_id) return res.status(400).json({ message: `Dòng "${it.product_name || ''}" chưa gắn sản phẩm trong kho — không thể xuất kho.` });
+      const q = Number(it.qty) || 0;
+      if (q <= 0) continue;
+      const cur = byProduct.get(it.product_id) || { product_id: it.product_id, product_name: it.product_name, unit: it.unit, qty: 0 };
+      cur.qty += q; byProduct.set(it.product_id, cur);
+    }
+    const lines = [...byProduct.values()];
+    if (!lines.length) return res.status(400).json({ message: 'Phiếu chưa có dòng hàng có số lượng giao > 0.' });
+
+    // Phân bổ FIFO + kiểm tra đủ tồn trước khi trừ.
+    // Trừ tồn ở các kho NVL/BTP/TP (ưu tiên Thành phẩm trước — cho giao theo đơn;
+    // bán hàng tồn kho có thể lấy từ NVL/BTP). Bỏ qua kho Phế liệu.
+    const shortages = [], allocations = [];
+    for (const l of lines) {
+      const need = Number(l.qty);
+      const { rows: stockRows } = await client.query(
+        `SELECT s.location_id, s.lot_code, s.quantity, s.unit, s.spec_key, s.specs
+         FROM inventory_stock s
+         JOIN locations lo ON lo.id = s.location_id
+         JOIN warehouses w ON w.id = lo.warehouse_id
+         WHERE s.product_id = $1 AND s.quantity > 0 AND w.warehouse_type IN ('NVL','BTP','TP')
+         ORDER BY (w.warehouse_type = 'TP') DESC, s.id ASC`,
+        [l.product_id]);
+      const onHand = stockRows.reduce((s, r) => s + Number(r.quantity), 0);
+      if (need > onHand + 1e-6) {
+        shortages.push({ name: l.product_name, unit: l.unit || '', on_hand: onHand, need, lack: need - onHand });
+      } else {
+        let remain = need;
+        for (const sr of stockRows) {
+          if (remain <= 1e-9) break;
+          const take = Math.min(remain, Number(sr.quantity));
+          allocations.push({ product_id: l.product_id, location_id: sr.location_id, lot_code: sr.lot_code || '', spec_key: sr.spec_key, specs: sr.specs || {}, quantity: take, unit: l.unit || sr.unit });
+          remain -= take;
+        }
+      }
+    }
+    if (shortages.length) {
+      const msg = 'Không đủ tồn kho để giao — vui lòng sản xuất/nhập kho trước:\n' +
+        shortages.map((x) => `• ${x.name}: tồn ${x.on_hand} ${x.unit}, cần giao ${x.need} ${x.unit} → thiếu ${x.lack} ${x.unit}`).join('\n');
+      return res.status(400).json({ message: msg, shortages });
+    }
+    const slipLoc = allocations[0].location_id; // kho đại diện cho phiếu xuất (có thể gồm nhiều kho)
+
+    await client.query('BEGIN');
+    // Sinh mã phiếu xuất kho PXK00001…
+    const slipCode = (await client.query(
+      `SELECT 'PXK' || LPAD((COALESCE(MAX(NULLIF(regexp_replace(slip_code,'\\D','','g'),''))::int,0)+1)::text,5,'0') AS code
+       FROM outbound_slips WHERE slip_code ~ '^PXK[0-9]+$'`)).rows[0].code;
+    const slip = (await client.query(
+      `INSERT INTO outbound_slips (slip_code, purpose, location_id, status, note, confirmed_at, created_by)
+       VALUES ($1,'Giao hàng cho khách',$2,'Đã xuất',$3, now(), $4) RETURNING id, slip_code`,
+      [slipCode, slipLoc, `Giao hàng phiếu ${dn.note_code}${dn.customer_name ? ' · ' + dn.customer_name : ''}`, req.userId || null])).rows[0];
+
+    for (const l of lines) await client.query(
+      `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,'',$5)`,
+      [slip.id, l.product_id, Number(l.qty), upUnit(l.unit), null]);
+
+    for (const a of allocations) await applyStock(client, {
+      product_id: a.product_id, location_id: a.location_id, delta: -a.quantity, unit: a.unit,
+      specs: a.specs, spec_key: a.spec_key, lot_code: a.lot_code,
+      clampZero: false, trx_type: 'Xuất', ref_code: slip.slip_code, note: `Giao hàng cho khách (${dn.note_code})`,
+    });
+
+    await client.query(`UPDATE delivery_notes SET status = 'Giao hàng', updated_at = now() WHERE id = $1`, [req.params.id]);
+    await updateOrderStatusAfterDelivery(client, dn.sales_order_id || null);
+    await client.query('COMMIT');
+    res.json({ message: `Đã giao hàng — tạo phiếu xuất kho ${slip.slip_code} (${lines.length} dòng) và trừ tồn kho.`, slip_code: slip.slip_code, slip_id: slip.id });
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi giao hàng' }); }
   finally { client.release(); }
 };
 

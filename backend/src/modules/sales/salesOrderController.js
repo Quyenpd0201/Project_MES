@@ -121,7 +121,7 @@ exports.deliverableOrders = async (req, res) => {
              (SELECT COALESCE(SUM(di.quantity),0) FROM delivery_note_items di
                 JOIN delivery_notes dn ON dn.id = di.delivery_note_id
                 JOIN sales_order_items it2 ON it2.id = di.sales_order_item_id
-                WHERE it2.sales_order_id = so.id AND dn.is_deleted = FALSE AND dn.status <> 'Đã hủy') AS delivered_total
+                WHERE it2.sales_order_id = so.id AND dn.is_deleted = FALSE AND dn.status NOT IN ('Bản nháp','Đã hủy')) AS delivered_total
       FROM sales_orders so
       WHERE so.customer_id = $1 AND so.is_deleted = FALSE
         AND so.status IN ('Đang sản xuất','Hoàn thành sản xuất','Chuyển hàng 1 phần','Đang vận chuyển')

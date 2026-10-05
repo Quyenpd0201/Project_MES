@@ -196,7 +196,7 @@ CREATE TABLE public.delivery_notes (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     paid_amount numeric(16,2) DEFAULT 0 NOT NULL,
-    CONSTRAINT delivery_notes_status_check CHECK (((status)::text = ANY ((ARRAY['Đã xuất hóa đơn'::character varying, 'Chờ thanh toán'::character varying, 'Đã thanh toán 1 phần'::character varying, 'Đã thanh toán'::character varying, 'Đã hủy'::character varying])::text[])))
+    CONSTRAINT delivery_notes_status_check CHECK (((status)::text = ANY ((ARRAY['Bản nháp'::character varying, 'Giao hàng'::character varying, 'Đã xuất hóa đơn'::character varying, 'Chờ thanh toán'::character varying, 'Đã thanh toán 1 phần'::character varying, 'Đã thanh toán'::character varying, 'Đã hủy'::character varying])::text[])))
 );
 
 
@@ -2214,4 +2214,10 @@ ALTER TABLE public.sales_order_items ADD COLUMN IF NOT EXISTS unit_price numeric
 -- 5) Phiếu giao hàng: SL thực tế giao + liên kết dòng đơn (để tính SL đã giao/còn lại, cập nhật trạng thái đơn)
 ALTER TABLE public.delivery_note_items ADD COLUMN IF NOT EXISTS actual_quantity numeric;
 ALTER TABLE public.delivery_note_items ADD COLUMN IF NOT EXISTS sales_order_item_id uuid REFERENCES public.sales_order_items(id);
+
+-- 6) Phiếu giao hàng: thêm trạng thái "Bản nháp" (mặc định khi tạo) + "Giao hàng"
+--    (nút Giao hàng tạo phiếu xuất kho "Giao hàng cho khách" + trừ tồn Kho Thành phẩm)
+ALTER TABLE public.delivery_notes DROP CONSTRAINT IF EXISTS delivery_notes_status_check;
+ALTER TABLE public.delivery_notes ADD CONSTRAINT delivery_notes_status_check
+  CHECK ((status)::text = ANY (ARRAY['Bản nháp','Giao hàng','Đã xuất hóa đơn','Chờ thanh toán','Đã thanh toán 1 phần','Đã thanh toán','Đã hủy']::text[]));
 

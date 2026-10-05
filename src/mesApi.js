@@ -67,6 +67,7 @@ export const roles = {
 export const deliveries = {
   ...resource("deliveries"),
   fromOrder: (orderId) => http(`/deliveries/from-order/${orderId}`),
+  ship: (id) => http(`/deliveries/${id}/ship`, body("POST", {})),
 };
 
 export const processes = resource("processes");
