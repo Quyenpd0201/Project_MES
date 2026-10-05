@@ -4,7 +4,15 @@ const db = require('../../core/db');
 // công đoạn cuối của 1 lệnh (Cắt nếu có, ngược lại Thổi)
 const FINAL = `(CASE WHEN EXISTS (SELECT 1 FROM production_tasks t2 WHERE t2.production_order_id = po.id AND t2.stage='Cắt') THEN 'Cắt' ELSE 'Thổi' END)`;
 
-exports.summary = async (_req, res) => {
+// Quyền xem số liệu tiền (doanh thu/công nợ) — dùng quyền deliveries.view_amounts, như Dashboard FE
+function canViewAmounts(req) {
+  if (req.user?.is_admin) return true;
+  const p = req.user?.permissions?.deliveries;
+  const v = p?.view_amounts, f = p?.fields?.amounts;
+  return v === 'ALLOW' || v === true || v?.status === 'ALLOW' || f === 'edit' || f === 'view';
+}
+
+exports.summary = async (req, res) => {
   try {
     const [kpi, machines, inProgress, dueSoon, statusBreakdown, overduePay, finance] = await Promise.all([
       // KPI tổng
@@ -82,8 +90,9 @@ exports.summary = async (_req, res) => {
       in_progress: inProgress.rows,
       due_soon: dueSoon.rows,
       status_breakdown: statusBreakdown.rows,
-      overdue_payments: overduePay.rows,
-      finance: finance.rows[0],
+      // Số liệu tiền: chỉ trả cho role được xem (defense-in-depth, không chỉ ẩn UI)
+      overdue_payments: canViewAmounts(req) ? overduePay.rows : [],
+      finance: canViewAmounts(req) ? finance.rows[0] : null,
     });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy dữ liệu dashboard' }); }
 };

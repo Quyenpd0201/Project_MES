@@ -5,6 +5,15 @@ const { guardDelete } = require('../../core/lib/deleteGuard');
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v) || 0);
 
+// Quyền xem tiền ở Phiếu giao hàng (chặn ở backend — không chỉ ẩn UI)
+function canViewAmounts(req) {
+  if (req.user?.is_admin) return true;
+  const p = req.user?.permissions?.deliveries;
+  const v = p?.view_amounts, f = p?.fields?.amounts;
+  return v === 'ALLOW' || v === true || v?.status === 'ALLOW' || f === 'edit' || f === 'view';
+}
+const stripMoneyItem = (it) => { const { unit_price, amount, ...rest } = it; return rest; };
+
 exports.list = async (req, res) => {
   try {
     const where = ['d.is_deleted = FALSE']; const params = []; let i = 1;
@@ -18,6 +27,7 @@ exports.list = async (req, res) => {
       LEFT JOIN customers c ON c.id = d.customer_id
       LEFT JOIN sales_orders so ON so.id = d.sales_order_id
       WHERE ${where.join(' AND ')} ORDER BY d.created_at DESC`, params);
+    if (!canViewAmounts(req)) rows.forEach((r) => { delete r.total_amount; delete r.paid_amount; });
     res.json({ data: rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy danh sách phiếu' }); }
 };
@@ -33,7 +43,12 @@ exports.getById = async (req, res) => {
       WHERE d.id = $1 AND d.is_deleted = FALSE`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy phiếu' });
     const items = await db.query(`SELECT * FROM delivery_note_items WHERE delivery_note_id = $1 ORDER BY line_no`, [req.params.id]);
-    res.json({ ...rows[0], items: items.rows });
+    const d = rows[0];
+    if (!canViewAmounts(req)) {
+      delete d.total_amount; delete d.paid_amount;
+      return res.json({ ...d, items: items.rows.map(stripMoneyItem) });
+    }
+    res.json({ ...d, items: items.rows });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết phiếu' }); }
 };
 
@@ -55,11 +70,14 @@ exports.fromOrder = async (req, res) => {
                        WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status <> 'Đã hủy'), 0) AS delivered
       FROM sales_order_items it JOIN products p ON p.id = it.product_id
       WHERE it.sales_order_id = $1 ORDER BY p.product_code`, [req.params.orderId])).rows;
+    const showAmt = canViewAmounts(req);
     res.json({
       sales_order_id: so.id, sales_order_code: so.order_code, customer_id: so.customer_id, customer_name: so.customer_name,
       items: items.map((it) => {
         const ordered = Number(it.ordered) || 0, delivered = Number(it.delivered) || 0;
-        return { ...it, ordered, produced: Number(it.produced) || 0, delivered, remaining: Math.max(0, ordered - delivered), unit_price: Number(it.unit_price) || 0 };
+        const base = { ...it, ordered, produced: Number(it.produced) || 0, delivered, remaining: Math.max(0, ordered - delivered) };
+        if (showAmt) base.unit_price = Number(it.unit_price) || 0; else delete base.unit_price;
+        return base;
       }),
     });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy đơn hàng' }); }
