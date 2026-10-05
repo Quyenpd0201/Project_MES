@@ -16,7 +16,8 @@ export const ACTION_LABELS = {
   view: "Xem", create: "Tạo mới", edit: "Sửa", delete: "Xóa",
   approve: "Duyệt", publish: "Phát hành", assign: "Phân công",
   execute: "Thực thi", import: "Import", export: "Xuất Excel",
-  print: "In tem", view_amounts: "Xem Kế toán/Tiền"
+  print: "In tem", view_amounts: "Xem Kế toán/Tiền",
+  request: "Yêu cầu", confirm: "Xác nhận"
 };
 
 // HTTP method tương ứng với từng action
@@ -24,6 +25,7 @@ const ACTION_HTTP = {
   view: "GET", create: "POST", edit: "PUT", delete: "DELETE",
   approve: "PUT", publish: "PUT", assign: "PUT",
   execute: "POST", import: "POST", export: "GET", print: "GET",
+  request: "POST", confirm: "POST"
 };
 
 // Route API tương ứng với từng module
@@ -90,7 +92,7 @@ export const PERM_TREE = [
     category: "Sản xuất",
     icon: Factory,
     modules: [
-      { key: "production",  label: "Lệnh sản xuất",        actions: ["view","create","edit","delete","publish","assign","export"] },
+      { key: "production",  label: "Lệnh sản xuất",        actions: ["view","create","edit","delete","publish","assign","export","request"] },
       { key: "orderstatus", label: "Lệnh theo trạng thái", actions: ["view","edit"] },
       { key: "execution",   label: "Thực thi sản xuất",    actions: ["view","execute"] },
       { key: "prod_output", label: "Sản lượng",            actions: ["view","edit","export"] },
@@ -111,7 +113,7 @@ export const PERM_TREE = [
     modules: [
       { key: "inventory",    label: "Tồn kho",            actions: ["view","export"] },
       { key: "inv_inbound",  label: "Nhập kho",           actions: ["view","create","edit","delete","approve"] },
-      { key: "inv_outbound", label: "Xuất kho",           actions: ["view","create","edit","delete","approve"] },
+      { key: "inv_outbound", label: "Xuất kho",           actions: ["view","create","edit","delete","approve","confirm"] },
       { key: "inv_transfer", label: "Chuyển kho",         actions: ["view","create","approve"] },
       { key: "inv_adjust",   label: "Điều chỉnh tồn kho", actions: ["view","create","approve"] },
     ]

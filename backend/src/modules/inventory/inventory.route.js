@@ -16,7 +16,7 @@ router.delete('/inventory/stock/:id', requirePerm('inv_adjust:create'), inventor
 router.post('/outbound-slips', requirePerm('inv_outbound:create'), inventory.createOutboundSlip);
 router.get('/outbound-slips', inventory.listOutboundSlips);
 router.get('/outbound-slips/:id', inventory.getOutboundSlip);
-router.post('/outbound-slips/:id/confirm', requirePerm('inv_outbound:create'), inventory.confirmOutboundSlip);
-router.post('/outbound-slips/:id/cancel', requirePerm('inv_outbound:create'), inventory.cancelOutboundSlip);
+router.post('/outbound-slips/:id/confirm', requirePerm('inv_outbound:confirm'), inventory.confirmOutboundSlip);
+router.post('/outbound-slips/:id/cancel', requirePerm('inv_outbound:confirm'), inventory.cancelOutboundSlip);
 
 module.exports = router;

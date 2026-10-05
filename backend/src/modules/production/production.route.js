@@ -21,7 +21,7 @@ router.post('/production-orders/:id/materials', requirePerm('production:edit'), 
 // NVL cần cung cấp (kế hoạch cấp NVL) + Yêu cầu NVL → xuất kho
 router.get('/production-orders/:id/planned-materials', production.getPlannedMaterials);
 router.post('/production-orders/:id/planned-materials', requirePerm('production:edit'), production.savePlannedMaterials);
-router.post('/production-orders/:id/request-materials', requirePerm('production:edit'), production.requestMaterials);
+router.post('/production-orders/:id/request-materials', requirePerm('production:request'), production.requestMaterials);
 router.delete('/production-orders/:id', requirePerm('production:delete'), production.remove);
 
 const scrap = require('./scrapController');
