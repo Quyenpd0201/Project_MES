@@ -144,7 +144,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
     <div className="space-y-5">
       <PageHeader title={!editId ? "Tạo phiếu giao hàng" : editing ? "Sửa phiếu giao hàng" : "Chi tiết phiếu giao hàng"} onBack={onBack}
         actions={editId && !editing ? (<>
-          {f.status === "Bản nháp" && can("deliveries", "edit") &&
+          {f.status === "Bản nháp" && can("deliveries", "approve") &&
             <button onClick={ship} className="btn-primary"><Truck size={16} /> Giao hàng</button>}
           <button onClick={() => onPrint?.(editId)} className="btn-ghost"><Printer size={16} /> In phiếu</button>
           {can("deliveries", "edit") && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
