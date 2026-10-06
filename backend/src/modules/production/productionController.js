@@ -273,12 +273,54 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const b = req.body;
-    // Không cho sửa NỘI DUNG lệnh đã Hoàn thành/Đã hủy (vẫn cho cập nhật chỉ-mỗi-trạng-thái).
+    // Không cho sửa NỘI DUNG lệnh đã Hoàn thành/Đã hủy, TRỪ KHI lệnh Hoàn thành mà
+    // có công đoạn chưa gán máy/ca/đội/công nhân/thực tế (cần bổ sung).
     const contentKeys = Object.keys(b).filter((k) => k !== 'status');
     if (contentKeys.length) {
       const cur = (await db.query(`SELECT status FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [req.params.id])).rows[0];
-      if (cur && ['Hoàn thành', 'Đã hủy'].includes(cur.status)) {
-        return res.status(400).json({ message: `Lệnh đã ${cur.status} — không thể sửa.` });
+      if (cur && cur.status === 'Đã hủy') {
+        return res.status(400).json({ message: `Lệnh đã Hủy — không thể sửa.` });
+      }
+      if (cur && cur.status === 'Hoàn thành') {
+        // Kiểm tra xem có công đoạn chưa đủ thông tin không
+        const { rows: incompleteTasks } = await db.query(
+          `SELECT id FROM production_tasks
+           WHERE production_order_id = $1
+             AND (machine_id IS NULL OR shift IS NULL OR shift = ''
+                  OR assigned_team IS NULL OR assigned_team = ''
+                  OR assigned_worker IS NULL OR assigned_worker = ''
+                  OR actual_qty IS NULL)`,
+          [req.params.id]
+        );
+        if (!incompleteTasks.length) {
+          return res.status(400).json({ message: `Lệnh đã Hoàn thành và tất cả công đoạn đã đầy đủ thông tin — không thể sửa.` });
+        }
+        // Có công đoạn chưa đủ → cho phép cập nhật
+      }
+    }
+    // Kiểm tra khi thủ công chuyển status sang 'Hoàn thành': bắt buộc tất cả công đoạn phải có đủ thông tin
+    if (b.status === 'Hoàn thành') {
+      const { rows: incompleteTasks } = await db.query(
+        `SELECT stage, machine_id, shift, assigned_team, assigned_worker, actual_qty
+         FROM production_tasks
+         WHERE production_order_id = $1
+           AND (machine_id IS NULL OR shift IS NULL OR shift = ''
+                OR assigned_team IS NULL OR assigned_team = ''
+                OR assigned_worker IS NULL OR assigned_worker = ''
+                OR actual_qty IS NULL OR actual_qty <= 0)`,
+        [req.params.id]
+      );
+      if (incompleteTasks.length > 0) {
+        const details = incompleteTasks.map((t) => {
+          const lacks = [];
+          if (!t.machine_id) lacks.push('máy');
+          if (!t.shift) lacks.push('ca');
+          if (!t.assigned_team) lacks.push('đội');
+          if (!t.assigned_worker) lacks.push('công nhân');
+          if (!t.actual_qty || t.actual_qty <= 0) lacks.push('SL thực tế');
+          return `${t.stage} (thiếu: ${lacks.join(', ')})`;
+        }).join('; ');
+        return res.status(400).json({ message: `Không thể xác nhận Hoàn thành — các công đoạn chưa đủ thông tin: ${details}. Vui lòng gán đủ máy, ca, đội, công nhân và nhập sản lượng thực tế.` });
       }
     }
     const fields = ['sales_order_id','customer_id','product_id','quantity','unit',
@@ -693,7 +735,22 @@ exports.saveTasks = async (req, res) => {
     const poId = req.params.id;
     const po = (await client.query(`SELECT order_code, quantity, status FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [poId])).rows[0];
     if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
-    if (['Hoàn thành', 'Đã hủy'].includes(po.status)) return res.status(400).json({ message: `Lệnh đã ${po.status} — không thể sửa phân công.` });
+    // Cho phép lưu phân công khi lệnh Hoàn thành nhưng có công đoạn chưa gán máy/ca/đội/công nhân/thực tế
+    if (po.status === 'Đã hủy') return res.status(400).json({ message: `Lệnh đã Hủy — không thể sửa phân công.` });
+    if (po.status === 'Hoàn thành') {
+      const { rows: incompleteTasks } = await client.query(
+        `SELECT id FROM production_tasks
+         WHERE production_order_id = $1
+           AND (machine_id IS NULL OR shift IS NULL OR shift = ''
+                OR assigned_team IS NULL OR assigned_team = ''
+                OR assigned_worker IS NULL OR assigned_worker = ''
+                OR actual_qty IS NULL)`,
+        [poId]
+      );
+      if (!incompleteTasks.length) {
+        return res.status(400).json({ message: `Lệnh đã Hoàn thành và tất cả công đoạn đã đầy đủ thông tin — không thể sửa phân công.` });
+      }
+    }
     const tasks = Array.isArray(req.body.tasks) ? req.body.tasks.filter(t => t && t.stage) : [];
 
     // Ràng buộc 150% (đồng bộ với frontend, chặn cả khi gọi API trực tiếp):
