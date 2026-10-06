@@ -3,16 +3,27 @@ const db = require('../../core/db');
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete } = require('../../core/lib/deleteGuard');
 const { applyStock } = require('../../core/lib/stock');
+const { buildSpecKey } = require('../../core/lib/specs');
 
 const num = (v) => (v === '' || v == null ? 0 : Number(v) || 0);
 
-// Quyền xem tiền ở Phiếu giao hàng (chặn ở backend — không chỉ ẩn UI)
-function canViewAmounts(req) {
-  if (req.user?.is_admin) return true;
-  const p = req.user?.permissions?.deliveries;
-  const v = p?.view_amounts, f = p?.fields?.amounts;
-  return v === 'ALLOW' || v === true || v?.status === 'ALLOW' || f === 'edit' || f === 'view';
-}
+// Bảng chuyển trạng thái hợp lệ cho phiếu giao (state machine).
+// - "Giao hàng" KHÔNG nằm trong bảng: chỉ đặt qua nút Giao hàng (ship) — có xuất kho + trừ tồn.
+// - "Bản nháp" chỉ được "Đã hủy" (chưa trừ kho) hoặc "Giao hàng" (qua nút). KHÔNG cho sang
+//   các trạng thái sau giao để tránh đánh dấu đã bán/đã xuất HĐ mà chưa trừ kho.
+// - Sau khi đã giao (đã trừ kho) KHÔNG cho "Đã hủy": chưa có luồng HOÀN KHO nên hủy sẽ mất tồn.
+const DN_TRANSITIONS = {
+  'Bản nháp':             ['Đã hủy'],
+  'Giao hàng':            ['Đã xuất hóa đơn', 'Chờ thanh toán', 'Đã thanh toán 1 phần', 'Đã thanh toán'],
+  'Đã xuất hóa đơn':      ['Chờ thanh toán', 'Đã thanh toán 1 phần', 'Đã thanh toán'],
+  'Chờ thanh toán':       ['Đã xuất hóa đơn', 'Đã thanh toán 1 phần', 'Đã thanh toán'],
+  'Đã thanh toán 1 phần': ['Chờ thanh toán', 'Đã thanh toán'],
+  'Đã thanh toán':        [],
+  'Đã hủy':               [],
+};
+
+// Quyền xem tiền ở Phiếu giao hàng (chặn ở backend — không chỉ ẩn UI) — helper dùng chung
+const { canViewAmounts } = require('../../core/lib/money');
 const stripMoneyItem = (it) => { const { unit_price, amount, ...rest } = it; return rest; };
 
 exports.list = async (req, res) => {
@@ -66,7 +77,7 @@ exports.fromOrder = async (req, res) => {
              it.quantity AS ordered,
              COALESCE((SELECT SUM(po.posted_qty) FROM production_orders po
                        WHERE po.sales_order_item_id = it.id AND po.is_deleted = FALSE), 0) AS produced,
-             COALESCE((SELECT SUM(di.quantity) FROM delivery_note_items di
+             COALESCE((SELECT SUM(COALESCE(di.actual_quantity, di.quantity)) FROM delivery_note_items di
                        JOIN delivery_notes dn ON dn.id = di.delivery_note_id
                        WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status NOT IN ('Bản nháp','Đã hủy')), 0) AS delivered
       FROM sales_order_items it JOIN products p ON p.id = it.product_id
@@ -89,7 +100,7 @@ async function updateOrderStatusAfterDelivery(client, salesOrderId) {
   if (!salesOrderId) return;
   const rows = (await client.query(`
     SELECT it.quantity AS ordered,
-           COALESCE((SELECT SUM(di.quantity) FROM delivery_note_items di
+           COALESCE((SELECT SUM(COALESCE(di.actual_quantity, di.quantity)) FROM delivery_note_items di
                      JOIN delivery_notes dn ON dn.id = di.delivery_note_id
                      WHERE di.sales_order_item_id = it.id AND dn.is_deleted = FALSE AND dn.status NOT IN ('Bản nháp','Đã hủy')), 0) AS delivered
     FROM sales_order_items it WHERE it.sales_order_id = $1`, [salesOrderId])).rows;
@@ -133,11 +144,13 @@ exports.create = async (req, res) => {
   try {
     const b = req.body;
     if (!b.customer_id) return res.status(400).json({ message: 'Vui lòng chọn Khách hàng' });
+    // Phiếu mới LUÔN là "Bản nháp" (bỏ qua b.status gửi lên) — mọi trạng thái sau đó phải đi
+    // qua đúng luồng: "Giao hàng" bằng nút ship (trừ kho), rồi mới tới hóa đơn/thanh toán.
     await client.query('BEGIN');
     const { rows } = await client.query(
       `INSERT INTO delivery_notes (sales_order_id, customer_id, delivery_date, status, note, paid_amount)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [b.sales_order_id || null, b.customer_id, b.delivery_date || new Date(), b.status || 'Bản nháp', b.note || null, num(b.paid_amount)]);
+       VALUES ($1,$2,$3,'Bản nháp',$4,$5) RETURNING *`,
+      [b.sales_order_id || null, b.customer_id, b.delivery_date || new Date(), b.note || null, num(b.paid_amount)]);
     const total = await saveItems(client, rows[0].id, b.items);
     await client.query(`UPDATE delivery_notes SET total_amount = $1 WHERE id = $2`, [total, rows[0].id]);
     await updateOrderStatusAfterDelivery(client, b.sales_order_id || null);
@@ -152,6 +165,19 @@ exports.update = async (req, res) => {
   try {
     const b = req.body;
     await client.query('BEGIN');
+    // Chặn đổi trạng thái tự do quanh "Giao hàng" (tránh: đánh dấu đã giao mà không trừ kho, hoặc trừ kho 2 lần)
+    const cur = (await client.query(`SELECT status FROM delivery_notes WHERE id = $1 AND is_deleted = FALSE`, [req.params.id])).rows[0];
+    if (!cur) { await client.query('ROLLBACK'); return res.status(404).json({ message: 'Không tìm thấy phiếu' }); }
+    if (b.status !== undefined && b.status !== cur.status) {
+      if (b.status === 'Giao hàng') { await client.query('ROLLBACK'); return res.status(400).json({ message: 'Không đặt trạng thái "Giao hàng" thủ công — hãy dùng nút "Giao hàng" để xuất kho + trừ tồn.' }); }
+      const allowed = DN_TRANSITIONS[cur.status] || [];
+      if (!allowed.includes(b.status)) { await client.query('ROLLBACK'); return res.status(400).json({ message: `Không thể chuyển trạng thái "${cur.status}" → "${b.status}".` }); }
+    }
+    // Chỉ cho sửa DÒNG HÀNG khi còn "Bản nháp": sau khi đã giao, dòng hàng đã quyết định lượng trừ kho → khóa lại.
+    if (b.items !== undefined && cur.status !== 'Bản nháp') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'Phiếu đã rời "Bản nháp" — không thể sửa dòng hàng (đã chốt theo lượng xuất kho).' });
+    }
     const fields = ['sales_order_id', 'customer_id', 'delivery_date', 'status', 'note'];
     const cols = [], vals = []; let i = 1;
     for (const f of fields) if (b[f] !== undefined) { cols.push(`${f} = $${i++}`); vals.push(b[f] === '' ? null : b[f]); }
@@ -189,24 +215,25 @@ exports.ship = async (req, res) => {
     if (dn.status !== 'Bản nháp') return res.status(400).json({ message: `Phiếu đã ở trạng thái "${dn.status}" — chỉ giao hàng được từ "Bản nháp".` });
 
     const items = (await client.query(
-      `SELECT product_id, product_name, unit,
+      `SELECT product_id, product_name, specs, unit,
               COALESCE(actual_quantity, quantity) AS qty
        FROM delivery_note_items WHERE delivery_note_id = $1`, [req.params.id])).rows;
-    // Gộp theo sản phẩm (số lượng giao)
-    const byProduct = new Map();
+    // Gộp theo (sản phẩm + thông số) để trừ ĐÚNG biến thể; số lượng = COALESCE(SL thực, SL giao)
+    const byKey = new Map();
     for (const it of items) {
       if (!it.product_id) return res.status(400).json({ message: `Dòng "${it.product_name || ''}" chưa gắn sản phẩm trong kho — không thể xuất kho.` });
       const q = Number(it.qty) || 0;
       if (q <= 0) continue;
-      const cur = byProduct.get(it.product_id) || { product_id: it.product_id, product_name: it.product_name, unit: it.unit, qty: 0 };
-      cur.qty += q; byProduct.set(it.product_id, cur);
+      const sk = buildSpecKey(it.specs || {});
+      const key = `${it.product_id}|${sk}`;
+      const cur = byKey.get(key) || { product_id: it.product_id, product_name: it.product_name, unit: it.unit, spec_key: sk, qty: 0 };
+      cur.qty += q; byKey.set(key, cur);
     }
-    const lines = [...byProduct.values()];
+    const lines = [...byKey.values()];
     if (!lines.length) return res.status(400).json({ message: 'Phiếu chưa có dòng hàng có số lượng giao > 0.' });
 
     // Phân bổ FIFO + kiểm tra đủ tồn trước khi trừ.
-    // Trừ tồn ở các kho NVL/BTP/TP (ưu tiên Thành phẩm trước — cho giao theo đơn;
-    // bán hàng tồn kho có thể lấy từ NVL/BTP). Bỏ qua kho Phế liệu.
+    // Ưu tiên ĐÚNG thông số (spec_key khớp) trước, rồi kho Thành phẩm, rồi FIFO; chỉ lấy ở NVL/BTP/TP.
     const shortages = [], allocations = [];
     for (const l of lines) {
       const need = Number(l.qty);
@@ -216,8 +243,8 @@ exports.ship = async (req, res) => {
          JOIN locations lo ON lo.id = s.location_id
          JOIN warehouses w ON w.id = lo.warehouse_id
          WHERE s.product_id = $1 AND s.quantity > 0 AND w.warehouse_type IN ('NVL','BTP','TP')
-         ORDER BY (w.warehouse_type = 'TP') DESC, s.id ASC`,
-        [l.product_id]);
+         ORDER BY (s.spec_key = $2) DESC, (w.warehouse_type = 'TP') DESC, s.id ASC`,
+        [l.product_id, l.spec_key]);
       const onHand = stockRows.reduce((s, r) => s + Number(r.quantity), 0);
       if (need > onHand + 1e-6) {
         shortages.push({ name: l.product_name, unit: l.unit || '', on_hand: onHand, need, lack: need - onHand });
@@ -239,6 +266,12 @@ exports.ship = async (req, res) => {
     const slipLoc = allocations[0].location_id; // kho đại diện cho phiếu xuất (có thể gồm nhiều kho)
 
     await client.query('BEGIN');
+    // Chống bấm đúp / gọi đồng thời: chỉ MỘT request "chiếm" được phiếu từ Bản nháp (atomic).
+    // Request thua sẽ không trừ kho lần 2.
+    const claim = await client.query(
+      `UPDATE delivery_notes SET status = 'Giao hàng', updated_at = now()
+       WHERE id = $1 AND status = 'Bản nháp' AND is_deleted = FALSE RETURNING id`, [req.params.id]);
+    if (!claim.rows.length) { await client.query('ROLLBACK'); return res.status(409).json({ message: 'Phiếu đã được giao hoặc đang được xử lý — vui lòng tải lại.' }); }
     // Sinh mã phiếu xuất kho PXK00001…
     const slipCode = (await client.query(
       `SELECT 'PXK' || LPAD((COALESCE(MAX(NULLIF(regexp_replace(slip_code,'\\D','','g'),''))::int,0)+1)::text,5,'0') AS code
@@ -258,7 +291,7 @@ exports.ship = async (req, res) => {
       clampZero: false, trx_type: 'Xuất', ref_code: slip.slip_code, note: `Giao hàng cho khách (${dn.note_code})`,
     });
 
-    await client.query(`UPDATE delivery_notes SET status = 'Giao hàng', updated_at = now() WHERE id = $1`, [req.params.id]);
+    // (trạng thái 'Giao hàng' đã được set atomically ở bước "claim" đầu transaction)
     await updateOrderStatusAfterDelivery(client, dn.sales_order_id || null);
     await client.query('COMMIT');
     res.json({ message: `Đã giao hàng — tạo phiếu xuất kho ${slip.slip_code} (${lines.length} dòng) và trừ tồn kho.`, slip_code: slip.slip_code, slip_id: slip.id });

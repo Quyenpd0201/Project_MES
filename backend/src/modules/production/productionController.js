@@ -121,11 +121,16 @@ async function syncOrderInventory(client, poId) {
     const producedT = t.status === 'Hoàn thành' ? (Number(t.actual_qty == null ? t.quantity : t.actual_qty) || 0) : 0;
     const delta = producedT - Number(t.posted_qty || 0);
     if (delta !== 0) {
-      // (a) Nhập kho ĐẦU RA của công đoạn này
+      // (a) Nhập kho ĐẦU RA của công đoạn này — THIẾU KHO thì THROW để rollback,
+      //     tránh mất sản lượng (trước đây bỏ qua nhập kho nhưng vẫn ghi posted_qty → tồn lệch).
       const outLoc = t.stage === finalStage ? finalLoc : btpLoc;
-      if (outLoc) await applyStock(client, stockOpts(outLoc, delta, `Nhập kho ${t.stage} (tự động)`));
+      if (!outLoc) throw new Error(`Chưa có kho ${t.stage === finalStage ? (o.product_type === 'Bán thành phẩm' ? 'Bán thành phẩm' : 'Thành phẩm') : 'Bán thành phẩm'} để nhập kho tự động — vui lòng tạo kho trước khi hoàn thành lệnh.`);
+      await applyStock(client, stockOpts(outLoc, delta, `Nhập kho ${t.stage} (tự động)`));
       // (b) TIÊU HAO BTP của công đoạn trước (mọi công đoạn trừ công đoạn đầu)
-      if (t.stage !== firstStage && btpLoc) await applyStock(client, stockOpts(btpLoc, -delta, `Tiêu hao BTP cho ${t.stage} (tự động)`));
+      if (t.stage !== firstStage) {
+        if (!btpLoc) throw new Error('Chưa có kho Bán thành phẩm để tiêu hao BTP — vui lòng tạo kho BTP trước.');
+        await applyStock(client, stockOpts(btpLoc, -delta, `Tiêu hao BTP cho ${t.stage} (tự động)`));
+      }
       await client.query(`UPDATE production_tasks SET posted_qty = $2 WHERE id = $1`, [t.id, producedT]);
     }
     if (t.stage === finalStage) totalFinal += producedT;
@@ -304,6 +309,8 @@ exports.update = async (req, res) => {
       `UPDATE production_orders SET ${cols.join(', ')} WHERE id = $${i} AND is_deleted = FALSE RETURNING *`,
       [...vals, req.params.id]);
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    // Hủy lệnh hoặc đổi SL → tính lại planned_qty của dòng đơn gắn với lệnh
+    await recomputePlannedQty(db, rows[0].sales_order_item_id);
     res.json(rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi cập nhật' }); }
 };
@@ -361,6 +368,22 @@ exports.reschedule = async (req, res) => {
   finally { client.release(); }
 };
 
+// Tính lại planned_qty của 1 dòng đơn = Σ SL các lệnh SX CHƯA hủy/chưa xóa gắn với dòng đó.
+// Gọi khi hủy / xóa / sửa lệnh → dòng đơn hiện đúng "còn phải lên kế hoạch" (trước đây chỉ cộng, không trừ).
+async function recomputePlannedQty(conn, soItemId) {
+  if (!soItemId) return;
+  await conn.query(`
+    UPDATE sales_order_items it SET
+      planned_qty = sub.s,
+      is_planned  = (sub.s >= it.quantity)
+    FROM (
+      SELECT COALESCE(SUM(po.quantity), 0) AS s
+      FROM production_orders po
+      WHERE po.sales_order_item_id = $1 AND po.is_deleted = FALSE AND po.status <> 'Đã hủy'
+    ) sub
+    WHERE it.id = $1`, [soItemId]);
+}
+
 exports.remove = async (req, res) => {
   try {
     const g = await guardDelete('production_orders', req.params.id, {
@@ -370,9 +393,11 @@ exports.remove = async (req, res) => {
     if (g.notFound) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
     if (g.blocked) return res.status(400).json({ message: g.message });
 
+    const soItemId = (await db.query(`SELECT sales_order_item_id FROM production_orders WHERE id = $1`, [req.params.id])).rows[0]?.sales_order_item_id;
     const { rowCount } = await db.query(
       `UPDATE production_orders SET is_deleted = TRUE WHERE id = $1 AND is_deleted = FALSE`, [req.params.id]);
     if (!rowCount) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    await recomputePlannedQty(db, soItemId); // trừ lại planned_qty của dòng đơn
     res.json({ message: 'Đã xóa lệnh sản xuất' });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi xóa' }); }
 };
@@ -682,7 +707,7 @@ exports.updateTask = async (req, res) => {
     const result = await recomputeOrder(client, r.rows[0].production_order_id);
     await client.query('COMMIT');
     res.json({ message: 'Đã cập nhật lô', ...result });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi cập nhật lô' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || err.message || 'Lỗi khi cập nhật lô' }); }
   finally { client.release(); }
 };
 
@@ -708,6 +733,24 @@ exports.saveTasks = async (req, res) => {
     if (badAct) return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
 
     await client.query('BEGIN');
+    // Giữ lại SL đã nhập kho (posted_qty) của từng lần qua lần lưu — nếu không, DELETE+INSERT
+    // sẽ reset posted_qty=0 và backflush nhập kho LẶP LẠI toàn bộ sản lượng mỗi lần "Lưu phân công".
+    // Khóa bền theo task_code (frontend gửi lại cho lần đã có); lần mới → mã mới + posted_qty=0.
+    const prevRows = (await client.query(
+      `SELECT task_code, posted_qty FROM production_tasks WHERE production_order_id = $1`, [poId])).rows;
+    const postedByCode = new Map(prevRows.map((r) => [r.task_code, Number(r.posted_qty) || 0]));
+    let maxSuffix = 0;
+    for (const r of prevRows) { const m = /-(\d+)$/.exec(r.task_code || ''); if (m) maxSuffix = Math.max(maxSuffix, Number(m[1])); }
+
+    // L55: chặn XÓA lần đã nhập kho (posted_qty > 0). Nếu bị bỏ khỏi payload, tồn đã nhập sẽ không được đảo lại.
+    // Muốn hủy sản lượng lần đó: GIỮ lần lại và đưa SL thực về 0 (backflush sẽ tự đảo tồn), rồi mới xóa.
+    const incomingCodes = new Set(tasks.filter((t) => t.task_code).map((t) => t.task_code));
+    const removedPosted = prevRows.filter((r) => Number(r.posted_qty) > 0 && !incomingCodes.has(r.task_code));
+    if (removedPosted.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: `Không thể xóa lần đã nhập kho: ${removedPosted.map((r) => r.task_code).join(', ')}. Hãy đưa SL thực của lần đó về 0 (giữ lần lại) để hoàn tồn, rồi mới xóa.` });
+    }
+
     await client.query(`DELETE FROM production_tasks WHERE production_order_id = $1`, [poId]);
     let n = 1;
     for (const t of tasks) {
@@ -716,15 +759,19 @@ exports.saveTasks = async (req, res) => {
       let st = t.status || 'Chờ';
       // Phương án 2: lần TỰ "Hoàn thành" khi SL thực ≥ SL kế hoạch (trừ khi đã hủy / đang tạm dừng)
       if (act != null && plan > 0 && act >= plan - 1e-6 && st !== 'Đã hủy' && st !== 'Dừng sản xuất') st = 'Hoàn thành';
+      // Lần đã có (gửi kèm task_code trùng) → giữ nguyên mã + posted_qty; lần mới → mã mới, posted_qty=0
+      const code = (t.task_code && postedByCode.has(t.task_code)) ? t.task_code : `${po.order_code}-${++maxSuffix}`;
+      const carriedPosted = postedByCode.get(code) || 0;
+      postedByCode.delete(code); // L56: mỗi mã chỉ mang posted_qty 1 lần (payload trùng task_code → lần 2 nhận 0)
       await client.query(`
         INSERT INTO production_tasks
-          (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note, assigned_worker_id)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
-        [poId, `${po.order_code}-${n}`, t.stage, plan,
+          (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date, assigned_team, assigned_worker, status, seq, note, assigned_worker_id, posted_qty)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+        [poId, code, t.stage, plan,
          act, t.scrap_qty || 0,
          t.machine_id || null, t.shift || null,
          t.planned_date || null, t.planned_end_date || t.planned_date || null,
-         t.assigned_team || null, t.assigned_worker || null, st, n, t.note || null, t.assigned_worker_id || null]);
+         t.assigned_team || null, t.assigned_worker || null, st, n, t.note || null, t.assigned_worker_id || null, carriedPosted]);
       n++;
     }
     await recomputeOrder(client, poId);
@@ -732,6 +779,6 @@ exports.saveTasks = async (req, res) => {
     res.json({ message: 'Đã lưu phân công', count: tasks.length });
   } catch (err) {
     await client.query('ROLLBACK'); console.error(err);
-    res.status(500).json({ message: err.detail || 'Lỗi khi lưu phân công' });
+    res.status(500).json({ message: err.detail || err.message || 'Lỗi khi lưu phân công' });
   } finally { client.release(); }
 };

@@ -8,7 +8,17 @@ import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 import { specShort } from "../../specs.js";
 import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
 
-const STATUSES = ["Bản nháp", "Giao hàng", "Đã xuất hóa đơn", "Chờ thanh toán", "Đã thanh toán 1 phần", "Đã thanh toán", "Đã hủy"];
+// Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
+// Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy (chưa có luồng hoàn kho).
+const DN_TRANSITIONS = {
+  "Bản nháp":             ["Đã hủy"],
+  "Giao hàng":            ["Đã xuất hóa đơn", "Chờ thanh toán", "Đã thanh toán 1 phần", "Đã thanh toán"],
+  "Đã xuất hóa đơn":      ["Chờ thanh toán", "Đã thanh toán 1 phần", "Đã thanh toán"],
+  "Chờ thanh toán":       ["Đã xuất hóa đơn", "Đã thanh toán 1 phần", "Đã thanh toán"],
+  "Đã thanh toán 1 phần": ["Chờ thanh toán", "Đã thanh toán"],
+  "Đã thanh toán":        [],
+  "Đã hủy":               [],
+};
 const today = () => new Date().toISOString().slice(0, 10);
 
 // Thông tin đơn vị bán hàng (in trên phiếu xuất kho)
@@ -175,7 +185,10 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
               />
             </Field>
             <Field label="Trạng thái">
-              <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+              <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+                <option value={f.status}>{f.status}{["Bản nháp", "Giao hàng"].includes(f.status) ? " (hệ thống)" : ""}</option>
+                {(DN_TRANSITIONS[f.status] || []).map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
             </Field>
             <Field label="Ngày giao"><input type="date" className={inputCls} value={f.delivery_date} onChange={(e) => set("delivery_date", e.target.value)} /></Field>
             <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>

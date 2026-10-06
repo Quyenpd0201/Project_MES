@@ -154,6 +154,7 @@ export const reports = {
     const q = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== '' && v != null));
     return http(`/reports/employees/${encodeURIComponent(worker)}/tasks?${q.toString()}`);
   },
+  director: (period = 'month') => http(`/reports/director?period=${period}`),
 };
 
 export const salesOrders = {

@@ -22,8 +22,22 @@ async function main() {
   try {
     console.log(`📦 Đang nạp schema từ: ${schemaFile}`);
     const sql = fs.readFileSync(schemaFile, 'utf8');
-    await pool.query(sql);
-    console.log('  ✓ Đã nạp schema_consolidated.sql');
+
+    // DB đã dựng chưa? (schema nền dùng CREATE TABLE không IF NOT EXISTS → nạp lại toàn bộ
+    // trên DB có sẵn sẽ lỗi "already exists" và bỏ qua luôn khối POST-MIGRATION ở cuối).
+    const fresh = (await pool.query(`SELECT to_regclass('public.products') AS t`)).rows[0].t == null;
+    const marker = '-- POST-MIGRATION';
+    const idx = sql.indexOf(marker);
+
+    if (fresh) {
+      await pool.query(sql);                 // DB mới → nạp toàn bộ (nền + POST-MIGRATION)
+      console.log('  ✓ DB mới — đã nạp toàn bộ schema_consolidated.sql');
+    } else if (idx !== -1) {
+      await pool.query(sql.slice(idx));      // DB đã có → chỉ áp khối POST-MIGRATION (idempotent)
+      console.log('  ✓ DB đã có — đã áp khối POST-MIGRATION (idempotent), bỏ qua schema nền');
+    } else {
+      console.log('  ⚠ DB đã có nhưng không tìm thấy khối POST-MIGRATION — không áp gì thêm');
+    }
 
     const tablesRes = await pool.query(
       `SELECT table_name FROM information_schema.tables
