@@ -103,7 +103,7 @@ export const PERM_TREE = [
     category: "Phế phẩm & Tái chế",
     icon: Recycle,
     modules: [
-      { key: "scrap",       label: "Ghi nhận phế phẩm",    actions: ["view","create"] },
+      { key: "scrap",       label: "Ghi nhận phế phẩm",    actions: ["view","create","edit","delete"] },
       { key: "recycling",   label: "Quản lý tái chế",      actions: ["view","create","edit","approve"] },
     ]
   },
