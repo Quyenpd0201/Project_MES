@@ -186,7 +186,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
     {
       key: "grp_rep", label: "Báo cáo", icon: Activity,
       children: [
-        { key: "rep_director", label: "Báo cáo giám đốc", icon: LayoutDashboard, perm: "reports", path: "/reports/director" },
+        { key: "rep_director", label: "Báo cáo giám đốc", icon: LayoutDashboard, perm: "rep_director", path: "/reports/director" },
         { key: "reports", label: "Báo cáo KPI", icon: Activity, path: "/reports" },
         { key: "rep_inv", label: "Báo cáo kho", icon: Warehouse, path: "/reports/inventory" },
         { key: "rep_employee", label: "Hiệu suất nhân viên", icon: Users, path: "/reports/employees" },

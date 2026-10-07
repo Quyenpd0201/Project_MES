@@ -130,6 +130,7 @@ export const PERM_TREE = [
     category: "Báo cáo",
     icon: BarChart2,
     modules: [
+      { key: "rep_director",  label: "Báo cáo giám đốc",     actions: ["view","export"] },
       { key: "reports",       label: "Báo cáo KPI",          actions: ["view","export"] },
       { key: "rep_inv",       label: "Báo cáo kho",          actions: ["view","export"] },
       { key: "rep_employee",  label: "Hiệu suất nhân viên",  actions: ["view","export"] },
