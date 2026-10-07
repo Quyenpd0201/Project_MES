@@ -41,3 +41,5 @@ _test*.js
 backend/test_*.js
 backend/_test*.js
 *.test.js
+test-*.js
+backend/test-*.js
