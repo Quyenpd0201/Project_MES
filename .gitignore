@@ -29,3 +29,6 @@ pgadmin-servers.json
 
 # Claude Code local settings (per-máy, có thể chứa secrets) — không commit
 .claude/settings.local.json
+
+# Mobile app (repo riêng: xone184/MES_Mobile)
+/mobile/
