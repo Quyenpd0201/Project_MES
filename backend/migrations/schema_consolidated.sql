@@ -2298,3 +2298,33 @@ UPDATE public.inventory_stock st
  WHERE st.created_at IS NULL;
 ALTER TABLE public.inventory_stock ALTER COLUMN created_at SET DEFAULT now();
 ALTER TABLE public.inventory_stock ALTER COLUMN created_at SET NOT NULL;
+
+-- 10) Thiết kế cuộn BTP (Thổi → Cuộn SP-PE-TC → Cắt → Bao bì). Xem docs/ai/plans/2026-10-08-thiet-ke-cuon-btp.md
+--     a) Cài đặt hệ thống dạng key/value
+CREATE TABLE IF NOT EXISTS public.app_settings (
+  key text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+--     b) Mã cuộn chung = SP-PE-TC "Cuộn PE" (chỉ seed nếu chưa có)
+INSERT INTO public.app_settings (key, value)
+SELECT 'roll_product_id', to_jsonb(id::text) FROM public.products
+WHERE product_code = 'SP-PE-TC' AND is_deleted = FALSE
+ON CONFLICT (key) DO NOTHING;
+
+--     c) Ghi lại công đoạn Cắt đã trừ những lô cuộn nào (truy xuất + hoàn kho khi Admin hủy hoàn thành)
+CREATE TABLE IF NOT EXISTS public.production_roll_usage (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  production_order_id uuid NOT NULL REFERENCES public.production_orders(id),
+  task_code varchar(40) NOT NULL,            -- khóa bền (production_tasks bị DELETE+INSERT mỗi lần lưu)
+  roll_product_id uuid NOT NULL,
+  location_id uuid NOT NULL,
+  lot_code varchar(40) NOT NULL,             -- lô cuộn bị trừ (mã LSX đã thổi ra nó)
+  spec_key text NOT NULL,
+  specs jsonb NOT NULL DEFAULT '{}'::jsonb,
+  qty_used numeric(14,2) NOT NULL,           -- kg trừ để cắt
+  qty_written_off numeric(14,2) NOT NULL DEFAULT 0, -- kg dư xóa do "đã hết cuộn"
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_roll_usage_task ON public.production_roll_usage (production_order_id, task_code);
+CREATE INDEX IF NOT EXISTS idx_roll_usage_lot  ON public.production_roll_usage (lot_code);
