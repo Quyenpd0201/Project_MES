@@ -2284,3 +2284,17 @@ CREATE INDEX IF NOT EXISTS idx_os_prod_order            ON public.outbound_slips
 CREATE INDEX IF NOT EXISTS idx_recroll_ticket           ON public.recycling_rolls (ticket_id);
 CREATE INDEX IF NOT EXISTS idx_dsi_record               ON public.daily_scrap_items (record_id);
 CREATE INDEX IF NOT EXISTS idx_locations_warehouse      ON public.locations (warehouse_id);
+
+
+-- 9) M50: xuất/chuyển kho theo FIFO cần biết lô vào vị trí kho LÚC NÀO (id là UUID ngẫu nhiên,
+--    không phản ánh thứ tự nhập). Dòng tồn cũ: lấy lần "Nhập" sớm nhất trong sổ giao dịch, không có thì updated_at.
+ALTER TABLE public.inventory_stock ADD COLUMN IF NOT EXISTS created_at timestamp with time zone;
+UPDATE public.inventory_stock st
+   SET created_at = COALESCE((
+         SELECT MIN(t.created_at) FROM public.inventory_transactions t
+          WHERE t.product_id = st.product_id AND t.location_id IS NOT DISTINCT FROM st.location_id
+            AND t.spec_key = st.spec_key AND t.lot_code = st.lot_code AND t.trx_type = 'Nhập'),
+         st.updated_at)
+ WHERE st.created_at IS NULL;
+ALTER TABLE public.inventory_stock ALTER COLUMN created_at SET DEFAULT now();
+ALTER TABLE public.inventory_stock ALTER COLUMN created_at SET NOT NULL;

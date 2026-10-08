@@ -871,10 +871,15 @@ exports.saveTasks = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const poId = req.params.id;
-    const po = (await client.query(`SELECT order_code, quantity, status FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [poId])).rows[0];
-    if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
+    // M40: khoá lệnh (FOR UPDATE) ngay đầu transaction → 2 lần bấm "Lưu" cùng lúc chạy LẦN LƯỢT.
+    // Trước đây đọc không khoá: cả hai cùng thấy posted_qty = 0 → nhập kho 2 lần (TP 2000 thay vì 1000)
+    // và DELETE+INSERT chồng nhau → nhân đôi các lần phân công.
+    await client.query('BEGIN');
+    const bail = async (code, message) => { await client.query('ROLLBACK'); return res.status(code).json({ message }); };
+    const po = (await client.query(`SELECT order_code, quantity, status FROM production_orders WHERE id = $1 AND is_deleted = FALSE FOR UPDATE`, [poId])).rows[0];
+    if (!po) return bail(404, 'Không tìm thấy lệnh sản xuất');
     // Cho phép lưu phân công khi lệnh Hoàn thành nhưng có công đoạn chưa gán máy/ca/đội/công nhân/thực tế
-    if (po.status === 'Đã hủy') return res.status(400).json({ message: `Lệnh đã Hủy — không thể sửa phân công.` });
+    if (po.status === 'Đã hủy') return bail(400, `Lệnh đã Hủy — không thể sửa phân công.`);
     if (po.status === 'Hoàn thành') {
       const { rows: incompleteTasks } = await client.query(
         `SELECT id FROM production_tasks
@@ -886,27 +891,26 @@ exports.saveTasks = async (req, res) => {
         [poId]
       );
       if (!incompleteTasks.length) {
-        return res.status(400).json({ message: `Lệnh đã Hoàn thành và tất cả công đoạn đã đầy đủ thông tin — không thể sửa phân công.` });
+        return bail(400, `Lệnh đã Hoàn thành và tất cả công đoạn đã đầy đủ thông tin — không thể sửa phân công.`);
       }
     }
     const tasks = Array.isArray(req.body.tasks) ? req.body.tasks.filter(t => t && t.stage) : [];
     for (const [idx, t] of tasks.entries()) {
       const badQty = invalidTaskQty(t, `Lần ${idx + 1} (${t.stage}): `);
-      if (badQty) return res.status(400).json({ message: badQty });
+      if (badQty) return bail(400, badQty);
     }
 
     // Ràng buộc 150% (đồng bộ với frontend, chặn cả khi gọi API trực tiếp):
     const cap = Number(po.quantity) * 1.5;
     // 1) SẢN LƯỢNG kế hoạch từng lần không vượt 150%
     const badPlan = tasks.find(t => (Number(t.quantity) || 0) > cap + 1e-6);
-    if (badPlan) return res.status(400).json({ message: `Sản lượng một lần (${badPlan.stage} ${Number(badPlan.quantity)}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
+    if (badPlan) return bail(400, `Sản lượng một lần (${badPlan.stage} ${Number(badPlan.quantity)}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).`);
     // 2) Σ SL thực cộng dồn mỗi công đoạn không vượt 150%
     const actByStage = {};
     tasks.forEach(t => { actByStage[t.stage] = (actByStage[t.stage] || 0) + (Number(t.actual_qty) || 0); });
     const badAct = Object.entries(actByStage).find(([, s]) => s > cap + 1e-6);
-    if (badAct) return res.status(400).json({ message: `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).` });
+    if (badAct) return bail(400, `SL thực cộng dồn công đoạn ${badAct[0]} (${badAct[1]}) vượt quá 150% SL cần sản xuất (${po.quantity} → tối đa ${cap}).`);
 
-    await client.query('BEGIN');
     // Giữ lại SL đã nhập kho (posted_qty) của từng lần qua lần lưu — nếu không, DELETE+INSERT
     // sẽ reset posted_qty=0 và backflush nhập kho LẶP LẠI toàn bộ sản lượng mỗi lần "Lưu phân công".
     // Khóa bền theo task_code (frontend gửi lại cho lần đã có); lần mới → mã mới + posted_qty=0.

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, Trash2, ArrowLeft, Save, CalendarClock, Factory, List, GanttChartSquare, Pencil, Printer, GitBranch, Copy, ChevronDown, ChevronRight } from "lucide-react";
 import { production, processes } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
@@ -162,6 +162,10 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
 
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [meta, setMeta] = useState(null); // dữ liệu lệnh đã nạp (mã lệnh, SP, đơn...) cho tem QR
+  // M40: khoá nút Lưu trong lúc đang gửi (chống bấm 2 lần). Ref chặn ngay lập tức — state chỉ cập nhật
+  // sau lần render, 2 cú bấm sát nhau vẫn lọt nếu chỉ dựa vào state.
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // Lệnh Hoàn thành nhưng có công đoạn chưa gán máy/ca/đội/công nhân/thực tế → vẫn cho sửa để bổ sung
   const tasksIncomplete = (ts) => ts.some(
     (t) => !t.machine_id || !t.shift || !t.assigned_team || !t.assigned_worker_id || (t.actual_qty === '' || t.actual_qty == null)
@@ -312,6 +316,9 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
     // Tỷ lệ (%) ở bảng NVL gộp → đồng bộ về mix_ratio (cấp lệnh); Số KG lưu riêng ở savePlannedMaterials.
     const mixRatio = plannedMats.filter((m) => m.material_id).map((m) => ({ material_id: m.material_id, ratio: m.ratio === '' || m.ratio == null ? null : Number(m.ratio) }));
     const matLines = plannedMats.filter((m) => m.material_id);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       if (editId) {
         // Status: chỉ áp khi người dùng CHỦ ĐỘNG đổi (khác trạng thái đã nạp).
@@ -332,6 +339,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         onSaved(); // tạo mới → về list
       }
     } catch (e) { toast.error("Lỗi lưu lệnh sản xuất: " + e.message); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   const del = async () => {
@@ -354,7 +362,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           {can("production", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); loadData(); }} className="btn-ghost">Hủy</button>}
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu lệnh sản xuất</button>
+          <button onClick={save} disabled={saving} className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16} /> {saving ? "Đang lưu..." : "Lưu lệnh sản xuất"}</button>
         </>)} />
 
       <fieldset disabled={!editing} className="space-y-5">
@@ -752,14 +760,19 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
     }).catch(e => { toast.error("Lỗi tải phân công: " + e.message); onClose(); });
   }, [order.id, onClose]);
 
+  const [saving, setSaving] = useState(false); // M40: chống bấm "Lưu thay đổi" 2 lần
+  const savingRef = useRef(false);
   const save = async () => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
     try {
       await production.saveTasks(order.id, tasks.filter(t => t.stage));
       toast.success("Lưu lịch phân công thành công");
       onSaved();
     } catch (e) {
       toast.error("Lỗi lưu lập lịch: " + e.message);
-    }
+    } finally { savingRef.current = false; setSaving(false); }
   };
 
   const setTask = (id, k, v) => setTasks(ts => ts.map(t => t.id === id ? { ...t, [k]: v } : t));
@@ -822,7 +835,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-lg">
           <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
-          <button onClick={save} disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2"><Save size={16}/> Lưu thay đổi</button>
+          <button onClick={save} disabled={loading || saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16}/> {saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
         </div>
       </div>
     </div>
