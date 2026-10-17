@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle, CalendarClock } from "lucide-react";
 import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.js";
@@ -840,6 +840,7 @@ function OrderVoucher({ id, onBack }) {
 function ExcelImportModal({ onClose, onDone }) {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const confirming = useRef(false); // B3: chặn bấm đúp gửi 2 lần trước khi nút kịp khóa
   const [step, setStep] = useState(1); // 1: Select File, 2: Preview, 3: Result
   const [previewData, setPreviewData] = useState([]);
   const [result, setResult] = useState(null);
@@ -878,7 +879,8 @@ function ExcelImportModal({ onClose, onDone }) {
 
   const handleConfirm = async () => {
     const validRows = previewData.filter(d => d.isValid);
-    if (validRows.length === 0) return;
+    if (validRows.length === 0 || confirming.current) return;
+    confirming.current = true;
     setLoading(true);
     let totalSuccess = 0;
     let totalErrors = 0;
@@ -906,6 +908,7 @@ function ExcelImportModal({ onClose, onDone }) {
       toast.error('Lỗi import: ' + e.message);
     } finally {
       setLoading(false);
+      confirming.current = false;
     }
   };
 

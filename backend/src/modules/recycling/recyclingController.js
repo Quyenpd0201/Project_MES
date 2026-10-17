@@ -1,5 +1,6 @@
 const db = require('../../core/db');
 const { applyStock, stockErrorResponse } = require('../../core/lib/stock');
+const { nextCode } = require('../../core/lib/codes');
 
 // L63: SL PE nhận về được vượt SL phế đã cân tối đa 10% (sai số cân 2 đầu / độ ẩm).
 // Vượt quá → gần như chắc nhập nhầm số, chặn để không thổi phồng tồn PE và báo cáo hao hụt.
@@ -60,18 +61,18 @@ exports.getById = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
+  const client = await db.pool.connect();
   try {
     const { export_date, scrap_warehouse_id, expected_qty, third_party_name, note } = req.body;
     // Phiếu không sửa được sau khi tạo → thiếu kho phế thì phiếu kẹt ở bước cân. Bắt chọn ngay khi tạo.
     if (!scrap_warehouse_id) return res.status(400).json({ message: 'Vui lòng chọn kho phế phẩm.' });
 
-    // Auto-generate ticket code
-    const countRes = await db.query(`SELECT count(*) FROM recycling_tickets`);
-    const count = parseInt(countRes.rows[0].count, 10) + 1;
-    const ticket_code = `TC-${String(count).padStart(5, '0')}`;
+    await client.query('BEGIN');
+    // D1: mã TC-xxxxx = MAX + 1 có khóa (trước đây COUNT(*)+1 → trùng khi tạo đồng thời / sau khi xóa phiếu)
+    const ticket_code = await nextCode(client, { table: 'recycling_tickets', col: 'ticket_code', prefix: 'TC-', width: 5 });
 
     // Get "Phế phẩm" product ID
-    const prodRes = await db.query(`SELECT id FROM products WHERE product_name = 'Phế phẩm' LIMIT 1`);
+    const prodRes = await client.query(`SELECT id FROM products WHERE product_name = 'Phế phẩm' LIMIT 1`);
     const product_id = prodRes.rows[0]?.id || null;
 
     const query = `
@@ -81,16 +82,18 @@ exports.create = async (req, res) => {
       ) VALUES ($1, 'Chờ cân', $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `;
-    const { rows } = await db.query(query, [
-      ticket_code, export_date, scrap_warehouse_id, expected_qty, 
+    const { rows } = await client.query(query, [
+      ticket_code, export_date, scrap_warehouse_id, expected_qty,
       third_party_name, note, req.user?.username || 'System', product_id
     ]);
+    await client.query('COMMIT');
 
     res.json(rows[0]);
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error(err);
     res.status(500).json({ message: 'Lỗi khi tạo phiếu tái chế' });
-  }
+  } finally { client.release(); }
 };
 
 exports.weigh = async (req, res) => {

@@ -2501,3 +2501,35 @@ SELECT 'recycled_pe_product_id', to_jsonb(id::text) FROM public.products
 WHERE product_code = 'SP00014' AND is_deleted = FALSE
 LIMIT 1
 ON CONFLICT (key) DO NOTHING;
+
+-- 19) MÃ CHỨNG TỪ KHÔNG TRÙNG KHI TẠO ĐỒNG THỜI (D1) — trước đây MAX(số)+1 không khóa: 5 đơn tạo cùng lúc
+--     → 3 đơn lỗi "order_code already exists". Nay khóa theo tên bảng (pg_advisory_xact_lock, tự nhả khi
+--     transaction kết thúc) trước khi tính MAX → lần sau chờ lần trước xong và thấy mã vừa cấp.
+--     Cùng khóa 'code:<bảng>' với backend/src/core/lib/codes.js (mã PXK / TC- tính trong code).
+--     Không đổi định dạng mã. Idempotent (CREATE OR REPLACE).
+CREATE OR REPLACE FUNCTION public.gen_code_trg() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+  prefix  text := TG_ARGV[0];
+  width   int  := TG_ARGV[1]::int;
+  colname text := TG_ARGV[2];
+  cur     text;
+  nextn   bigint;
+  rec     jsonb;
+BEGIN
+  rec := to_jsonb(NEW);
+  cur := rec->>colname;
+  IF cur IS NULL OR cur = '' THEN
+    PERFORM pg_advisory_xact_lock(hashtext('code:' || TG_TABLE_NAME));
+    EXECUTE format(
+      'SELECT COALESCE(MAX(substr(%I, length($1) + 1)::bigint), 0) + 1 FROM %I
+        WHERE left(%I, length($1)) = $1 AND substr(%I, length($1) + 1) ~ ''^[0-9]{1,18}$''',
+      colname, TG_TABLE_NAME, colname, colname
+    ) INTO nextn USING prefix;
+    rec := jsonb_set(rec, ARRAY[colname], to_jsonb(prefix || lpad(nextn::text, width, '0')));
+    NEW := jsonb_populate_record(NEW, rec);
+  END IF;
+  RETURN NEW;
+END
+$$;
