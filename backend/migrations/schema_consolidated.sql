@@ -2492,3 +2492,12 @@ UPDATE public.delivery_notes
 --     cũ (sau VAT = trước VAT × 1,08). FALSE: sau VAT = thành tiền (không cộng 8%).
 --     Chỉ ảnh hưởng phần HIỂN THỊ tiền sau VAT của đơn; phiếu giao / công nợ vẫn tính theo tiền trước VAT như cũ.
 ALTER TABLE public.sales_orders ADD COLUMN IF NOT EXISTS has_vat boolean NOT NULL DEFAULT true;
+
+-- 18) SẢN PHẨM NHẬN CUỘN PE TÁI CHẾ — phiếu tái chế "Hoàn thành" nhập cuộn PE vào SP này.
+--     Trước đây tra theo tên 'Cuộn PE' + loại 'Bán thành phẩm' → không khớp SP nào, phiếu không bao giờ hoàn thành.
+--     Mặc định SP00014 "Cuộn PE". Đổi SP: UPDATE app_settings. Idempotent: đã có thì giữ nguyên.
+INSERT INTO public.app_settings (key, value)
+SELECT 'recycled_pe_product_id', to_jsonb(id::text) FROM public.products
+WHERE product_code = 'SP00014' AND is_deleted = FALSE
+LIMIT 1
+ON CONFLICT (key) DO NOTHING;

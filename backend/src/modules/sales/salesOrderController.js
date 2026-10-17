@@ -132,6 +132,23 @@ exports.deliverableOrders = async (req, res) => {
 
 const numOrNull = (v) => (v === '' || v == null ? null : v);
 
+// Kiểm dòng hàng có chọn sản phẩm: SL là số > 0, đơn giá (nếu gửi) là số ≥ 0. Trả thông báo lỗi hoặc null.
+// Đơn giá bỏ trống = NV không có quyền tiền → không gửi, hợp lệ.
+function itemsError(items) {
+  const list = Array.isArray(items) ? items : [];
+  for (let i = 0; i < list.length; i++) {
+    const it = list[i];
+    if (!it || !it.product_id) continue;
+    const q = Number(it.quantity);
+    if (it.quantity === '' || it.quantity == null || !Number.isFinite(q) || q <= 0) return `Dòng ${i + 1}: Số lượng phải là số lớn hơn 0.`;
+    if (it.unit_price !== undefined && it.unit_price !== '' && it.unit_price !== null) {
+      const p = Number(it.unit_price);
+      if (!Number.isFinite(p) || p < 0) return `Dòng ${i + 1}: Đơn giá phải là số không âm.`;
+    }
+  }
+  return null;
+}
+
 // UPSERT dòng hàng: giữ id cũ (không xóa-tạo lại) để bảo toàn ngày thực tế + liên kết lệnh SX.
 async function saveItems(client, orderId, items) {
   const list = (Array.isArray(items) ? items : []).filter((x) => x && x.product_id && x.quantity);
@@ -160,7 +177,7 @@ async function saveItems(client, orderId, items) {
         `INSERT INTO sales_order_items
            (sales_order_id, product_id, quantity, unit, specs, spec_key, attr_size, attr_thickness, attr_color,
             core_weight, total_weight, note, planned_start_date, planned_end_date, material_type, mix_ratio, unit_price)
-         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,COALESCE($17,0))`,
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,COALESCE($17::numeric,0))`,
         [orderId, ...base]);
     }
   }
@@ -173,16 +190,19 @@ exports.create = async (req, res) => {
     if (!b.customer_id) return res.status(400).json({ message: 'Vui lòng chọn Khách hàng' });
     if (!Array.isArray(b.items) || !b.items.filter(x => x.product_id && x.quantity).length)
       return res.status(400).json({ message: 'Đơn hàng cần ít nhất 1 dòng hàng hợp lệ' });
+    const itemErr = itemsError(b.items);
+    if (itemErr) return res.status(400).json({ message: itemErr });
     await client.query('BEGIN');
     const { rows } = await client.query(
       `INSERT INTO sales_orders (customer_id, order_date, due_date, status, note, material_type, priority, mix_ratio, has_vat)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [b.customer_id, b.order_date || new Date(), b.due_date || null, b.status || 'Mới', b.note || null, b.material_type || null, b.priority || 'Trung bình', JSON.stringify(b.mix_ratio || []),
+      // Đơn mới LUÔN "Mới" (bỏ qua b.status) — các trạng thái sau đi theo sản xuất / giao hàng
+      [b.customer_id, b.order_date || new Date(), b.due_date || null, 'Mới', b.note || null, b.material_type || null, b.priority || 'Trung bình', JSON.stringify(b.mix_ratio || []),
        b.has_vat !== false]); // mặc định CÓ VAT (như trước); chỉ false khi bỏ tick
     await saveItems(client, rows[0].id, b.items);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi tạo đơn hàng' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: 'Lỗi khi tạo đơn hàng' }); }
   finally { client.release(); }
 };
 
@@ -190,6 +210,8 @@ exports.update = async (req, res) => {
   const client = await db.pool.connect();
   try {
     const b = req.body;
+    const itemErr = b.items !== undefined ? itemsError(b.items) : null;
+    if (itemErr) return res.status(400).json({ message: itemErr });
     await client.query('BEGIN');
     const fields = ['customer_id', 'order_date', 'due_date', 'status', 'note', 'material_type', 'priority', 'mix_ratio', 'has_vat'];
     const cols = [], vals = []; let i = 1;
@@ -204,7 +226,7 @@ exports.update = async (req, res) => {
     if (b.items !== undefined) await saveItems(client, req.params.id, b.items);
     await client.query('COMMIT');
     res.json({ message: 'Đã cập nhật đơn hàng' });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi cập nhật' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: 'Lỗi khi cập nhật' }); }
   finally { client.release(); }
 };
 

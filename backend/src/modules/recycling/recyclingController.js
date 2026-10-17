@@ -62,7 +62,9 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
   try {
     const { export_date, scrap_warehouse_id, expected_qty, third_party_name, note } = req.body;
-    
+    // Phiếu không sửa được sau khi tạo → thiếu kho phế thì phiếu kẹt ở bước cân. Bắt chọn ngay khi tạo.
+    if (!scrap_warehouse_id) return res.status(400).json({ message: 'Vui lòng chọn kho phế phẩm.' });
+
     // Auto-generate ticket code
     const countRes = await db.query(`SELECT count(*) FROM recycling_tickets`);
     const count = parseInt(countRes.rows[0].count, 10) + 1;
@@ -127,9 +129,19 @@ exports.weigh = async (req, res) => {
       return res.status(400).json({ message: 'Chưa cấu hình sản phẩm "Phế phẩm" trong danh mục — không thể ghi xuất kho.' });
     }
 
+    // Phiếu chưa chọn kho phế → báo rõ (trước đây trừ tồn ở vị trí NULL → báo nhầm "tồn 0")
+    if (!ticket.scrap_warehouse_id) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'Chưa chọn kho phế phẩm cho phiếu — không thể trừ tồn phế. Hãy tạo phiếu mới có chọn kho phế phẩm.' });
+    }
+
     // Tìm location mặc định của kho phế phẩm
     const locRes = await client.query(`SELECT id FROM locations WHERE warehouse_id = $1 LIMIT 1`, [ticket.scrap_warehouse_id]);
     const locationId = locRes.rows[0]?.id || null;
+    if (!locationId) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'Kho phế phẩm chưa có vị trí — hãy tạo vị trí kho trước.' });
+    }
 
     // Trừ tồn kho phế phẩm QUA applyStock (sổ cái khớp tồn, không đi vòng qua inventory_stock)
     if (actualTotal > 0) {
@@ -252,13 +264,17 @@ exports.complete = async (req, res) => {
     // Tính hao hụt
     const loss_qty = Number(ticket.expected_qty) - Number(ticket.total_received_qty);
 
-    // Get "Cuộn PE" (Bán thành phẩm) product ID
-    const prodRes = await client.query(`SELECT id FROM products WHERE product_name ILIKE 'Cuộn PE' AND product_type = 'Bán thành phẩm' LIMIT 1`);
+    // SP nhận cuộn PE tái chế: cấu hình ở app_settings.recycled_pe_product_id (jsonb chứa chuỗi uuid),
+    // không tra theo tên/loại SP (trước đây tìm 'Cuộn PE' + loại 'Bán thành phẩm' → không bao giờ khớp).
+    const prodRes = await client.query(
+      `SELECT p.id FROM app_settings a
+       JOIN products p ON p.id::text = a.value #>> '{}' AND p.is_deleted = FALSE
+       WHERE a.key = 'recycled_pe_product_id'`);
     const pe_product_id = prodRes.rows[0]?.id || null;
 
     if (!pe_product_id) {
        await client.query('ROLLBACK');
-       return res.status(400).json({ message: 'Không tìm thấy mã sản phẩm Cuộn PE (Bán thành phẩm)' });
+       return res.status(400).json({ message: 'Chưa cấu hình sản phẩm nhận cuộn PE tái chế (app_settings.recycled_pe_product_id), hoặc sản phẩm đó đã bị xóa.' });
     }
 
     // Cập nhật phiếu hoàn thành

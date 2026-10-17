@@ -451,7 +451,8 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
             onChange={(v) => set("customer_id", v)} />
         </Field>}
         {!fhid("status") && <Field label="Trạng thái">
-          <select className={inputCls} disabled={fdis("status")} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+          {/* Đơn mới luôn "Mới" (backend cũng ép) → khóa khi tạo / sao chép */}
+          <select className={inputCls} disabled={fdis("status") || !editId} title={!editId ? "Đơn mới luôn ở trạng thái Mới" : undefined} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
         </Field>}
         {!fhid("priority") && <Field label="Độ ưu tiên">
           <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>

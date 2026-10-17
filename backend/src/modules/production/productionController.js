@@ -385,6 +385,8 @@ exports.create = async (req, res) => {
   try {
     const b = req.body;
     if (!b.product_id || !b.quantity) return res.status(400).json({ message: 'Thiếu Sản phẩm hoặc Số lượng' });
+    const qty = Number(b.quantity);
+    if (!Number.isFinite(qty) || qty <= 0) return res.status(400).json({ message: 'Số lượng phải là số lớn hơn 0.' });
     const finishing = Array.isArray(b.finishing)
       ? b.finishing.filter(f => f && f.name).map(f => ({ name: f.name, checked: !!f.checked }))
       : [];
@@ -405,15 +407,16 @@ exports.create = async (req, res) => {
        VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11::jsonb,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
-        b.sales_order_id || null, b.customer_id || null, b.product_id, b.quantity, upUnit(b.unit),
+        b.sales_order_id || null, b.customer_id || null, b.product_id, qty, upUnit(b.unit),
         JSON.stringify(specs), buildSpecKey(specs), a.size || null, a.thickness || null, a.color || null, JSON.stringify(finishing),
         b.machine_id || null, b.planned_date || null, b.shift || null, b.assigned_team || null,
-        group_key, b.due_date || null, b.status || 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority,
+        // Lệnh mới LUÔN "Chờ duyệt" (bỏ qua b.status) — Hoàn thành chỉ suy ra từ sản lượng, Đã lên kế hoạch qua xếp lịch
+        group_key, b.due_date || null, 'Chờ duyệt', b.note || null, b.assigned_worker || null, priority,
         JSON.stringify(b.mix_ratio || []), b.material_type || null
       ]
     );
     res.status(201).json(rows[0]);
-  } catch (err) { console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi tạo lệnh sản xuất' }); }
+  } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi tạo lệnh sản xuất' }); }
 };
 
 exports.update = async (req, res) => {

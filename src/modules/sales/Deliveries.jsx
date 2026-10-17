@@ -341,7 +341,9 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                 {(DN_TRANSITIONS[f.status] || []).map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </Field>
-            <Field label="Ngày giao"><input type="date" className={inputCls} value={f.delivery_date} onChange={(e) => set("delivery_date", e.target.value)} /></Field>
+            {/* Ngày giao chốt = ngày bấm "Giao hàng" → sau đó khóa; không chọn ngày tương lai */}
+            <Field label="Ngày giao"><input type="date" className={inputCls} value={f.delivery_date} max={today()} disabled={!isDraft}
+              title={!isDraft ? "Ngày giao đã chốt khi bấm Giao hàng" : undefined} onChange={(e) => set("delivery_date", e.target.value)} /></Field>
             <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             {showMoney && <Field label="Tổng tiền phiếu">
               <div className={inputCls + " bg-slate-50 font-semibold text-slate-800"}>{fmt(total)} đ</div>
