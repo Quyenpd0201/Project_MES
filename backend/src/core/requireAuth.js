@@ -126,3 +126,24 @@ module.exports.requirePerm = (permString) => {
     res.status(403).json({ message: 'Bạn không có quyền thực hiện thao tác này' });
   };
 };
+
+/**
+ * Có quyền `action` trên đúng app key của web (vd 'md_customers', 'orders') không — cùng cách
+ * frontend `can(app, action)` trong src/perm.jsx (admin luôn có; 'ALLOW' | true | {status:'ALLOW'}).
+ */
+function hasAppPerm(req, app, action) {
+  if (req.user?.is_admin) return true;
+  const v = req.user?.permissions?.[app]?.[action];
+  return v === 'ALLOW' || v === true || v?.status === 'ALLOW';
+}
+module.exports.hasAppPerm = hasAppPerm;
+
+/**
+ * Middleware: cho qua nếu có ÍT NHẤT MỘT cặp [app, action]. Dùng app key của web (khớp menu / nút).
+ * vd requireAnyPerm(['orders', 'view'], ['deliveries', 'view'])
+ */
+module.exports.requireAnyPerm = (...pairs) => (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Chưa xác thực' });
+  if (pairs.some(([app, action]) => hasAppPerm(req, app, action))) return next();
+  res.status(403).json({ message: 'Bạn không có quyền thực hiện thao tác này' });
+};
