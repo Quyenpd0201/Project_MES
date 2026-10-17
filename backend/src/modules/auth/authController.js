@@ -11,33 +11,54 @@ if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
 const JWT_SECRET = process.env.JWT_SECRET || 'mes_fallback_secret_key';
 
 // ── Brute-force protection ────────────────────────────────────────────────────
-const FAIL_MAX = 5;         // số lần sai tối đa
-const LOCK_MS  = 15 * 60 * 1000; // khóa 15 phút
-const loginAttempts = new Map(); // ip → { count, lockedUntil }
+// Đếm lần sai theo 3 khóa (trong cửa sổ 15 phút), chạm ngưỡng nào thì khóa 15 phút:
+//  - tài khoản + IP : 5 lần  → người gõ sai chỉ khóa CHÍNH tài khoản đó trên máy đó
+//                              (cả xưởng chung 1 Wi-Fi/1 IP không bị khóa lây).
+//  - tài khoản      : 20 lần → chặn dò mật khẩu 1 tài khoản bằng cách đổi IP liên tục.
+//  - IP             : 50 lần → chặn dò hàng loạt tài khoản từ 1 nơi.
+const LOCK_MS = 15 * 60 * 1000; // cửa sổ đếm + thời gian khóa: 15 phút
+const LIMITS = { userIp: 5, user: 20, ip: 50 };
+const loginAttempts = new Map(); // key → { count, firstAt, lockedUntil }
 
-function checkBruteForce(ip) {
-  const entry = loginAttempts.get(ip);
-  if (!entry) return false;
-  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true; // đang khóa
-  return false;
+function attemptKeys(ip, username) {
+  const u = String(username || '').trim().toLowerCase();
+  return [
+    { key: `ui:${u}|${ip}`, max: LIMITS.userIp },
+    { key: `u:${u}`,        max: LIMITS.user },
+    { key: `ip:${ip}`,      max: LIMITS.ip },
+  ];
 }
-function recordFailedLogin(ip) {
-  const entry = loginAttempts.get(ip) || { count: 0, lockedUntil: null };
-  entry.count++;
-  if (entry.count >= FAIL_MAX) {
-    entry.lockedUntil = Date.now() + LOCK_MS;
-    entry.count = 0; // reset để tính lại sau khi hết khóa
+function checkBruteForce(ip, username) {
+  const now = Date.now();
+  return attemptKeys(ip, username).some(({ key }) => {
+    const e = loginAttempts.get(key);
+    return !!(e && e.lockedUntil && now < e.lockedUntil);
+  });
+}
+function recordFailedLogin(ip, username) {
+  const now = Date.now();
+  for (const { key, max } of attemptKeys(ip, username)) {
+    let e = loginAttempts.get(key);
+    // Hết cửa sổ 15 phút (hoặc hết khóa) → đếm lại từ đầu
+    if (!e || (e.lockedUntil ? e.lockedUntil <= now : now - e.firstAt > LOCK_MS)) {
+      e = { count: 0, firstAt: now, lockedUntil: null };
+    }
+    e.count++;
+    if (e.count >= max) e.lockedUntil = now + LOCK_MS;
+    loginAttempts.set(key, e);
   }
-  loginAttempts.set(ip, entry);
 }
-function clearFailedLogin(ip) {
-  loginAttempts.delete(ip);
+function clearFailedLogin(ip, username) {
+  // Đăng nhập đúng → xóa đếm của tài khoản này (giữ đếm theo IP để vẫn chặn dò hàng loạt)
+  const [ui, u] = attemptKeys(ip, username);
+  loginAttempts.delete(ui.key);
+  loginAttempts.delete(u.key);
 }
 // Dọn entries cũ mỗi giờ
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, e] of loginAttempts) {
-    if (!e.lockedUntil || e.lockedUntil < now) loginAttempts.delete(ip);
+  for (const [key, e] of loginAttempts) {
+    if (e.lockedUntil ? e.lockedUntil < now : now - e.firstAt > LOCK_MS) loginAttempts.delete(key);
   }
 }, 60 * 60 * 1000);
 
@@ -80,15 +101,15 @@ exports.login = async (req, res) => {
   try {
     const ip = req.ip || req.connection.remoteAddress || 'unknown';
 
-    // Kiểm tra brute-force
-    if (checkBruteForce(ip)) {
-      return res.status(429).json({ message: 'Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.' });
-    }
-
-    const { username, password } = req.body;
+    const { username, password } = req.body || {};
     // Validate input cơ bản
     if (!username || !password || typeof username !== 'string' || typeof password !== 'string') {
       return res.status(400).json({ message: 'Cần nhập tài khoản và mật khẩu' });
+    }
+
+    // Kiểm tra brute-force (theo tài khoản + IP, tài khoản, IP)
+    if (checkBruteForce(ip, username)) {
+      return res.status(429).json({ message: 'Tài khoản tạm thời bị khóa do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.' });
     }
 
     const { rows } = await db.query(
@@ -97,11 +118,11 @@ exports.login = async (req, res) => {
     );
     const u = rows[0];
     if (!u || u.status !== 'Hoạt động' || !verifyPassword(password, u.password_hash)) {
-      recordFailedLogin(ip);
+      recordFailedLogin(ip, username);
       return res.status(401).json({ message: 'Sai tài khoản hoặc mật khẩu' });
     }
 
-    clearFailedLogin(ip);
+    clearFailedLogin(ip, username);
     const token = jwt.sign({ userId: u.id }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token, user: await userPayload(u.id) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi đăng nhập' }); }
