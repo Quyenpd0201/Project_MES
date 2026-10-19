@@ -1,5 +1,5 @@
 // backend/middleware/requireAuth.js — xác thực Bearer token cho mọi request
-const { verifyToken } = require('../modules/auth/authController');
+const { decodeToken, isSessionActive } = require('../modules/auth/authController');
 const { calculateEffectivePermissions } = require('../modules/auth/roleController');
 const db = require('./db');
 
@@ -12,10 +12,15 @@ module.exports = async function requireAuth(req, res, next) {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
   if (!token) return res.status(401).json({ message: 'Cần đăng nhập để thực hiện thao tác này' });
 
-  const userId = verifyToken(token);
-  if (!userId) return res.status(401).json({ message: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại' });
+  const payload = decodeToken(token);
+  if (!payload) return res.status(401).json({ message: 'Phiên đăng nhập hết hạn, vui lòng đăng nhập lại' });
+  const userId = payload.userId;
 
   try {
+    // Phiên đã đăng xuất / tài khoản đã đổi mật khẩu → hết hiệu lực ngay
+    if (!(await isSessionActive(payload))) {
+      return res.status(401).json({ message: 'Phiên đăng nhập đã kết thúc, vui lòng đăng nhập lại' });
+    }
     const { rows } = await db.query(
       `SELECT u.id, u.username, u.full_name, u.status, u.team, u.linked_worker,
               COALESCE(u.permissions, '{}'::jsonb) AS user_permissions,

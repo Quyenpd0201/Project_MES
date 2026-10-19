@@ -123,38 +123,75 @@ exports.login = async (req, res) => {
     }
 
     clearFailedLogin(ip, username);
-    const token = jwt.sign({ userId: u.id }, JWT_SECRET, { expiresIn: '8h' });
+    // jti: mã riêng của phiên (để đăng xuất thu hồi đúng phiên này); tv: phiên bản mật khẩu (đổi mật khẩu → phiên cũ hết hạn)
+    const token = jwt.sign({ userId: u.id, tv: u.token_version || 0, jti: crypto.randomUUID() }, JWT_SECRET, { expiresIn: '8h' });
     res.json({ token, user: await userPayload(u.id) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi đăng nhập' }); }
 };
 
 exports.me = async (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
-  const userId = exports.verifyToken(token);
-  if (!userId) {
+  const payload = exports.decodeToken(token);
+  if (!payload || !(await exports.isSessionActive(payload))) {
     return res.status(401).json({ message: 'Phiên đăng nhập hết hạn' });
   }
-  const user = await userPayload(userId);
+  const user = await userPayload(payload.userId);
   if (!user) return res.status(401).json({ message: 'Tài khoản không tồn tại' });
   res.json({ user });
 };
 
-exports.logout = (req, res) => {
+// Đăng xuất = thu hồi phiên này (jti) ngay, không đợi hết 8 giờ. Token cũ (trước bản này, không có jti) chỉ hết hạn tự nhiên.
+exports.logout = async (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+  const payload = exports.decodeToken(token);
+  if (payload?.jti && payload.exp) {
+    try {
+      await db.query(
+        `INSERT INTO revoked_tokens (jti, user_id, expires_at) VALUES ($1, $2, to_timestamp($3)) ON CONFLICT (jti) DO NOTHING`,
+        [payload.jti, payload.userId || null, payload.exp]);
+      await db.query(`DELETE FROM revoked_tokens WHERE expires_at < now()`); // dọn phiên đã hết hạn
+    } catch (e) { console.error('[logout] revoke', e.message); }
+  }
   res.json({ message: 'Đã đăng xuất' });
+};
+
+// Phiên còn hiệu lực: chưa bị thu hồi (đăng xuất) và đúng phiên bản mật khẩu hiện tại.
+// Gộp 1 truy vấn; dùng chung cho /auth/me và middleware requireAuth.
+let warnedNoMigration = false;
+exports.isSessionActive = async (payload, client = db) => {
+  let rows;
+  try {
+    ({ rows } = await client.query(
+      `SELECT u.token_version,
+              EXISTS (SELECT 1 FROM revoked_tokens r WHERE r.jti = $2) AS revoked
+       FROM users u WHERE u.id = $1`, [payload.userId, payload.jti || '']));
+  } catch (e) {
+    // Chưa chạy migrate (thiếu cột token_version / bảng revoked_tokens) → không chặn ai, chỉ cảnh báo 1 lần
+    if (e.code === '42703' || e.code === '42P01') {
+      if (!warnedNoMigration) { warnedNoMigration = true; console.warn('[auth] Chưa migrate token_version/revoked_tokens — thu hồi phiên đang TẮT. Chạy: npm run migrate'); }
+      return true;
+    }
+    throw e;
+  }
+  if (!rows[0]) return false;
+  if (rows[0].revoked) return false;
+  return (Number(payload.tv) || 0) === (Number(rows[0].token_version) || 0);
 };
 
 exports.hashPassword = hashPassword;
 
-// Verify token helper for middleware
-exports.verifyToken = (token) => {
+// Giải mã + kiểm chữ ký/hạn token → payload { userId, tv, jti, exp } hoặc null
+exports.decodeToken = (token) => {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    return payload.userId;
+    return payload && payload.userId ? payload : null;
   } catch (err) {
     return null;
   }
 };
+
+// Verify token helper (giữ cho tương thích) → userId hoặc null
+exports.verifyToken = (token) => exports.decodeToken(token)?.userId || null;
 
 // Tạo tài khoản admin mặc định nếu DB chưa có user nào (kể cả chưa bị xóa)
 exports.ensureSeedAdmin = async () => {
