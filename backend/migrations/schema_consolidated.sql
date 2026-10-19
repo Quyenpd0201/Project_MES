@@ -2533,3 +2533,17 @@ BEGIN
   RETURN NEW;
 END
 $$;
+
+-- ---------------------------------------------------------------------
+-- [mobile-api] Thu hồi phiên đăng nhập (JWT) — cần chạy `npm run migrate` khi đưa lên PRD
+--  - users.token_version: tăng khi đổi mật khẩu → mọi phiên cũ của tài khoản đó hết hiệu lực ngay.
+--  - revoked_tokens: phiên (jti) đã đăng xuất; giữ tới lúc token tự hết hạn rồi dọn.
+-- ---------------------------------------------------------------------
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS public.revoked_tokens (
+  jti        text PRIMARY KEY,
+  user_id    uuid,
+  expires_at timestamptz NOT NULL,
+  revoked_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS revoked_tokens_expires_idx ON public.revoked_tokens (expires_at);
