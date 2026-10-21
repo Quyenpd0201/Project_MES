@@ -211,7 +211,7 @@ function ReceiptForm({ lookups, id, onBack, onSaved }) {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {preview.rows.map((n) => {
-                    const late = n.age_days > (info.settings?.bad_days ?? 30);
+                    const late = info.settings?.bad_days != null && n.age_days > info.settings.bad_days; // S-12: chưa có ngưỡng thì không tô
                     return (
                       <tr key={n.id} className={n.take > 0 ? "" : "text-slate-400"}>
                         <td className="px-4 py-1.5 font-medium">{n.note_code}</td>
