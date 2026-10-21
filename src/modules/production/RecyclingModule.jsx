@@ -390,7 +390,7 @@ Hoàn thành phiếu?`)) return;
           (step === 4 && ticket.status === 'Đang tái chế')
         )) && (
           <button onClick={nextStep} disabled={loading} className="btn-primary flex items-center gap-2">
-            {loading ? "Đang xử lý..." : step === 4 ? <><CheckCircle2 size={16}/> Hoàn thành & nhập kho</> : step === 2 ? "Lưu cân & trừ phế" : step === 3 ? "Lưu cuộn" : "Tạo phiếu"}
+            {loading ? "Đang xử lý…" : step === 4 ? <><CheckCircle2 size={16}/> Hoàn thành & nhập kho</> : step === 2 ? "Lưu cân & trừ phế" : step === 3 ? "Lưu cuộn" : "Tạo phiếu"}
           </button>
         )}
       </div>

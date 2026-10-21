@@ -568,7 +568,7 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
       <div className="px-5 py-3 bg-white border-b border-slate-100 flex items-center gap-3 flex-shrink-0">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền..." value={searchQuery}
+          <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền…" value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none" />
         </div>
@@ -657,7 +657,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2 flex-shrink-0">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền (vd: bom.create)..." value={searchQuery}
+            <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền (vd: bom.create)…" value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" />
           </div>
@@ -961,7 +961,7 @@ export default function PermissionsModule() {
               <div className="relative w-64">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  placeholder="Tìm quyền, mã API..."
+                  placeholder="Tìm quyền, mã API…"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"

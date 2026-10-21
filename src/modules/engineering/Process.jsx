@@ -205,7 +205,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
                     <div className="md:col-span-4">
                       <Field label="Công đoạn">
-                        <input className={inputCls} value={s.name} placeholder="VD: Thổi màng..." onChange={(e) => upStep(s._k, "name", e.target.value)} />
+                        <input className={inputCls} value={s.name} placeholder="VD: Thổi màng…" onChange={(e) => upStep(s._k, "name", e.target.value)} />
                       </Field>
                     </div>
                     <div className="md:col-span-3">
@@ -224,7 +224,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                               upStep(s._k, "machine_ids", [...curr, v]);
                             }
                           }}>
-                            <option value="">+ Chọn máy...</option>
+                            <option value="">+ Chọn máy…</option>
                             {machines.filter((m) => !(s.machine_ids || []).includes(m.id)).map((m) => (
                               <option key={m.id} value={m.id}>
                                 {m.factory ? `[${m.factory}] ` : ""}{m.name}{m.machine_type ? ` · ${m.machine_type}` : ""}

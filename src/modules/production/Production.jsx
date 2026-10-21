@@ -496,7 +496,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           {can("production", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); loadData(); }} className="btn-ghost">Hủy</button>}
-          <button onClick={save} disabled={saving} className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16} /> {saving ? "Đang lưu..." : "Lưu lệnh sản xuất"}</button>
+          <button onClick={save} disabled={saving} className="btn-primary disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu lệnh sản xuất"}</button>
         </>)} />
 
       <fieldset disabled={!editing} className="space-y-5">
@@ -942,7 +942,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
               <button onClick={(e) => confirmClose(e, () => setCutModal(null))} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg">Hủy</button>
               <button onClick={() => finishComplete(cutModal.codes, [...cutModal.finish])} disabled={completing}
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-60 flex items-center gap-2">
-                <CheckCircle2 size={16} /> {completing ? "Đang xử lý..." : "Xác nhận hoàn thành"}
+                <CheckCircle2 size={16} /> {completing ? "Đang xử lý…" : "Xác nhận hoàn thành"}
               </button>
             </div>
           </div>
@@ -1024,7 +1024,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
           <button onClick={(e) => confirmClose(e, onClose)} className="text-slate-400 hover:text-slate-600">&times;</button>
         </div>
         <div className="p-4 overflow-y-auto">
-          {loading ? <p className="text-slate-500">Đang tải...</p> : (
+          {loading ? <p className="text-slate-500">Đang tải…</p> : (
             <div className="overflow-x-auto border border-slate-200 rounded-lg">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
@@ -1059,7 +1059,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
                           <input disabled={dis} className={inputCls} placeholder="VD: Ca 1" value={t.shift || ""} onChange={e => setTask(t.id, "shift", e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
-                          <input disabled={dis} className={inputCls} placeholder="Nhân công..." value={t.assigned_worker || ""} onChange={e => setTask(t.id, "assigned_worker", e.target.value)} />
+                          <input disabled={dis} className={inputCls} placeholder="Nhân công…" value={t.assigned_worker || ""} onChange={e => setTask(t.id, "assigned_worker", e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
                           <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(t.status)}`}>{t.status}</span>
@@ -1074,7 +1074,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-lg">
           <button onClick={(e) => confirmClose(e, onClose)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
-          <button onClick={save} disabled={loading || saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16}/> {saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
+          <button onClick={save} disabled={loading || saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16}/> {saving ? "Đang lưu…" : "Lưu thay đổi"}</button>
         </div>
       </div>
     </div>

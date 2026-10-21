@@ -44,11 +44,11 @@ function RoleForm({ record, onBack, onSaved }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Mã vai trò (tự sinh nếu để trống)</label>
-          <input className={inputCls} value={f.role_code} onChange={(e) => set("role_code", e.target.value)} placeholder="VD: VT001..." disabled={isEdit} />
+          <input className={inputCls} value={f.role_code} onChange={(e) => set("role_code", e.target.value)} placeholder="VD: VT001…" disabled={isEdit} />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Tên vai trò <span className="text-rose-500">*</span></label>
-          <input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Nhập tên..." />
+          <input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="Nhập tên…" />
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
@@ -59,7 +59,7 @@ function RoleForm({ record, onBack, onSaved }) {
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
-          <textarea className={inputCls + " resize-none"} rows="3" value={f.description} onChange={(e) => set("description", e.target.value)} placeholder="Mô tả vai trò này làm gì..."></textarea>
+          <textarea className={inputCls + " resize-none"} rows="3" value={f.description} onChange={(e) => set("description", e.target.value)} placeholder="Mô tả vai trò này làm gì…"></textarea>
         </div>
       </div>
     </div>
@@ -165,7 +165,7 @@ export default function RolesModule() {
           <>
             <div className="relative mr-2">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input type="text" placeholder="Tìm vai trò..." value={q} onChange={(e) => setQ(e.target.value)} className="pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 md:w-64" />
+              <input type="text" placeholder="Tìm vai trò…" value={q} onChange={(e) => setQ(e.target.value)} className="pl-9 pr-3 py-1.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-48 md:w-64" />
             </div>
             <button onClick={fetchRoles} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
             <button onClick={() => setEditingRole({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>
@@ -224,7 +224,7 @@ export default function RolesModule() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Users size={18}/> Danh sách tài khoản mang vai trò {selectedRole.name}</h3>
-                <button onClick={() => toast.info("Gắn tài khoản vào vai trò đang phát triển...")} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-medium flex items-center gap-1"><Plus size={16}/> Thêm tài khoản</button>
+                <button onClick={() => toast.info("Gắn tài khoản vào vai trò đang phát triển…")} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 font-medium flex items-center gap-1"><Plus size={16}/> Thêm tài khoản</button>
               </div>
               <DataTable
                 rows={roleUsers}

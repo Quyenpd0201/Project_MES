@@ -557,7 +557,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                                     newArr[i] = { ...newArr[i], material_id: v };
                                     upItem(it._k, "mix_ratio", newArr);
                                   }}
-                                  placeholder="Chọn..."
+                                  placeholder="Chọn…"
                                   className="w-full rounded border-slate-300 text-sm py-1.5 px-2"
                                 />
                               ) : (
@@ -921,7 +921,7 @@ function ExcelImportModal({ onClose, onDone }) {
               <div className="flex gap-3 justify-end">
                 <button onClick={(e) => confirmClose(e, onClose)} disabled={loading} className="btn-ghost">Hủy</button>
                 <button onClick={handlePreview} disabled={!file || loading} className="btn-primary disabled:opacity-50">
-                  {loading ? 'Đang đọc...' : 'Tiếp tục'}
+                  {loading ? 'Đang đọc…' : 'Tiếp tục'}
                 </button>
               </div>
             </>
@@ -997,7 +997,7 @@ function ExcelImportModal({ onClose, onDone }) {
               <div className="flex gap-3 justify-end pt-2">
                 <button onClick={() => setStep(1)} className="btn-ghost" disabled={loading}>Quay lại</button>
                 <button onClick={handleConfirm} disabled={previewData.length === 0 || loading || previewData.some(d => !d.isValid)} className="btn-primary disabled:opacity-50">
-                  {loading ? 'Đang nhập...' : <><Save size={16} /> Xác nhận nhập ({previewData.length})</>}
+                  {loading ? 'Đang nhập…' : <><Save size={16} /> Xác nhận nhập ({previewData.length})</>}
                 </button>
               </div>
             </div>

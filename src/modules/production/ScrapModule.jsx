@@ -162,7 +162,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
               {stats.length === 0 ? (
                 <tr>
                   <td colSpan={cols.length} className="px-4 py-8 text-center text-slate-500">
-                    {loading ? "Đang tải dữ liệu..." : "Không có dữ liệu trong 7 ngày qua"}
+                    {loading ? "Đang tải dữ liệu…" : "Không có dữ liệu trong 7 ngày qua"}
                   </td>
                 </tr>
               ) : (
@@ -186,7 +186,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
                               <List size={14} /> Chi tiết Công đoạn & Lệnh SX ngày {fmtDate(row.date)}
                             </div>
                             {detailsLoading ? (
-                              <div className="text-slate-500 text-sm py-4 animate-pulse">Đang tải chi tiết...</div>
+                              <div className="text-slate-500 text-sm py-4 animate-pulse">Đang tải chi tiết…</div>
                             ) : dailyDetails.length === 0 ? (
                               <div className="text-slate-500 text-sm py-4">Không có công đoạn nào được ghi nhận.</div>
                             ) : (
@@ -397,7 +397,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
               </div>
               <div className="p-4">
                 {loading ? (
-                  <div className="py-8 text-center text-slate-500 animate-pulse">Đang tải dữ liệu...</div>
+                  <div className="py-8 text-center text-slate-500 animate-pulse">Đang tải dữ liệu…</div>
                 ) : wos.length === 0 ? (
                   <div className="py-12 text-center">
                     <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -471,7 +471,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                         rows={2}
                         value={note}
                         onChange={e => setNote(e.target.value)}
-                        placeholder="Nguyên nhân phế, lỗi kỹ thuật..."
+                        placeholder="Nguyên nhân phế, lỗi kỹ thuật…"
                         disabled={record && !cameFromManage}
                       />
                     </div>
@@ -482,7 +482,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                         disabled={saving || loading}
                         className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
                       >
-                        <Save size={18} /> {saving ? "Đang lưu..." : (record ? "Cập nhật dữ liệu" : "Xác nhận ghi nhận")}
+                        <Save size={18} /> {saving ? "Đang lưu…" : (record ? "Cập nhật dữ liệu" : "Xác nhận ghi nhận")}
                       </button>
                     ) : (
                       <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-4 rounded-lg text-sm text-center flex flex-col items-center gap-2">
@@ -575,7 +575,7 @@ function ScrapManagement({ onEdit }) {
           <input 
             type="text" 
             className={inputCls + " w-64"} 
-            placeholder="Tìm theo tên công nhân..." 
+            placeholder="Tìm theo tên công nhân…" 
             value={search} onChange={e => setSearch(e.target.value)} 
           />
         </div>

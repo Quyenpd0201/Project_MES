@@ -823,7 +823,7 @@ function OutputReportBody({ lookups }) {
             columns={columns}
             rows={viewRows}
             rowKey={(r) => r.id}
-            emptyText={loading ? "Đang tải dữ liệu..." : "Không có lệnh nào trong mục này"}
+            emptyText={loading ? "Đang tải dữ liệu…" : "Không có lệnh nào trong mục này"}
           />
         )}
       </Section>

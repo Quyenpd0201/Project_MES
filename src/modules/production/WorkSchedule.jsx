@@ -64,7 +64,7 @@ Chuyển tuần?`)) return;
       setIsEditing(false);
       return;
     }
-    const toastId = toast.loading("Đang lưu lịch làm việc...");
+    const toastId = toast.loading("Đang lưu lịch làm việc…");
     try {
       await workSchedules.bulkUpsert(changes);
       toast.success("Đã lưu lịch làm việc", { id: toastId });

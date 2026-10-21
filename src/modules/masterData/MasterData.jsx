@@ -370,7 +370,7 @@ function buildConfigs(lookups) {
       fields: [
         { key: "name", label: "Tên máy", required: true, full: true },
         { key: "factory", label: "Nhà máy", type: "select", required: true, options: ["Nhà máy thổi", "Nhà máy cắt"] },
-        { key: "machine_type", label: "Loại máy", placeholder: "Máy thổi lớn / Máy cắt..." },
+        { key: "machine_type", label: "Loại máy", placeholder: "Máy thổi lớn / Máy cắt…" },
         { key: "production_status", label: "Trạng thái SX (tự động)", readOnly: true, badge: true },
         { key: "status", label: "Tình trạng máy", type: "select", options: ["Hoạt động", "Bảo trì", "Ngừng"], default: "Hoạt động" },
       ],

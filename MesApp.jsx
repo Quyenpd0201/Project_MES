@@ -287,7 +287,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
               <input
                 value={search} onChange={e => setSearch(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                placeholder="Tìm module..."
+                placeholder="Tìm module…"
               />
             </div>
           </div>

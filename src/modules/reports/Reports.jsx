@@ -70,7 +70,7 @@ function KpiReport() {
     }).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")).finally(() => setLoading(false));
   }, [tryN]);
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
+  if (loading) return <div>Đang tải dữ liệu…</div>;
   if (loadErr) return <LoadError message={`Không tải được báo cáo KPI (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />;
   if (!data || !charts) return null;
 
@@ -457,7 +457,7 @@ function DetailedReport() {
                   setFilters({ ...filters, orderCode: val });
                 }
               }}
-              placeholder="Nhập mã lệnh..."
+              placeholder="Nhập mã lệnh…"
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-44 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
             />
             <datalist id="order-codes-list">
@@ -500,7 +500,7 @@ function DetailedReport() {
 
       {/* ── Summary Cards ── */}
       {loading ? (
-        <div className="text-center py-10 text-slate-500 text-sm">Đang tải dữ liệu...</div>
+        <div className="text-center py-10 text-slate-500 text-sm">Đang tải dữ liệu…</div>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -733,7 +733,7 @@ function MachineReport() {
     }).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")).finally(() => setLoading(false));
   }, [tryN]);
 
-  if (loading) return <div>Đang tải dữ liệu...</div>;
+  if (loading) return <div>Đang tải dữ liệu…</div>;
   if (loadErr) return <LoadError message={`Không tải được báo cáo máy (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />;
   if (!data) return null;
 
