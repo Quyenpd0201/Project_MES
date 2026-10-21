@@ -412,7 +412,7 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
                     <Tooltip content={<ChartTooltip />} />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                     <Bar yAxisId="left" dataKey="total_scrap" name="Tổng phế (kg)" fill="#f43f5e" radius={[3, 3, 0, 0]} maxBarSize={32} />
-                    <Line yAxisId="right" type="monotone" dataKey="scrap_ratio" name="Phế/kg" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                    <Line yAxisId="right" type="monotone" dataKey="scrap_ratio" name="Phế / 1 kg TP" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
@@ -806,7 +806,7 @@ function EmployeeReportBody() {
                       {tile("Lệnh / việc", totLenh)}
                       {tile("Tổng sản lượng", fmt(totSL) + " kg", "text-blue-600")}
                       {tile("Tổng phế", fmt(totPhe) + " kg", "text-rose-600")}
-                      {tile("Phế / 1kg (TB)", fmtDec(ratio, 3), "text-amber-600")}
+                      {tile("Phế / 1 kg TP (TB)", fmtDec(ratio, 3), "text-amber-600")}
                     </div>
                   );
                 })()}
@@ -869,7 +869,7 @@ function EmployeeReportBody() {
                       rows={bySL} valOf={(w) => Number(w.actual_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
                     <Criterion title="Ít phế nhất" sub="kg phế — ít nhất được vinh danh" color="#10b981"
                       rows={byPhe} valOf={(w) => Number(w.scrap_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
-                    <Criterion title="Phế / 1kg thấp nhất" sub="kg phế / kg TP — ít nhất được vinh danh" color="#f59e0b"
+                    <Criterion title="Phế / 1 kg TP thấp nhất" sub="kg phế ÷ kg TP — ít nhất được vinh danh" color="#f59e0b"
                       rows={byRatio} valOf={(w) => ratioOf(w)} fmtVal={(v) => fmtDec(v, 3)} />
                   </div>
                 );

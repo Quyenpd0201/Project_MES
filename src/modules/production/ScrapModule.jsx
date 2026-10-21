@@ -53,7 +53,8 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     stats.forEach(r => { wos += Number(r.total_wos) || 0; });
     const finished = Number(totals.total_finished) || 0;
     const scrapTotal = Number(totals.total_scrap) || 0;
-    const ratio = fmtDec(finished > 0 ? scrapTotal / finished * 100 : 0, 2);
+    // Tỷ lệ phế = phế / (TP + phế) — CÙNG công thức với Sản lượng SX / Báo cáo GĐ / backend (P-11)
+    const ratio = fmtDec(finished + scrapTotal > 0 ? scrapTotal / (finished + scrapTotal) * 100 : 0, 1);
     const kgPerKg = finished > 0 ? scrapTotal / finished : 0; // số — định dạng khi hiển thị
     return { wos, finished, scrapTotal, ratio, kgPerKg };
   }, [stats, totals]);
@@ -99,7 +100,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
     { key: "actual_qty", label: "Thực tế", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.actual_qty)} {r.unit}</span> },
     { key: "product_scrap_qty", label: "Tổng Phế (SP/Ngày)", align: "right", render: r => <span className="font-semibold text-rose-500">{fmt(r.product_scrap_qty)}</span> },
-    { key: "ratio", label: "Tỷ lệ Phế / kg", align: "right", render: r => {
+    { key: "ratio", label: "Phế / 1 kg TP", align: "right", render: r => {
       const actual = Number(r.actual_qty) || 0;
       const pScrap = Number(r.product_scrap_qty) || 0;
       return fmtDec(actual > 0 ? pScrap / actual : 0, 4);
@@ -134,7 +135,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
           <div className="text-xs text-slate-400 mt-1">Tỷ lệ chung: {summary.ratio}%</div>
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
-          <div className="text-slate-500 text-sm font-medium mb-1">Phế / 1 đơn vị thành phẩm</div>
+          <div className="text-slate-500 text-sm font-medium mb-1">Phế / 1 kg TP <span className="font-normal text-slate-400">(kg phế ÷ kg thành phẩm)</span></div>
           <div className="text-2xl font-bold text-amber-600">{fmtDec(summary.kgPerKg, 4)}</div>
           <div className="text-xs text-slate-400 mt-1">≈ {fmtDec(summary.kgPerKg * 1000, 1)} / 1000 đơn vị TP</div>
         </div>
@@ -226,7 +227,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
                                              </div>
                                            </div>
                                            <div className="bg-amber-50 rounded-lg p-2.5 flex items-center justify-between mt-1">
-                                             <span className="text-xs text-amber-700 font-semibold">Tỷ lệ phế / {task.unit}:</span>
+                                             <span className="text-xs text-amber-700 font-semibold">Phế / 1 {task.unit} TP:</span>
                                              <span className="text-sm font-bold text-amber-600">{ratio}</span>
                                            </div>
                                         </div>

@@ -1023,7 +1023,7 @@ const STAFF_CRITERIA = [
     sort: (a, b) => b.output - a.output, val: (x) => x.output, show: (v) => <>{fmt(v)} <span className="text-xs font-medium text-slate-400">kg</span></> },
   { key: "scrap", label: "Ít phế nhất", desc: "kg phế — ít nhất được vinh danh", color: "#10b981",
     sort: (a, b) => a.scrap - b.scrap, val: (x) => x.scrap, show: (v) => <>{fmt(v)} <span className="text-xs font-medium text-slate-400">kg</span></> },
-  { key: "ratio", label: "Phế / 1kg thấp nhất", desc: "kg phế / kg thành phẩm — ít nhất được vinh danh", color: "#f59e0b",
+  { key: "ratio", label: "Phế / 1 kg TP thấp nhất", desc: "kg phế ÷ kg thành phẩm — ít nhất được vinh danh", color: "#f59e0b",
     sort: (a, b) => a.scrap_ratio - b.scrap_ratio, val: (x) => x.scrap_ratio, show: (v) => fmt3(v) },
 ];
 
@@ -1045,7 +1045,7 @@ function StaffView({ w }) {
           meta={<>TB <span className="font-semibold text-slate-700">{fmt(w.avg_per_hour)}</span> kg / giờ công</>} />
         <KpiCard icon={PackageX} accent={w.total_scrap > 0 ? "rose" : "slate"} label="Tổng phế" hint="Theo Quản lý phế" delay={140}
           value={<>{fmt(w.total_scrap ?? 0)}{unit}</>} />
-        <KpiCard icon={Gauge} accent="amber" label="Phế / 1kg (TB)" hint="kg phế / kg thành phẩm" delay={210}
+        <KpiCard icon={Gauge} accent="amber" label="Phế / 1 kg TP (TB)" hint="kg phế ÷ kg thành phẩm" delay={210}
           value={w.scrap_ratio == null ? "—" : fmt3(w.scrap_ratio)} />
       </div>
 
