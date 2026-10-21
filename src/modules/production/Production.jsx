@@ -4,7 +4,7 @@ import { production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory, machinesForStage } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
 import { PackageCheck, CheckCircle2, Lock, RotateCcw } from "lucide-react";
 import Qr from "../../Qr.jsx";
 import { SpecFields } from "../../SpecFields.jsx";
@@ -1089,10 +1089,12 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   const [rows, setRows] = useState([]);
   const [cameFromFocus, setCameFromFocus] = useState(false); // mở từ module khác → back về đúng chỗ
 
+  // Phạm vi danh sách: mặc định lệnh chưa xong + lệnh tạo trong 90 ngày (lệnh cũ đã xong ẩn bớt cho nhẹ); "Tất cả" = như cũ
+  const [scope, setScope] = useRemembered("prod:list:scope", "recent");
   const load = useCallback(async () => {
-    try { setRows(await production.list({})); }
+    try { setRows(await production.list(scope === "all" ? {} : { recent_days: 90 })); }
     catch (e) { toast.error("Lỗi tải lệnh sản xuất: " + e.message); }
-  }, []);
+  }, [scope]);
   useEffect(() => { load(); }, [load]);
 
   // Mở sẵn chi tiết lệnh khi được điều hướng từ module khác (vd: Kế hoạch)
@@ -1162,6 +1164,11 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   return (
     <div className="space-y-5">
       <ListHeader title="Lệnh sản xuất" actions={<>
+        <select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Phạm vi lệnh" title="Phạm vi lệnh hiển thị"
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700">
+          <option value="recent">Chưa xong + 90 ngày</option>
+          <option value="all">Tất cả lệnh</option>
+        </select>
         <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
           <button onClick={() => setMode("table")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "table" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><List size={15} /> Bảng</button>
           <button onClick={() => setMode("gantt")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "gantt" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><GanttChartSquare size={15} /> Gantt</button>
