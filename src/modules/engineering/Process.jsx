@@ -4,7 +4,7 @@ import { processes, resource } from "../../mesApi.js";
 
 const bomApi = resource("boms");
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving } from "../../components.jsx";
 import { usePerm } from "../../perm.jsx";
 
 const procApi = processes;
@@ -20,7 +20,7 @@ function FlowChart({ steps, pname, mname }) {
     <div className="flex flex-wrap items-stretch gap-2 overflow-x-auto py-2">
       {steps.map((s, i) => {
         const inputs = (s.inputs || []).map((x) => { const nm = pname(x.material_id); return nm ? `${nm}${x.quantity ? ` (${fmt(x.quantity)}${x.unit ? " " + x.unit : ""})` : ""}` : null; }).filter(Boolean);
-        const place = [s.workshop, mname(s.machine_id), s.duration_minutes ? `${fmt(s.duration_minutes)} phút` : ""].filter(Boolean).join(" · ");
+        const place = [s.workshop, (s.machine_ids?.length ? s.machine_ids : [s.machine_id]).map(mname).filter(Boolean).join(", "), s.duration_minutes ? `${fmt(s.duration_minutes)} phút` : ""].filter(Boolean).join(" · ");
         return (
           <React.Fragment key={s._k ?? i}>
             <div className="min-w-[210px] flex-1 border border-slate-300 rounded-xl bg-white overflow-hidden">
@@ -69,9 +69,11 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   const pcode = (id) => products.find((p) => p.id === id)?.product_code;
   const mname = (id) => machines.find((m) => m.id === id)?.name;
 
-  const emptyStep = () => ({ _k: 0, name: "", workshop: "", machine_id: "", duration_minutes: "", inputs: [], output_product_id: "", output_quantity: "", output_unit: "", yield_percent: "", scrap_percent: "" });
+  const emptyStep = () => ({ _k: 0, name: "", workshop: "", machine_id: "", machine_ids: [], duration_minutes: "", inputs: [], output_product_id: "", output_quantity: "", output_unit: "", yield_percent: "", scrap_percent: "" });
   const mapStep = (s, i) => ({
     _k: i + 1, name: s.name, workshop: s.workshop || "", machine_id: s.machine_id || "",
+    // Nhiều máy (cột machine_ids); quy trình cũ chỉ có 1 máy → hiện máy đó
+    machine_ids: Array.isArray(s.machine_ids) && s.machine_ids.length ? s.machine_ids.map(String) : (s.machine_id ? [String(s.machine_id)] : []),
     duration_minutes: s.duration_minutes ?? "",
     inputs: Array.isArray(s.inputs) && s.inputs.length
       ? s.inputs.map((x) => ({ material_id: x.material_id || "", quantity: x.quantity ?? "", unit: x.unit || "" }))
@@ -126,17 +128,18 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   // đổi xưởng thì bỏ máy nếu máy không thuộc xưởng mới
   const changeWorkshop = (k, ws) => setSteps((a) => a.map((x) => {
     if (x._k !== k) return x;
-    const keep = machines.find((m) => m.id === x.machine_id && (!ws || m.factory === ws));
-    return { ...x, workshop: ws, machine_id: keep ? x.machine_id : "" };
+    const inWs = (id) => machines.some((m) => String(m.id) === String(id) && (!ws || m.factory === ws));
+    return { ...x, workshop: ws, machine_id: inWs(x.machine_id) ? x.machine_id : "", machine_ids: (x.machine_ids || []).filter(inWs) };
   }));
 
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!f.name) return toast.error("Nhập tên quy trình");
     try {
       const payload = {
         ...f,
         steps: steps.filter((s) => s.name).map((s) => ({
-          name: s.name, workshop: s.workshop, machine_id: s.machine_id, duration_minutes: s.duration_minutes,
+          name: s.name, workshop: s.workshop, machine_ids: s.machine_ids || [], machine_id: (s.machine_ids || [])[0] || null, duration_minutes: s.duration_minutes,
           inputs: (s.inputs || []).filter((it) => it.material_id),
           output_product_id: s.output_product_id, output_quantity: s.output_quantity, output_unit: s.output_unit,
           yield_percent: s.yield_percent, scrap_percent: s.scrap_percent,
@@ -156,7 +159,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
           {can("process", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); loadData(); }} className="btn-ghost">Hủy</button>}
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu quy trình</button>
+          <button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu quy trình"}</button>
         </>)} />
 
       <fieldset disabled={!editing} className="space-y-5">

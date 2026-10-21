@@ -84,6 +84,19 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
  * Dropdown chọn Đơn vị tính (thay ô nhập tự do). Luôn giữ giá trị cũ ngoài danh mục
  * (vd dữ liệu cũ) để không mất dữ liệu.
  */
+/* Chống bấm Lưu nhiều lần: const [saving, guard] = useSaving(); <button onClick={() => guard(save)} disabled={saving}>
+   ref chặn ngay lần bấm thứ 2 (state chưa kịp cập nhật), state để đổi nhãn "Đang lưu…" */
+export function useSaving() {
+  const busy = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const guard = async (fn) => {
+    if (busy.current) return;
+    busy.current = true; setSaving(true);
+    try { return await fn(); } finally { busy.current = false; setSaving(false); }
+  };
+  return [saving, guard];
+}
+
 export function UnitSelect({ value, onChange, disabled = false, className }) {
   const v = value || "";
   const opts = v && !UNITS.includes(v) ? [v, ...UNITS] : UNITS;

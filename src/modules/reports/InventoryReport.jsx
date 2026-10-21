@@ -164,8 +164,8 @@ export default function InventoryReport({ lookups }) {
   const unitTxns  = recentTxns.filter(t => unitOf(t.unit) === unit);
 
   /* ── KPI values ───────────────────────────────────────────────── */
-  const totalStockText = [...stockByUnit.entries()].sort((a, b) => b[1] - a[1])
-    .map(([u, q]) => `${fmt(q)} ${u}`).join(" · ") || "0";
+  // Đơn vị nhiều nhất làm số chính, các đơn vị khác ở dòng phụ
+  const [stockMain, ...stockRest] = [...stockByUnit.entries()].sort((a, b) => b[1] - a[1]);
   const totalIn    = unitTxns.filter(t => t.trx_type === "Nhập").reduce((s, t) => s + Number(t.quantity), 0);
   const totalOut   = unitTxns.filter(t => t.trx_type === "Xuất").reduce((s, t) => s + Number(t.quantity), 0);
 
@@ -345,7 +345,7 @@ export default function InventoryReport({ lookups }) {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <KpiCard label="Tổng tồn kho" value={totalStockText} sub={`${filteredStock.length} sản phẩm`} icon={Warehouse} color="blue" />
+        <KpiCard label="Tổng tồn kho" value={stockMain ? `${fmt(stockMain[1])} ${stockMain[0]}` : 0} sub={stockRest.length ? stockRest.map(([u, q]) => `${fmt(q)} ${u}`).join(" · ") : `${filteredStock.length} sản phẩm`} icon={Warehouse} color="blue" />
         <KpiCard label="Nhập kho" value={`${fmt(totalIn)} ${unit}`} sub={`${days} ngày qua`} icon={TrendingUp} color="green" />
         <KpiCard label="Xuất kho" value={`${fmt(totalOut)} ${unit}`} sub={`${days} ngày qua`} icon={TrendingDown} color="amber" />
         <KpiCard label="Dưới định mức" value={lowStockItems.length} sub="Cần bổ sung ngay" icon={AlertTriangle} color={lowStockItems.length > 0 ? "rose" : "green"} />

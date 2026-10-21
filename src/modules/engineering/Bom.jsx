@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, G
 import { resource } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving } from "../../components.jsx";
 
 const bomApi = resource("boms");
 const procApi = resource("processes");
@@ -78,6 +78,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   const isColor = f.bom_type === "Công thức pha màu";
   const ratioSum = lines.reduce((s, l) => s + (Number(l.ratio_percent) || 0), 0);
 
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!f.product_id) return toast.error("Chọn sản phẩm đầu ra");
     if (!f.name) return toast.error("Nhập tên định mức");
@@ -107,7 +108,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
           {can("bom", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); loadData(); }} className="btn-ghost">Hủy</button>}
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu định mức</button>
+          <button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu định mức"}</button>
         </>)} />
 
       {isLinked && (

@@ -8,7 +8,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast, todayYmd } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving } from "../../components.jsx";
 
 // Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
 // Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy — hàng trả lại dùng nút "Khách trả hàng" (nhập lại kho).
@@ -351,8 +351,10 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
   const total = !editing && noteTotal != null ? Number(noteTotal) || 0 : rows.reduce((s, r) => s + amountOf(r), 0);
   const debt = total - (Number(f.paid_amount) || 0);
 
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!f.customer_id) return toast.error("Chọn khách hàng");
+    if (editId && f.status === "Đã hủy" && !confirm(`Hủy phiếu giao ${noteCode || ""}?\nPhiếu đã hủy không khôi phục được.`)) return;
     if (blockedNew) return toast.error(editId
       ? "Khách mới chọn đang nợ vượt hạn mức — không thể chuyển phiếu sang khách này. Cần lập Phiếu thanh toán thu bớt nợ trước."
       : "Khách nợ vượt hạn mức — không thể tạo phiếu giao mới. Cần lập Phiếu thanh toán thu bớt nợ trước.");
@@ -397,7 +399,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
       <PageHeader title={!editId ? "Tạo phiếu giao hàng" : editing ? "Sửa phiếu giao hàng" : "Chi tiết phiếu giao hàng"} onBack={onBack}
         actions={editId && !editing ? (<>
           {isDraft && can("deliveries", "approve") &&
-            <button onClick={ship} className="btn-primary"><Truck size={16} /> Giao hàng</button>}
+            <button onClick={() => guard(ship)} disabled={saving} className="btn-primary"><Truck size={16} /> {saving ? "Đang xử lý…" : "Giao hàng"}</button>}
           {PAYABLE_STATUSES.includes(f.status) && can("deliveries", "approve") &&
             <button onClick={() => setReturning(true)} className="btn-ghost"><RotateCcw size={16} /> Khách trả hàng</button>}
           <button onClick={() => onPrint?.(editId)} className="btn-ghost"><Printer size={16} /> In phiếu</button>
@@ -405,8 +407,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
           {can("deliveries", "delete") && f.status === "Đã hủy" && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}
         </>) : (<>
           {editId && <button onClick={() => { setEditing(false); load(); }} className="btn-ghost">Hủy</button>}
-          <button onClick={save} disabled={blockedNew} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-            title={blockedNew ? "Khách nợ vượt hạn mức" : undefined}><Save size={16} /> Lưu phiếu</button>
+          <button onClick={() => guard(save)} disabled={blockedNew || saving} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            title={blockedNew ? "Khách nợ vượt hạn mức" : undefined}><Save size={16} /> {saving ? "Đang lưu…" : "Lưu phiếu"}</button>
         </>)} />
 
       {returning && <ReturnModal id={editId} noteCode={noteCode} lookups={lookups}

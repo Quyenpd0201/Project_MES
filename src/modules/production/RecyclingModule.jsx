@@ -145,6 +145,18 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
   });
 
   const nextStep = async () => {
+    // Bước 2 trừ tồn phế, bước 4 nhập kho — hỏi rõ mã phiếu + số kg trước khi ghi
+    if (step === 2) {
+      const total = (Number(s2.internal_scrap_qty) || 0) + (Number(s2.mixed_scrap_qty) || 0);
+      if (!confirm(`Phiếu ${ticket.ticket_code}: trừ ${fmt(total)} kg phế phẩm khỏi kho phế. Tiếp tục?`)) return;
+    }
+    if (step === 4 && s4.import_warehouse_id) {
+      const received = rolls.reduce((t, r) => t + (Number(r.weight) || 0), 0);
+      const whName = warehouses.find((w) => String(w.id) === String(s4.import_warehouse_id))?.name || "";
+      const loss = (Number(ticket.expected_qty) || 0) - received;
+      if (!confirm(`Phiếu ${ticket.ticket_code}: nhập ${fmt(received)} kg vào kho ${whName}. Hao hụt dự kiến ${fmt(loss)} kg.
+Hoàn thành phiếu?`)) return;
+    }
     setLoading(true);
     try {
       if (step === 1 && !ticket) {
@@ -373,7 +385,7 @@ function TicketModal({ ticket, initialStep, warehouses, onClose, onSuccess }) {
           (step === 4 && ticket.status === 'Đang tái chế')
         )) && (
           <button onClick={nextStep} disabled={loading} className="btn-primary flex items-center gap-2">
-            {loading ? "Đang xử lý..." : step === 4 ? <><CheckCircle2 size={16}/> Hoàn thành phiếu</> : "Lưu & Tiếp tục"}
+            {loading ? "Đang xử lý..." : step === 4 ? <><CheckCircle2 size={16}/> Hoàn thành & nhập kho</> : step === 2 ? "Lưu cân & trừ phế" : step === 3 ? "Lưu cuộn" : "Tạo phiếu"}
           </button>
         )}
       </div>

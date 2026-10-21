@@ -16,123 +16,6 @@ const Field = ({ label, required, children }) => (
   </div>
 );
 
-/* Bộ ô nhập thông số kỹ thuật (dùng ở Nhập/Xuất & thêm dòng tồn) */
-function SpecFields({ specs, onChange, disabled, cls = inputCls }) {
-  const get = (n) => specs?.[n] || "";
-  const setV = (n, v) => { const next = { ...specs }; if (v) next[n] = v; else delete next[n]; onChange(next); };
-  return (
-    <>
-      {PRODUCT_SPECS.map((spec) => {
-        const lbl = <span className="block text-xs font-medium text-slate-500 mb-1">{spec.name}</span>;
-        if (spec.kind === "select") return (
-          <label key={spec.name}>{lbl}
-            <select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
-              <option value="">-- Chọn --</option>{spec.options.map((o) => <option key={o}>{o}</option>)}
-            </select>
-          </label>
-        );
-        if (spec.kind === "num") { const { num } = splitNU(get(spec.name)); return (
-          <label key={spec.name}>{lbl}
-            <div className="relative">
-              <input type="number" className={cls + " pr-10"} disabled={disabled} value={num} placeholder="0"
-                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${spec.unit}` : "")} />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">{spec.unit}</span>
-            </div>
-          </label>
-        ); }
-        if (spec.kind === "text") {
-          return (
-            <label key={spec.name}>{lbl}
-              <input type="text" className={cls} disabled={disabled} value={get(spec.name)} placeholder={spec.placeholder || ""}
-                onChange={(e) => setV(spec.name, e.target.value)} />
-            </label>
-          );
-        }
-        const { num, unit } = splitNU(get(spec.name)); const cu = unit || spec.units[0];
-        // Bỏ "w-full" của inputCls: trong flex nó ép ô số co lại chỉ còn mũi tên tăng/giảm
-        const clsFlex = cls.replace("w-full ", "");
-        return (
-          <label key={spec.name}>{lbl}
-            <div className="flex gap-1.5">
-              <input type="number" step="any" className={clsFlex + " flex-1 min-w-0 no-spin"} disabled={disabled} value={num} placeholder="0"
-                onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${cu}` : "")} />
-              <select className={clsFlex + " w-[4.5rem] shrink-0 px-2"} disabled={disabled} value={cu}
-                onChange={(e) => setV(spec.name, num ? `${num} ${e.target.value}` : "")}>
-                {spec.units.map((u) => <option key={u}>{u}</option>)}
-              </select>
-            </div>
-          </label>
-        );
-      })}
-    </>
-  );
-}
-
-function AdjustModal({ lookups, onClose, onSaved }) {
-  const [f, setF] = useState({ product_id: "", trx_type: "Nhập", quantity: "", unit: "", location_id: "", lot_code: "", note: "" });
-  const [specs, setSpecs] = useState({});
-  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const onProduct = (id) => {
-    const p = lookups.products.find((x) => x.id === id);
-    setF((s) => ({ ...s, product_id: id, unit: p?.unit || s.unit }));
-  };
-  const save = async () => {
-    if (!f.product_id) return toast.error("Chọn sản phẩm");
-    if (!f.quantity || Number(f.quantity) <= 0) return toast.error("Nhập số lượng hợp lệ");
-    if (!f.location_id) return toast.error("Chọn kho / vị trí");
-    try { await inventory.adjust({ ...f, specs }); toast.success("Đã ghi nhận giao dịch thành công"); onSaved(); }
-    catch (e) { toast.error("Lỗi: " + e.message); }
-  };
-  return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <h3 className="text-lg font-bold text-slate-800">Nhập / Xuất / Điều chỉnh tồn</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <Field label="Sản phẩm" required>
-            <SearchSelect
-              value={f.product_id}
-              onChange={onProduct}
-              options={lookups.products.map((p) => ({ value: p.id, label: `${p.product_code} · ${p.product_name}` }))}
-              placeholder="-- Chọn --"
-            />
-          </Field>
-          <Field label="Loại giao dịch" required>
-            <select className={inputCls} value={f.trx_type} onChange={(e) => set("trx_type", e.target.value)}>
-              <option>Nhập</option><option>Xuất</option><option>Điều chỉnh</option>
-            </select>
-          </Field>
-          <Field label="Số lượng" required>
-            <input type="number" min="0" className={inputCls} value={f.quantity} onChange={(e) => set("quantity", e.target.value)} />
-          </Field>
-          <Field label="Đơn vị">
-            <UnitSelect value={f.unit} onChange={(v) => set("unit", v)} />
-          </Field>
-          <Field label="Vị trí lưu trữ">
-            <select className={inputCls} value={f.location_id} onChange={(e) => set("location_id", e.target.value)}>
-              <option value="">-- Không xác định --</option>
-              {lookups.locations.map((l) => <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>)}
-            </select>
-          </Field>
-          <Field label="Lô sản xuất">
-            <input className={inputCls} value={f.lot_code} placeholder="VD: LSX00007 / Thủ công" onChange={(e) => set("lot_code", e.target.value)} />
-          </Field>
-        </div>
-        <div>
-          <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Thông số kỹ thuật</div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-            <SpecFields specs={specs} onChange={setSpecs} />
-          </div>
-        </div>
-        <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
-        <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="btn-ghost">Hủy</button>
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---- Tab Tồn kho: cây 3 cấp Sản phẩm → Nhóm thông số → Lô sản xuất ---- */
 
 /* ---- Tab Tồn kho: 2 chế độ xem (Theo sản phẩm / Theo vị trí) ---- */
@@ -145,7 +28,6 @@ function TreeTab({ lookups }) {
   const [filterType, setFilterType] = useState("");
   const [viewMode, setViewMode] = useState("location"); // "product" | "location"
   const [openState, setOpenState] = useState(() => new Set());
-  const [adjusting, setAdjusting] = useState(false);
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [showZero, setShowZero] = useState(false); // mặc định ẩn các lô 0 kg
 
@@ -504,7 +386,6 @@ function TreeTab({ lookups }) {
 
       {viewMode === "product" ? renderProductView() : renderLocationView()}
 
-      {adjusting && <AdjustModal lookups={lookups} onClose={() => setAdjusting(false)} onSaved={() => { setAdjusting(false); load(); }} />}
     </div>
   );
 }

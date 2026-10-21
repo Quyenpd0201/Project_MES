@@ -40,7 +40,7 @@ import EmployeeReport from "./src/modules/reports/EmployeeReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
 import ScrapModule from "./src/modules/production/ScrapModule.jsx";
 import RecyclingModule from "./src/modules/production/RecyclingModule.jsx";
-import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect } from "./src/components.jsx";
+import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect, useSaving } from "./src/components.jsx";
 
 /* =====================================================================
    MES — Quản lý Sản phẩm & Dashboard (single-file demo)
@@ -665,6 +665,7 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   const updateAttr = (key, field, val) =>
     setAttributes((a) => a.map((x) => (x._key === key ? { ...x, [field]: val } : x)));
 
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!form.product_name) return toast.error("Vui lòng nhập Tên sản phẩm");
     const cleanAttrs = attributes
@@ -683,7 +684,7 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
   return (
     <div className="space-y-5">
       <PageHeader title={productId ? "Sửa sản phẩm" : (copyId ? "Thêm mới sản phẩm (sao chép)" : "Thêm mới sản phẩm")} onBack={onBack}
-        actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu sản phẩm</button>} />
+        actions={<button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu sản phẩm"}</button>} />
 
       <ProductFields form={form} set={set} code={code} disabled={false} />
       <WarehouseLimitsList limits={warehouseLimits} setLimits={setWarehouseLimits} lookups={lookups} disabled={false} productUnit={form.unit} />
@@ -764,6 +765,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
     if (!confirm("Xóa sản phẩm này?")) return;
     try { await api.remove(id); toast.success("Đã xóa sản phẩm"); onDeleted?.(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!form.product_name) return toast.error("Vui lòng nhập Tên sản phẩm");
     const cleanAttrs = attributes.filter((a) => a.name && a.value).map(({ name, value }) => ({ name, value }));
@@ -788,7 +790,7 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
         badge={<StatusBadge status={p.status} />} subtitle={p.product_code}
         actions={editing ? (<>
           <button onClick={cancel} className="btn-ghost">Hủy</button>
-          <button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>
+          <button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu"}</button>
         </>) : (<>
           {can("products", "edit") && <button onClick={() => { setTab("info"); setEditing(true); }} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
           {can("products", "delete") && <button onClick={del} className="btn-ghost" style={{ color: "#e11d48" }}><Trash2 size={16} /> Xóa</button>}

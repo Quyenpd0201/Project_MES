@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
-import { ListHeader, DataTable, Section } from "../../components.jsx";
+import { ListHeader, DataTable, Section, useSaving } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
@@ -15,6 +15,7 @@ function RoleForm({ record, onBack, onSaved }) {
   });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!f.name) return toast.error("Vui lòng nhập tên vai trò");
     try {
@@ -37,7 +38,7 @@ function RoleForm({ record, onBack, onSaved }) {
         <h2 className="text-xl font-bold text-slate-800">{isEdit ? "Sửa vai trò" : "Thêm vai trò mới"}</h2>
         <div className="flex items-center gap-2">
           <button onClick={onBack} className="px-4 py-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium transition-colors">Hủy</button>
-          <button onClick={save} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"><Save size={16} /> Lưu</button>
+          <button onClick={() => guard(save)} disabled={saving} className="px-4 py-2 disabled:opacity-60 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu"}</button>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

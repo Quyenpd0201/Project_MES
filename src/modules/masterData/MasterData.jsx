@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, Save, Upload, Download, FileDown } fro
 import * as XLSX from "xlsx";
 import { resource, customerOrders, machineOrders, nextCode } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, DataTable, PageHeader, Section } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, useSaving } from "../../components.jsx";
 import {  inputCls, statusClass, fmt, fmtDate , toast } from "../../ui.js";
 
 const isObjOptions = (f) => f.type === "select" && f.options && typeof f.options[0] === "object";
@@ -47,6 +47,7 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
     if (showMachine) machineOrders(record.id).then(setMTasks).catch(() => {});
   }, [showMachine, record?.id]); // eslint-disable-line
 
+  const [saving, guard] = useSaving();
   const save = async () => {
     for (const fl of cfg.fields)
       if (fl.required && !f[fl.key]) return toast.error(`Vui lòng nhập ${fl.label}`);
@@ -64,7 +65,7 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
   return (
     <div className="space-y-5">
       <PageHeader title={`${isEdit ? "Sửa" : "Thêm"} ${cfg.title.toLowerCase()}`} onBack={onBack}
-        actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>} />
+        actions={<button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu"}</button>} />
       {(() => {
         const groups = {};
         const defaultGroup = cfg.fields.some(f => f.group === "Thông tin chung") ? "Thông tin chung" : "Thông tin";
@@ -254,7 +255,9 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   };
 
   // ---- Import Excel ----
+  const [importing, setImporting] = useState(false);
   const importExcel = async (file) => {
+    if (importing) return;
     try {
       const wb = XLSX.read(await file.arrayBuffer());
       const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -272,12 +275,15 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
         return p;
       }).filter((p) => Object.keys(p).filter((k) => k !== (codeCol && codeCol.key)).length);
       if (!payloads.length) return toast.error("Không đọc được dòng dữ liệu hợp lệ. Kiểm tra tiêu đề cột khớp file mẫu.");
+      if (!confirm(`Nhập ${payloads.length} dòng vào ${cfg.title}?`)) return;
+      setImporting(true);
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} dòng.`;
       if (res.failed) msg += `\nLỗi ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
       toast.error(msg);
       load();
     } catch (e) { toast.error("Lỗi đọc file: " + e.message); }
+    finally { setImporting(false); }
   };
 
   const dtCols = [
@@ -310,9 +316,9 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         <button onClick={downloadTemplate} className="btn-ghost"><FileDown size={16} /> Tải mẫu</button>
         {can("md_" + cfg.resource, "create") && (
-          <label className="btn-ghost cursor-pointer">
-            <Upload size={16} /> Nhập Excel
-            <input type="file" accept=".xlsx,.xls" className="hidden"
+          <label className={`btn-ghost ${importing ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}>
+            <Upload size={16} /> {importing ? "Đang nhập…" : "Nhập Excel"}
+            <input type="file" accept=".xlsx,.xls" className="hidden" disabled={importing}
               onChange={(e) => { if (e.target.files[0]) importExcel(e.target.files[0]); e.target.value = ""; }} />
           </label>
         )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RotateCcw, Plus, Pencil, Trash2, Save } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, useSaving } from "../../components.jsx";
 import { users, roles } from "../../mesApi.js";
 import {  inputCls, statusClass , toast } from "../../ui.js";
 
@@ -12,6 +12,7 @@ function UserForm({ record, roleList, teams, employees, onBack, onSaved }) {
   const isEdit = !!record?.id;
   const [f, setF] = useState({ username: record?.username || "", password: "", full_name: record?.full_name || "", role_id: record?.role_id || "", status: record?.status || "Hoạt động", team: record?.team || "", linked_worker: record?.linked_worker || "" });
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  const [saving, guard] = useSaving();
   const save = async () => {
     if (!f.username) return toast.error("Nhập tài khoản");
     if (!isEdit && !f.password) return toast.error("Nhập mật khẩu");
@@ -23,7 +24,7 @@ function UserForm({ record, roleList, teams, employees, onBack, onSaved }) {
   return (
     <div className="space-y-5">
       <PageHeader title={isEdit ? "Sửa tài khoản" : "Thêm tài khoản"} onBack={onBack}
-        actions={<button onClick={save} className="btn-primary"><Save size={16} /> Lưu</button>} />
+        actions={<button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : "Lưu"}</button>} />
       <Section title="Thông tin tài khoản">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           <F label="Tài khoản" required><input className={inputCls} value={f.username} onChange={(e) => set("username", e.target.value)} placeholder="tên đăng nhập" /></F>
