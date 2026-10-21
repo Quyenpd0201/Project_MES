@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useAppSettings } from "../../appSettings.js";
 import {
   Activity, Download, RefreshCcw, TrendingUp, Package, CheckCircle2, AlertTriangle,
   X, User, Users, CalendarDays, Factory, ShoppingCart, Tag, ClipboardList, Layers,
@@ -402,6 +403,7 @@ export default function OutputReport(props) {
 }
 
 function OutputReportBody({ lookups }) {
+  const S = useAppSettings();
   const { can, isAdmin } = usePerm(); // eslint-disable-line no-unused-vars
   const [rows, setRows]               = useState([]);
   const [loading, setLoading]         = useState(false);
@@ -769,7 +771,7 @@ function OutputReportBody({ lookups }) {
           icon={AlertCircle} color={overdueCount > 0 ? "rose" : "green"} {...cardProps("overdue")} />
         <KpiCard label="Phế phẩm"    value={scrapErr ? "—" : fmt(totalScrap)}
           sub={scrapErr ? "Lỗi tải số liệu phế" : `Tỷ lệ phế ${scrapRateTxt}%`}
-          icon={AlertTriangle} color={scrapRate > 5 ? "rose" : "amber"} {...cardProps("scrap")} />
+          icon={AlertTriangle} color={scrapRate > S.scrap_alert_percent ? "rose" : "amber"} {...cardProps("scrap")} />
       </div>
 
       <OutputCharts rows={filtered} onPick={pick} />

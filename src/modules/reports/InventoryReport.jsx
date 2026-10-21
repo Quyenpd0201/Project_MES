@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "../../appSettings.js";
 import {
   Warehouse, Download, RefreshCcw, TrendingUp, TrendingDown,
   Package, AlertTriangle, CheckCircle2, BarChart2
@@ -92,6 +93,7 @@ export default function InventoryReport(props) {
 }
 
 function InventoryReportBody({ lookups }) {
+  const S = useAppSettings(); const nearK = S.near_min_percent / 100; // Cài đặt hệ thống (mặc định 120%)
   const { can, isAdmin } = usePerm(); // eslint-disable-line no-unused-vars
   const [stockData, setStockData]   = useState([]);
   const [txnData, setTxnData]       = useState([]);
@@ -185,13 +187,13 @@ function InventoryReportBody({ lookups }) {
     });
   });
 
-  // Near min (within 120%)
+  // Gần định mức: tồn ≥ tối thiểu và < near_min_percent% tối thiểu
   const nearMinItems = filteredStock.filter(p => {
     if (!p.warehouse_limits?.length) return false;
     return p.warehouse_limits.some(w => {
       const qty = p.warehouse_totals?.[w.warehouse_id] || 0;
       const min = Number(w.min_quantity);
-      return w.min_quantity != null && qty >= min && qty < min * 1.2;
+      return w.min_quantity != null && qty >= min && qty < min * nearK;
     });
   });
 
@@ -502,7 +504,7 @@ function InventoryReportBody({ lookups }) {
               {[...lowStockItems, ...nearMinItems.filter(p => !lowStockItems.includes(p))].map(p => {
                 const alertLimits = (p.warehouse_limits || []).filter(w => {
                   const qty = p.warehouse_totals?.[w.warehouse_id] || 0;
-                  return w.min_quantity != null && qty < Number(w.min_quantity) * 1.2;
+                  return w.min_quantity != null && qty < Number(w.min_quantity) * nearK;
                 });
                 return alertLimits.map(w => {
                   const qty = p.warehouse_totals?.[w.warehouse_id] || 0;

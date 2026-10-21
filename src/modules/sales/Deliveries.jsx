@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useAppSettings } from "../../appSettings.js";
 import { useNavigate } from "react-router-dom";
 import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, Printer, FileText, Truck, Wallet, X } from "lucide-react";
 import { deliveries as api, resource, inventory, paymentReceipts } from "../../mesApi.js";
@@ -26,13 +27,6 @@ const PAYABLE_STATUSES = ["Giao hàng", "Đã xuất hóa đơn", "Chờ thanh t
 
 const today = todayYmd; // ngày giao mặc định theo giờ VN (toISOString lệch 1 ngày trước 7h sáng)
 
-// Thông tin đơn vị bán hàng (in trên phiếu xuất kho)
-const COMPANY = {
-  name: "CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT XNK BAO BÌ NGỌC AN THƯ",
-  tax: "0316748578",
-  address: "119/1 Đường Đỗ Mười, Tổ 4, Khu phố 1, Phường Thới An, Thành Phố Hồ Chí Minh",
-  phone: "0938 446 156",
-};
 const MIN_ROWS = 8; // số dòng tối thiểu của bảng (in giấy cho đẹp)
 
 const Field = ({ label, required, children }) => (
@@ -589,6 +583,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
 
 /* ---- Phiếu in (template chung giao hàng + thanh toán) ---- */
 function DeliveryVoucher({ id, onBack }) {
+  const S = useAppSettings();
+  const COMPANY = { name: S.company_name, tax: S.company_tax, address: S.company_address, phone: S.company_phone }; // Cài đặt hệ thống
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("deliveries", "amounts") !== "hidden";
   const [d, setD] = useState(null);

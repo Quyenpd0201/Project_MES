@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useAppSettings } from "../../appSettings.js";
 import { Link } from "react-router-dom";
 import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Copy, Upload, CheckCircle, XCircle, AlertCircle, CalendarClock } from "lucide-react";
 import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.js";
@@ -303,6 +304,7 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
 
 /* ---- Form đơn hàng ---- */
 function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreateDelivery, onOpenProductionOrder }) {
+  const S = useAppSettings(); const vatPct = S.vat_percent; // VAT hiển thị — Cài đặt hệ thống (mặc định 8%)
   const { can, fperm, fpermSecret } = usePerm();
   const fhid = (k) => fperm("orders", k) === "hidden";
   const fdis = (k) => fperm("orders", k) !== "edit";
@@ -316,7 +318,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const [seq, setSeq] = useState(2);
   const [recCode, setRecCode] = useState(""); // mã bản ghi đang mở (cho câu hỏi xóa)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  const vatRate = f.has_vat ? 1.08 : 1; // Có VAT: cộng 8% (như cũ) · Không VAT: giữ nguyên thành tiền
+  const vatRate = f.has_vat ? 1 + vatPct / 100 : 1; // Có VAT: cộng vatPct% · Không VAT: giữ nguyên thành tiền
 
   const loadData = useCallback(() => {
     if (!editId) return;
@@ -482,7 +484,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                     </div>
                   </label>
                   <label>
-                    <span className="block text-xs font-medium text-slate-500 mb-1">{f.has_vat ? "Thành tiền (sau VAT 8%)" : "Thành tiền (không VAT)"}</span>
+                    <span className="block text-xs font-medium text-slate-500 mb-1">{f.has_vat ? `Thành tiền (sau VAT ${fmt(vatPct)}%)` : "Thành tiền (không VAT)"}</span>
                     <div className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-blue-700 font-semibold">
                       {fmt(((Number(it.unit_price) || 0) * (Number(it.quantity) || 0)) * vatRate)} đ
                     </div>
@@ -659,7 +661,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
               <label className={`flex items-center gap-2 text-sm text-slate-700 select-none ${moneyPerm === "edit" ? "cursor-pointer" : "cursor-default"}`}>
                 <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                   disabled={moneyPerm !== "edit"} checked={!!f.has_vat} onChange={(e) => set("has_vat", e.target.checked)} />
-                Có VAT 8%
+                Có VAT {fmt(vatPct)}%
               </label>
               <div className="flex items-baseline gap-2">
                 <span className="text-sm text-slate-500">Tổng trước VAT:</span>
@@ -668,7 +670,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                 </span>
               </div>
               <div className="flex items-baseline gap-2">
-                <span className="text-sm text-slate-500">{f.has_vat ? "Tổng sau VAT (8%):" : "Tổng (không VAT):"}</span>
+                <span className="text-sm text-slate-500">{f.has_vat ? `Tổng sau VAT (${fmt(vatPct)}%):` : "Tổng (không VAT):"}</span>
                 <span className="text-lg font-bold text-blue-700">
                   {fmt(items.reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0) * vatRate, 0))} đ
                 </span>
@@ -694,6 +696,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
 
 /* ---- Phiếu đặt hàng (in được) ---- */
 function OrderVoucher({ id, onBack }) {
+  const S = useAppSettings();
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("orders", "amounts") !== "hidden";
   const [o, setO] = useState(null);
@@ -716,7 +719,7 @@ function OrderVoucher({ id, onBack }) {
         <div className="flex items-center gap-4 border-b-2 border-blue-700 pb-3 mb-4">
           <Logo className="h-14 w-auto shrink-0" />
           <div className="flex-1 text-center">
-            <div className="text-sm font-semibold text-slate-700">CÔNG TY TNHH THƯƠNG MẠI SẢN XUẤT XNK BAO BÌ NGỌC AN THƯ</div>
+            <div className="text-sm font-semibold text-slate-700">{S.company_name}</div>
             <h2 className="text-xl font-bold text-slate-900 mt-2 uppercase">Phiếu đặt hàng</h2>
             <div className="text-sm text-slate-600 mt-0.5">Số: <b>{o.order_code}</b></div>
           </div>

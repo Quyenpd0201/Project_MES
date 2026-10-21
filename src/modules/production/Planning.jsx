@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { getAppSettings } from "../../appSettings.js";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
 import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 import { planning, production } from "../../mesApi.js";
@@ -209,7 +210,8 @@ function computePriority(batches) {
   const anchorDays = anchor?.earliest_due ? Math.ceil((new Date(anchor.earliest_due) - today) / 86400000) : null;
   const aw = anchor ? bw(anchor) : null;
   const widthDist = (b) => (aw == null || bw(b) == null) ? Infinity : Math.abs(bw(b) - aw);
-  const urgent = anchorDays != null && anchorDays <= 5;
+  const { urgent_days, priority_top } = getAppSettings(); // Cài đặt hệ thống (mặc định 5 / 5)
+  const urgent = anchorDays != null && anchorDays <= urgent_days;
 
   const restNormal = (anchor ? normalSorted.slice(1) : normalSorted).sort((a, c) =>
     urgent
@@ -219,7 +221,7 @@ function computePriority(batches) {
   const orderedAll = [...highGroup, ...(anchor ? [anchor, ...restNormal] : restNormal)];
 
   const rankMap = {};
-  orderedAll.slice(0, 5).forEach((b, i) => { rankMap[b.batch_key] = i + 1; });
+  orderedAll.slice(0, priority_top).forEach((b, i) => { rankMap[b.batch_key] = i + 1; });
   return { rankMap, ordered: orderedAll, anchorDays };
 }
 
