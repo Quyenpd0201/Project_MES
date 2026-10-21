@@ -523,11 +523,11 @@ function InventoryReportBody({ lookups }) {
                         <div className="flex items-center gap-2">
                           {isLow ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700">
-                              🔴 Dưới tối thiểu ({pct}%)
+                              <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-rose-500 mr-1 align-middle" />Dưới tối thiểu ({pct}%)
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                              🟡 Sắp dưới mức ({pct}%)
+                              <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 align-middle" />Sắp dưới mức ({pct}%)
                             </span>
                           )}
                         </div>

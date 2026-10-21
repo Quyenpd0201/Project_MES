@@ -97,7 +97,7 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
                     <td className="px-3 py-2 text-slate-600">{it.customer_name || "—"}</td>
                     <td className="px-3 py-2 text-slate-500">{it.note || "—"}</td>
                     <td className="px-3 py-2 text-slate-500">
-                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs">✦ Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs">⟳ Hàng pha</span> : "—"}
+                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs">Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs">Hàng pha</span> : "—"}
                     </td>
                     <td className="px-3 py-2 text-right text-slate-500">{fmt(rem(it))} {it.unit}</td>
                     <td className="px-3 py-2 text-right">
@@ -272,7 +272,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
         <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className={`text-2xl font-bold ${overdueMode ? "text-rose-600" : "text-slate-800"}`}>{list.length}</div><div className="text-xs text-slate-500">{overdueMode ? "Lô quá hạn" : "Lô cần sản xuất"}</div></div>
         {!overdueMode && <div className="bg-white rounded-xl border border-slate-200 px-5 py-3"><div className="text-2xl font-bold text-slate-800">{demandLines}</div><div className="text-xs text-slate-500">Dòng đơn hàng chờ</div></div>}
       </div>
-      {!list.length && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">{overdueMode ? "Không có lô nào quá hạn giao. 🎉" : "Không có đơn hàng nào cần lên kế hoạch. Tạo đơn hàng ở mục Đơn hàng trước."}</div>}
+      {!list.length && <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400">{overdueMode ? "Không có lô nào quá hạn giao." : "Không có đơn hàng nào cần lên kế hoạch. Tạo đơn hàng ở mục Đơn hàng trước."}</div>}
       <div className="space-y-4">
         {slice.map((b, idx) => {
           const rank = priority.rankMap[b.batch_key];
@@ -326,7 +326,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
                     <td className="px-4 py-2">{fmtDate(it.due_date)}</td>
                     <td className="px-4 py-2 text-slate-500">{it.note || "—"}</td>
                     <td className="px-4 py-2 text-slate-500">
-                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">✦ Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-100">⟳ Hàng pha</span> : "—"}
+                      {it.material_type === 'zin' ? <span className="text-emerald-600 font-medium text-xs bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">Hàng zin</span> : it.material_type === 'pha' ? <span className="text-amber-600 font-medium text-xs bg-amber-50 px-2 py-0.5 rounded border border-amber-100">Hàng pha</span> : "—"}
                     </td>
                   </tr>
                 ))}

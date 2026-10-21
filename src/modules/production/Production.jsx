@@ -489,7 +489,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           {editId && meta?.status && <span className={`inline-flex px-2.5 py-0.5 rounded-full text-sm font-medium ${statusClass(meta.status)}`}>{meta.status}</span>}
         </span>} onBack={onBack}
         actions={editId && !editing ? (<>
-          {locked && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">🔒 Đã {meta?.status} · không thể sửa</span>}
+          {locked && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200"><Lock size={12} aria-hidden="true" /> Đã {meta?.status} · không thể sửa</span>}
           {meta?.status === 'Hoàn thành' && !locked && <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">⚠ Hoàn thành · cần bổ sung phân công</span>}
           {can("production", "edit") && !matsIssued && !locked && <button onClick={requestMats} disabled={pmBusy} className="btn-ghost text-amber-700 border-amber-300 hover:bg-amber-50"><PackageCheck size={16} /> Yêu cầu NVL</button>}
           {can("production", "edit") && !locked && <button onClick={() => setEditing(true)} className="btn-ghost"><Pencil size={16} /> Sửa</button>}
@@ -816,7 +816,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                           <td colSpan={4} className="cursor-pointer py-2 pr-2" onClick={() => toggleStage(stg)}>
                             {stg === "Cắt" && rollAvail && (
                               <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5">
-                                🧵 Tồn cuộn khả dụng: {fmt(rollAvail.total_kg)} kg ({rollAvail.spec_label})
+                                Tồn cuộn khả dụng: {fmt(rollAvail.total_kg)} kg ({rollAvail.spec_label})
                               </span>
                             )}
                           </td>

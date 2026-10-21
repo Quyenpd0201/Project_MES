@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import {
   ShieldCheck, Search, Edit, Trash2, X, ChevronRight, ChevronDown,
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
-  BarChart2, Settings, Save, ArrowLeft, Recycle
+  BarChart2, Settings, Save, ArrowLeft, Recycle, Lock, CheckCircle2, GitBranch, UserCheck, MapPin
 } from "lucide-react";
 import { ListHeader, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
@@ -424,12 +424,12 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                         </span>
                                         {isInherited && (
                                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">
-                                            🔵 Kế thừa
+                                            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 mr-1 align-middle" />Kế thừa
                                           </span>
                                         )}
                                         {isChecked && (
                                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-medium border border-emerald-200">
-                                            🟢 Trực tiếp
+                                            <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 align-middle" />Trực tiếp
                                           </span>
                                         )}
                                       </div>
@@ -678,10 +678,10 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
         <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-5 flex-shrink-0 text-xs text-slate-500">
           <span><span className="font-bold text-blue-600 text-sm">{totalSelected}</span> quyền đang chọn</span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> 🟢 Trực tiếp
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> Trực tiếp
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> 🔵 Kế thừa từ role cha
+            <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Kế thừa từ role cha
           </span>
         </div>
 
@@ -930,15 +930,15 @@ export default function PermissionsModule() {
           {/* ── KPI Cards ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Tổng quyền hệ thống", val: statTotal,    icon: "🔒", color: "text-slate-700",   bg: "bg-white",        border: "border-slate-200" },
-              { label: "Quyền được cấp",       val: statGranted,  icon: "✅", color: "text-blue-600", bg: "bg-blue-50",    border: "border-blue-200" },
-              { label: "Quyền kế thừa",        val: statInherited,icon: "🔵", color: "text-blue-600",   bg: "bg-blue-50",      border: "border-blue-200" },
-              { label: "Quyền trực tiếp",      val: statDirect,   icon: "🟢", color: "text-emerald-600",bg: "bg-emerald-50",   border: "border-emerald-200" },
+              { label: "Tổng quyền hệ thống", val: statTotal,    icon: Lock, color: "text-slate-700",   bg: "bg-white",        border: "border-slate-200" },
+              { label: "Quyền được cấp",       val: statGranted,  icon: CheckCircle2, color: "text-blue-600", bg: "bg-blue-50",    border: "border-blue-200" },
+              { label: "Quyền kế thừa",        val: statInherited,icon: GitBranch, color: "text-blue-600",   bg: "bg-blue-50",      border: "border-blue-200" },
+              { label: "Quyền trực tiếp",      val: statDirect,   icon: UserCheck, color: "text-emerald-600",bg: "bg-emerald-50",   border: "border-emerald-200" },
             ].map((k, i) => (
               <div key={i} className={`${k.bg} rounded-xl border ${k.border} p-5 hover:shadow-md transition-shadow`}>
                 <div className="flex items-start justify-between mb-3">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide leading-tight">{k.label}</p>
-                  <span className="text-lg leading-none">{k.icon}</span>
+                  <k.icon size={18} aria-hidden="true" className={k.color} />
                 </div>
                 <p className={`text-3xl font-bold ${k.color}`}>{k.val}</p>
               </div>
@@ -1028,12 +1028,12 @@ export default function PermissionsModule() {
                                   <div className="flex items-center gap-1.5 ml-1">
                                     {directCount > 0 && (
                                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 border border-emerald-200 font-medium">
-                                        🟢 {directCount}
+                                        <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 align-middle" />{directCount}
                                       </span>
                                     )}
                                     {inheritCount > 0 && (
                                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 border border-blue-200 font-medium">
-                                        🔵 {inheritCount}
+                                        <span aria-hidden="true" className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 mr-1 align-middle" />{inheritCount}
                                       </span>
                                     )}
                                   </div>
@@ -1067,13 +1067,13 @@ export default function PermissionsModule() {
                                                 {ACTION_LABELS[actKey] || actKey}
                                               </span>
                                               {isDirect ? (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-medium border border-emerald-200">🟢 Trực tiếp</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600 font-medium border border-emerald-200">Trực tiếp</span>
                                               ) : (
-                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">🔵 Kế thừa</span>
+                                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-600 font-medium border border-blue-200">Kế thừa</span>
                                               )}
                                               {scope !== "ALL" && (
                                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-600 border border-amber-200 font-medium">
-                                                  📍 {scope}{scopeValue ? `: ${scopeValue}` : ""}
+                                                  <MapPin size={10} aria-hidden="true" className="inline -mt-0.5 mr-0.5" />{scope}{scopeValue ? `: ${scopeValue}` : ""}
                                                 </span>
                                               )}
                                             </div>

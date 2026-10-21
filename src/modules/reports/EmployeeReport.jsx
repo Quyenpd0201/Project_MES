@@ -209,7 +209,7 @@ function WorkOrdersTable({ tasks }) {
                           ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-amber-100 text-amber-700'
                         }`}>
-                        {t.material_type === 'zin' ? '✦ Hàng zin' : '⟳ Hàng pha'}
+                        {t.material_type === 'zin' ? 'Hàng zin' : 'Hàng pha'}
                       </span>
                     )}
                   </td>
@@ -727,7 +727,7 @@ function EmployeeReportBody() {
                           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
                             }`}>
                             {rank <= 3 && !isSelected
-                              ? ["🥇", "🥈", "🥉"][rank - 1]
+                              ? rank // hạng 1/2/3 bằng số (thay huy chương emoji)
                               : w.worker?.[0]?.toUpperCase() || "?"}
                           </div>
                           {/* Name + team */}
