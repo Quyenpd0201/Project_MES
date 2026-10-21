@@ -56,8 +56,8 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
         await api.update(record.id, f);
         toast.success("Đã lưu thành công"); // ở lại màn chi tiết, không thoát ra list
       } else {
-        await api.create(f);
-        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+        const created = await api.create(f);
+        toast.success("Đã lưu thành công"); onSaved(created); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
@@ -307,8 +307,8 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   ];
 
   if (editing)
-    return <RecordForm cfg={cfg} record={editing.id ? editing : null} onOpenOrder={onOpenOrder} onOpenProductionOrder={onOpenProductionOrder}
-      onBack={() => { setEditing(null); load(); }} onSaved={() => { setEditing(null); load(); }} />;
+    return <RecordForm key={editing.id || "new"} cfg={cfg} record={editing.id ? editing : null} onOpenOrder={onOpenOrder} onOpenProductionOrder={onOpenProductionOrder}
+      onBack={() => { setEditing(null); load(); }} onSaved={(rec) => { setEditing(rec?.id ? rec : null); load(); }} />;
 
   return (
     <div className="space-y-4">

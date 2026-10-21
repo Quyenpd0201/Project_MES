@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Upload, Save, Plus, Trash2, RefreshCcw, History, AlertTriangle, PackageCheck, Check, Ban, ChevronRight, ChevronDown, ClipboardList } from "lucide-react";
-import { DataTable, PageHeader, UnitSelect, SearchSelect } from "../../components.jsx";
+import { DataTable, PageHeader, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, toast, todayYmd } from "../../ui.js";
@@ -423,7 +423,7 @@ function PendingSlips({ canConfirm, onConfirmed }) {
 function OutboundHistory() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState(defaultRange());
+  const [range, setRange] = useRemembered("outbound:range", defaultRange);
   const load = useCallback(async () => {
     setLoading(true);
     try { setRows(await inventory.transactions({ trx_type: "Xuất", ...range, limit: 2000 })); }

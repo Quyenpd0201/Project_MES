@@ -4,7 +4,7 @@ import {
   X, User, Users, CalendarDays, Factory, ShoppingCart, Tag, ClipboardList, Layers,
   ChevronRight, AlertCircle,
 } from "lucide-react";
-import { ListHeader, Section, DataTable, SearchSelect } from "../../components.jsx";
+import { ListHeader, Section, DataTable, SearchSelect, useRemembered } from "../../components.jsx";
 import { production, scrap as scrapApi } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast, todayYmd, monthStartYmd } from "../../ui.js";
 import * as XLSX from "xlsx";
@@ -397,11 +397,11 @@ export default function OutputReport({ lookups }) {
   );
   const [rows, setRows]               = useState([]);
   const [loading, setLoading]         = useState(false);
-  const [from, setFrom]               = useState(monthStart());
-  const [to, setTo]                   = useState(today());
-  const [productFilter, setProductFilter] = useState("");
-  const [teamFilter, setTeamFilter]   = useState("");
-  const [statusFilter, setStatusFilter] = useState(""); // "" | tên trạng thái | OVERDUE
+  const [from, setFrom]               = useRemembered("output:from", monthStart);
+  const [to, setTo]                   = useRemembered("output:to", today);
+  const [productFilter, setProductFilter] = useRemembered("output:product", "");
+  const [teamFilter, setTeamFilter]   = useRemembered("output:team", "");
+  const [statusFilter, setStatusFilter] = useRemembered("output:status", ""); // "" | tên trạng thái | OVERDUE
   const [showCustomer, setShowCustomer] = useState(false);
   // Góc nhìn của bảng chi tiết: { key: all|actual|remain|running|done|overdue|scrap } hoặc { key: status|date, value }
   const [view, setView] = useState({ key: "all" });

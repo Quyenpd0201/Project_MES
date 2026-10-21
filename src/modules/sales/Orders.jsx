@@ -367,8 +367,8 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         toast.success("Đã lưu thành công");
         setEditing(false); loadData(); // ở lại màn chi tiết, không thoát ra list
       } else {
-        await ordersApi.create({ ...f, items: valid });
-        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+        const created = await ordersApi.create({ ...f, items: valid });
+        toast.success("Đã lưu thành công"); onSaved(created?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) { toast.error("Lỗi lưu đơn hàng: " + e.message); }
   };
@@ -1098,9 +1098,9 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
       </div>
 
       {view === "form" && (
-        <OrderForm lookups={lookups} editId={editId} copyId={copyId}
+        <OrderForm key={editId || "new"} lookups={lookups} editId={editId} copyId={copyId}
           onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} 
-          onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
+          onSaved={(newId) => { if (newId) { setEditId(newId); setCopyId(null); } else { setView("list"); setEditId(null); setCopyId(null); } load(); }}
           onPrint={(id) => { setVoucherId(id); setView("voucher"); }} 
           onCreateDelivery={onCreateDelivery} 
           onOpenProductionOrder={onOpenProductionOrder} 

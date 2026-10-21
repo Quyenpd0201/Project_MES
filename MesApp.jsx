@@ -674,8 +674,8 @@ function ProductForm({ productId, copyId, onBack, onSaved, lookups }) {
     const cleanLimits = warehouseLimits.map(({ warehouse_id, min_quantity, max_quantity }) => ({ warehouse_id, min_quantity, max_quantity }));
     try {
       if (productId) await api.update(productId, { ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits });
-      else await api.create({ ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits });
-      toast.success("Đã lưu thành công"); onSaved();
+      const created = productId ? null : await api.create({ ...form, attributes: cleanAttrs, warehouse_limits: cleanLimits });
+      toast.success("Đã lưu thành công"); onSaved(created?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
     } catch (e) {
       toast.error("Lỗi lưu sản phẩm: " + e.message);
     }
@@ -1322,7 +1322,7 @@ export default function MesApp() {
               />} />
               <Route path="/products/form" element={lookups ? <ProductForm productId={productEditId} copyId={productCopyId} lookups={lookups}
                 onBack={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
-                onSaved={() => { setProductCopyId(null); navigate(productEditId ? "/products/detail" : "/products"); }}
+                onSaved={(newId) => { setProductCopyId(null); if (newId) { setDetailId(newId); setDetailBack("/products"); } navigate(productEditId || newId ? "/products/detail" : "/products"); }}
               /> : loadingEl} />
               <Route path="/products/detail" element={lookups ? <ProductDetail id={detailId} onBack={() => navigate(detailBack)}
                 onDeleted={() => navigate(detailBack)} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} lookups={lookups}

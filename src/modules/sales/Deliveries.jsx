@@ -380,8 +380,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
         toast.success("Đã lưu thành công");
         setEditing(false); load(); // ở lại màn chi tiết
       } else {
-        warnPrice(await api.create(body));
-        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+        const created = await api.create(body); warnPrice(created);
+        toast.success("Đã lưu thành công"); onSaved(created?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) { toast.error("Lỗi lưu phiếu: " + e.message); }
   };
@@ -722,8 +722,8 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
   const del = async (id) => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const resetToList = () => { setView("list"); setEditId(null); setNewOrderId(null); };
-  if (view === "form") return <DeliveryForm lookups={lookups} editId={editId} initialOrderId={newOrderId}
-    onBack={() => { resetToList(); load(); }} onSaved={() => { resetToList(); load(); }}
+  if (view === "form") return <DeliveryForm key={editId || "new"} lookups={lookups} editId={editId} initialOrderId={newOrderId}
+    onBack={() => { resetToList(); load(); }} onSaved={(newId) => { if (newId) { setEditId(newId); setNewOrderId(null); } else resetToList(); load(); }}
     onPrint={(id) => { setVoucherId(id); setView("voucher"); }} />;
   if (view === "voucher") return <DeliveryVoucher id={voucherId} onBack={() => setView("list")} />;
 

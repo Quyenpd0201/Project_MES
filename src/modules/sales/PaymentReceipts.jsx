@@ -83,7 +83,7 @@ function ReceiptForm({ lookups, id, onBack, onSaved }) {
       if (isNew) {
         const r = await api.create(f);
         toast.success(r.message || "Đã lưu phiếu thanh toán", { duration: 6000 });
-        onSaved();
+        onSaved(r?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       } else {
         await api.update(id, f);
         toast.success("Đã cập nhật phiếu");
@@ -286,7 +286,8 @@ export default function PaymentReceiptsModule({ lookups }) {
     <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem số liệu tiền / thanh toán.</div>
   );
   const back = () => { setView("list"); setOpenId(null); load(); };
-  if (view === "form") return <ReceiptForm lookups={lookups} id={openId} onBack={back} onSaved={back} />;
+  if (view === "form") return <ReceiptForm key={openId || "new"} lookups={lookups} id={openId} onBack={back}
+    onSaved={(newId) => { if (newId) { setOpenId(newId); load(); } else back(); }} />;
 
   const open = (id) => { setOpenId(id); setView("form"); };
   const columns = [

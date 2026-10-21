@@ -146,7 +146,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
         })),
       };
       if (editId) { await procApi.update(editId, payload); toast.success("Đã cập nhật thành công"); loadData(); setEditing(false); }
-      else { await procApi.create(payload); toast.success("Đã lưu thành công"); onSaved(); }
+      else { const created = await procApi.create(payload); toast.success("Đã lưu thành công"); onSaved(created?.id); } // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
     } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
   const del = async () => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
@@ -326,7 +326,7 @@ export default function ProcessModule({ lookups }) {
   useEffect(() => { load(); }, [load]);
   const del = async (id) => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
-  if (view === "form") return <ProcessForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
+  if (view === "form") return <ProcessForm key={editId || "new"} lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={(newId) => { if (newId) { setEditId(newId); setCopyId(null); } else { setView("list"); setEditId(null); setCopyId(null); } load(); }} />;
 
   const columns = [
     { key: "process_code", label: "Mã", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.process_code}</button> },

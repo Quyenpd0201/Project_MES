@@ -89,8 +89,8 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
         toast.success("Đã lưu thành công");
         setEditing(false); loadData(); // ở lại màn chi tiết
       } else {
-        await bomApi.create(payload);
-        toast.success("Đã lưu thành công"); onSaved(); // tạo mới → về list
+        const created = await bomApi.create(payload);
+        toast.success("Đã lưu thành công"); onSaved(created?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) { toast.error("Lỗi lưu định mức: " + e.message); }
   };
@@ -224,8 +224,8 @@ export default function BomModule({ lookups }) {
   };
 
   if (view === "form")
-    return <BomForm lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
-      onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
+    return <BomForm key={editId || "new"} lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); load(); }}
+      onSaved={(newId) => { if (newId) { setEditId(newId); setCopyId(null); } else { setView("list"); setEditId(null); setCopyId(null); } load(); }} />;
 
   const columns = [
     { key: "bom_code", label: "Mã", filter: "text", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.bom_code}</button> },

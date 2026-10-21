@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { PackagePlus, Save, Plus, Trash2, RefreshCcw, FileText, History } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast, todayYmd } from "../../ui.js";
@@ -190,7 +190,7 @@ function InboundForm({ lookups, onSaved }) {
 function TransactionHistory({ type }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState(defaultRange());
+  const [range, setRange] = useRemembered("inbound:range", defaultRange);
   const load = useCallback(async () => {
     setLoading(true);
     try { setRows(await inventory.transactions({ trx_type: type, ...range, limit: 2000 })); }

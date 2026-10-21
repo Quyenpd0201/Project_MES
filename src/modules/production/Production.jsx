@@ -403,7 +403,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         const created = await production.create({ ...f, mix_ratio: mixRatio, finishing });
         if (created?.id && matLines.length) await production.savePlannedMaterials(created.id, matLines);
         toast.success("Tạo lệnh sản xuất mới thành công");
-        onSaved(); // tạo mới → về list
+        onSaved(created?.id); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) { toast.error("Lỗi lưu lệnh sản xuất: " + e.message); }
     finally { savingRef.current = false; setSaving(false); }
@@ -1107,9 +1107,9 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   };
 
   if (view === "form")
-    return <ProductionForm lookups={lookups} editId={editId} copyId={copyId}
+    return <ProductionForm key={editId || "new"} lookups={lookups} editId={editId} copyId={copyId}
       onBack={backFromForm}
-      onSaved={() => { setView("list"); setEditId(null); setCopyId(null); load(); }} />;
+      onSaved={(newId) => { if (newId) { setEditId(newId); setCopyId(null); } else { setView("list"); setEditId(null); setCopyId(null); } load(); }} />;
 
   const columns = [
     { key: "order_code", label: "Mã lệnh", filter: "text", minWidth: "120px", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },

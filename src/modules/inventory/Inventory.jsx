@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, Trash2, ChevronRight, Layers, Boxes } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -22,10 +22,10 @@ const Field = ({ label, required, children }) => (
 function TreeTab({ lookups }) {
   const { can } = usePerm();
   const [data, setData] = useState([]);
-  const [q, setQ] = useState("");
-  const [filterWh, setFilterWh] = useState("");
-  const [filterZone, setFilterZone] = useState("");
-  const [filterType, setFilterType] = useState("");
+  const [q, setQ] = useRemembered("inv:tree:q", "");
+  const [filterWh, setFilterWh] = useRemembered("inv:tree:wh", "");
+  const [filterZone, setFilterZone] = useRemembered("inv:tree:zone", "");
+  const [filterType, setFilterType] = useRemembered("inv:tree:type", "");
   const [viewMode, setViewMode] = useState("location"); // "product" | "location"
   const [openState, setOpenState] = useState(() => new Set());
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -394,7 +394,7 @@ function TreeTab({ lookups }) {
 /* ---- Tab: Lịch sử giao dịch kho ---- */
 function TransactionsTab() {
   const [rows, setRows] = useState([]);
-  const [range, setRange] = useState(defaultRange());
+  const [range, setRange] = useRemembered("inv:trx:range", defaultRange);
   const load = useCallback(async () => {
     try { setRows(await inventory.transactions({ ...range, limit: 2000 })); } catch (e) { toast.error("Lỗi tải lịch sử: " + e.message); }
   }, [range]);
@@ -426,7 +426,7 @@ function TransactionsTab() {
 
 /* ---- Hub Kho ---- */
 export default function InventoryModule({ lookups }) {
-  const [tab, setTab] = useState("stock");
+  const [tab, setTab] = useRemembered("inv:tab", "stock");
   const tabs = [
     { key: "stock", label: "Tồn kho", icon: Warehouse },
     { key: "trx", label: "Lịch sử giao dịch", icon: History },

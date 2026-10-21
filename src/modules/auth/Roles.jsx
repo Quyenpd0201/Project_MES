@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
-import { ListHeader, DataTable, Section, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, Section, useSaving, useRemembered } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
@@ -23,9 +23,9 @@ function RoleForm({ record, onBack, onSaved }) {
         await roles.update(record.id, f);
         toast.success("Đã lưu vai trò thành công"); // ở lại form
       } else {
-        await roles.create(f);
+        const created = await roles.create(f);
         toast.success("Đã lưu vai trò thành công");
-        onSaved(); // tạo mới → về list
+        onSaved(created); // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
       }
     } catch (e) {
       toast.error("Lỗi: " + e.message);
@@ -70,7 +70,7 @@ export default function RolesModule() {
   const [list, setList] = useState([]);
   const [userList, setUserList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useRemembered("roles:q", "");
 
   const [selectedRole, setSelectedRole] = useState(null);
   const [activeTab, setActiveTab] = useState("permissions"); // 'permissions', 'users'
@@ -153,7 +153,7 @@ export default function RolesModule() {
   if (editingRole) {
     return (
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm max-w-3xl mx-auto mt-6">
-        <RoleForm record={editingRole.id ? editingRole : null} onBack={() => { setEditingRole(null); fetchRoles(); }} onSaved={() => { setEditingRole(null); fetchRoles(); }} />
+        <RoleForm key={editingRole.id || "new"} record={editingRole.id ? editingRole : null} onBack={() => { setEditingRole(null); fetchRoles(); }} onSaved={(rec) => { setEditingRole(rec?.id ? rec : null); fetchRoles(); }} />
       </div>
     );
   }

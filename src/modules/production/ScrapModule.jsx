@@ -4,7 +4,7 @@ import {
   BarChart2, FileText, CheckCircle2, TrendingUp, TrendingDown,
   RefreshCcw, ChevronDown, ChevronRight
 } from "lucide-react";
-import { PageHeader, DataTable } from "../../components.jsx";
+import { PageHeader, DataTable, useRemembered } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -520,7 +520,7 @@ function ScrapManagement({ onEdit }) {
   const [date, setDate] = useState(todayYmd());
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useRemembered("scrap:manage:search", "");
 
   const loadData = useCallback(async () => {
     setLoading(true);
