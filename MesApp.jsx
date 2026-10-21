@@ -1205,6 +1205,13 @@ function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
 }
 
 /* =============================== ROOT APP =============================== */
+// Lấy `entity` từ URL cho MasterDataScreen. Định nghĩa NGOÀI MesApp: đặt bên trong thì mỗi lần
+// MesApp vẽ lại sẽ tạo component mới → màn danh mục bị dựng lại, mất chữ đang gõ / vị trí cuộn (M-01)
+function MasterDataWrapper(props) {
+  const { entity } = useParams();
+  return <MasterDataScreen {...props} entity={entity} />;
+}
+
 export default function MesApp() {
   const navigate = useNavigate();
   const [authLoading, setAuthLoading] = useState(true);
@@ -1284,12 +1291,6 @@ export default function MesApp() {
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Đang tải…</div>;
   if (!user) return <Login onLogin={setUser} />;
 
-  // Wrapper cho MasterDataScreen để lấy `entity` từ URL
-  const MasterDataWrapper = () => {
-    const { entity } = useParams();
-    return lookups ? <MasterDataScreen lookups={lookups} entity={entity} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl;
-  };
-
   return (
     <PermProvider user={user}>
       <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-slate-50 font-sans text-slate-900 relative">
@@ -1340,7 +1341,7 @@ export default function MesApp() {
               <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
               <Route path="/traceability/lot" element={<TraceabilityLot />} />
               <Route path="/master-data/roles" element={<RolesModule />} />
-              <Route path="/master-data/:entity" element={<MasterDataWrapper />} />
+              <Route path="/master-data/:entity" element={lookups ? <MasterDataWrapper lookups={lookups} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
               <Route path="/qrlabels" element={<QrLabelsModule />} />
               <Route path="/qrscan" element={<QrScanModule />} />

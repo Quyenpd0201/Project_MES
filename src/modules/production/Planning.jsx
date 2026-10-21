@@ -178,7 +178,8 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
 
 /* Chiều ngang (số) của lô — lấy từ thông số kỹ thuật */
 function batchWidth(b) {
-  const w = b.specs && b.specs["Chiều ngang"];
+  // "Chiều ngang" = khóa cũ (dữ liệu trước mục 24 migrate) — dự phòng khi PRD chưa migrate
+  const w = b.specs && (b.specs["Chiều ngang (Rộng)"] ?? b.specs["Chiều ngang"]);
   if (w != null) { const m = String(w).match(/[\d.]+/); if (m) return Number(m[0]); }
   return null;
 }

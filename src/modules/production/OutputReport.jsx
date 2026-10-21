@@ -325,7 +325,9 @@ function OrderDetailDrawer({ order, onClose }) {
             ) : (
               <div className="divide-y divide-slate-100">
                 {tasks.map((t, i) => {
-                  const tActual  = (t.actual_qty != null && t.actual_qty !== "") ? Number(t.actual_qty) : (Number(t.quantity) || 0);
+                  // Chưa nhập thực tế → hiện "—", không lấy SL kế hoạch thay vào (trước đây hiện 100% dù chưa làm)
+                  const hasActual = t.actual_qty != null && t.actual_qty !== "";
+                  const tActual  = hasActual ? Number(t.actual_qty) : 0;
                   const tPlanned = Number(t.quantity) || 0;
                   const tPct     = tPlanned > 0 ? Math.round(tActual / tPlanned * 100) : 0;
                   const tColor   = tPct >= 100 ? "text-emerald-600" : tPct >= 80 ? "text-amber-600" : "text-rose-600";
@@ -345,8 +347,8 @@ function OrderDetailDrawer({ order, onClose }) {
                       </div>
                       <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                         <span>KH: <b className="text-slate-700">{fmt(tPlanned)}</b></span>
-                        <span>TT: <b className={tColor}>{fmt(tActual)} ({tPct}%)</b></span>
-                        {tPlanned - tActual > 0
+                        <span>TT: {hasActual ? <b className={tColor}>{fmt(tActual)} ({tPct}%)</b> : <b className="text-slate-400">—</b>}</span>
+                        {!hasActual ? null : tPlanned - tActual > 0
                           ? <span className="text-amber-600">Còn: <b>{fmt(tPlanned - tActual)}</b></span>
                           : tActual > tPlanned && <span className="text-emerald-600">Vượt: <b>+{fmt(tActual - tPlanned)}</b></span>}
                         {t.planned_date && <span className="flex items-center gap-1"><CalendarDays size={11} />{fmtDate(t.planned_date)}</span>}
