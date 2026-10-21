@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { ListHeader, DataTable, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
-import { inputCls, fmt, toast, todayYmd, fmtDate } from "../../ui.js";
+import { inputCls, fmt, toast, todayYmd, fmtDate, statusClass } from "../../ui.js";
 
 const warehousesApi = resource("warehouses");
 
@@ -71,9 +71,8 @@ export default function RecyclingModule() {
     { key: "third_party_name", label: "Bên thứ 3" },
     { key: "status", label: "Trạng thái", render: r => (
       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-        r.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' :
-        r.status === 'Đang tái chế' ? 'bg-amber-100 text-amber-700' :
-        'bg-slate-100 text-slate-700'
+        // 'Đang tái chế' / 'Chờ cân' chưa có trong STATUS_COLORS (ui.js) → giữ màu cũ, chờ Đợt 5 bổ sung bảng màu chung
+        r.status === 'Đang tái chế' ? 'bg-amber-100 text-amber-700' : statusClass(r.status)
       }`}>{r.status}</span>
     )},
     { key: "expected_qty", label: "Tổng (kg)", align: "right", render: r => <span className="font-semibold">{fmt(r.expected_qty)}</span> },

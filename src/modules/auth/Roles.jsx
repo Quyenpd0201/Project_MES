@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
 import { ListHeader, DataTable, Section, useSaving, useRemembered, DialogBehavior, confirmClose } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
-import { toast, inputCls } from "../../ui.js";
+import { toast, inputCls, statusClass } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
 
 function RoleForm({ record, onBack, onSaved }) {
@@ -181,7 +181,7 @@ export default function RolesModule() {
               { key: "name", label: "Tên vai trò", render: (r) => <div className="font-semibold text-slate-800">{r.name}</div> },
               { key: "description", label: "Mô tả" },
               { key: "status", label: "Trạng thái", render: (r) => (
-                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${r.status === 'Hoạt động' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{r.status}</span>
+                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span>
               )},
               { key: "_actions", label: "", align: "right", render: (r) => (
                 <div className="flex items-center justify-end gap-2">

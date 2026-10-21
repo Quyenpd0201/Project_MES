@@ -222,7 +222,7 @@ function ReceiptForm({ lookups, id, onBack, onSaved }) {
                         <td className="px-4 py-1.5 text-right tabular-nums font-semibold text-emerald-700">{n.take > 0 ? vnd(n.take) : "—"}</td>
                         <td className="px-4 py-1.5 text-right tabular-nums">
                           {n.take > 0 && n.after <= 0.005
-                            ? <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Đã thanh toán</span>
+                            ? <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusClass("Đã thanh toán")}`}>Đã thanh toán</span>
                             : vnd(n.after)}
                         </td>
                       </tr>
