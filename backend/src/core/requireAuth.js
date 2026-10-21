@@ -2,6 +2,7 @@
 const { decodeToken, isSessionActive } = require('../modules/auth/authController');
 const { calculateEffectivePermissions } = require('../modules/auth/roleController');
 const db = require('./db');
+const { runWithUser } = require('./requestContext');
 
 /**
  * Middleware xác thực phiên đăng nhập.
@@ -53,7 +54,8 @@ module.exports = async function requireAuth(req, res, next) {
     });
     
     req.user.permissions = merged;
-    next();
+    // K-16: phần còn lại của request chạy trong ngữ cảnh user → sổ cái kho ghi được người thực hiện
+    runWithUser({ id: req.user.id, name: req.user.full_name || req.user.username }, next);
   } catch (err) {
     console.error('[requireAuth]', err);
     res.status(500).json({ message: 'Lỗi xác thực, vui lòng thử lại' });
