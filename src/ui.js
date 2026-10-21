@@ -8,7 +8,8 @@ export const inputCls =
   "placeholder:text-slate-400 disabled:placeholder-transparent " +
   "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition";
 
-export const fmt = (n) => (n == null || n === "" ? "—" : Number(n).toLocaleString("vi-VN"));
+// C-08: không phải số (NaN, Infinity, "abc") → "—" thay vì "NaN"
+export const fmt = (n) => { if (n == null || n === "") return "—"; const x = Number(n); return Number.isFinite(x) ? x.toLocaleString("vi-VN") : "—"; };
 
 // Parse ISO date string trực tiếp để tránh lệch múi giờ và phụ thuộc locale browser
 export const fmtDate = (d) => {
