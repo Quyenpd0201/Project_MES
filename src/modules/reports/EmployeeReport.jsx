@@ -331,7 +331,7 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Sản lượng đã làm" value={fmt(actual_qty)} sub="tổng thực tế" icon={Layers} color="indigo" />
         <KpiCard label="Tổng phế" value={scrap_qty > 0 ? fmt(scrap_qty) : "0"} sub="phế phẩm (kg)" icon={AlertCircle} color={scrap_qty > 0 ? "rose" : "green"} />
-        <KpiCard label="Phế/kg" value={fmtDec(actual_qty > 0 ? Number(scrap_qty) / Number(actual_qty) : 0, 4)} sub="tỷ lệ" icon={Target} color="amber" />
+        <KpiCard label="Phế / 1 kg TP" value={fmtDec(actual_qty > 0 ? Number(scrap_qty) / Number(actual_qty) : 0, 4)} sub="tỷ lệ" icon={Target} color="amber" />
         <KpiCard label="Tỷ lệ hoàn thành" value={`${overall}%`} sub="KH so với TT" icon={TrendingUp} color="emerald" />
         <KpiCard label="Số lệnh làm việc" value={tasks_count} sub="tổng số lệnh" icon={Package} color="blue" />
         <KpiCard label="Ngày làm việc" value={work_days ?? "—"} sub="ngày có phân công" icon={CalendarDays} color="indigo" />
