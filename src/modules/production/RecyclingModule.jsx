@@ -35,7 +35,7 @@ export default function RecyclingModule() {
       const wRes = await warehousesApi.list();
       setWarehouses(wRes);
     } catch (e) {
-      toast.error("Không tải được phiếu tái chế — bấm Làm mới: " + e.message);
+      toast.error("Không tải được danh sách kho — bấm Làm mới: " + e.message);
     }
   };
 
