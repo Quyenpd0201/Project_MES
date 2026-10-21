@@ -421,14 +421,15 @@ function OutputReportBody({ lookups }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await production.list({ status: "" }) // API trả đủ mọi lệnh (không giới hạn số dòng);
+      // Chỉ tải lệnh trong kỳ đang chọn — máy chủ lọc theo đúng orderDate() (trước đây tải hết rồi lọc ở trình duyệt)
+      const data = await production.list({ date_from: from, date_to: to });
       setRows(Array.isArray(data) ? data : data?.data || []);
     } catch (e) {
       toast.error("Lỗi tải sản lượng: " + e.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [from, to]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -3,6 +3,7 @@ const express = require('express');
 require('./src/core/asyncErrors'); // lỗi trong handler async → error handler cuối (500), không sập server
 const cors = require('cors');
 const helmet = require('helmet');
+const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const productsRouter = require('./src/modules/engineering/product.route');
 const apiRouter = require('./src/routes');
@@ -21,6 +22,8 @@ if (trustProxy !== '') app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(
 
 // ── Bảo mật HTTP Headers ──────────────────────────────────────────────────────
 app.use(helmet());
+// Nén gzip mọi phản hồi (JSON danh sách giảm ~90% dung lượng — quan trọng khi xưởng dùng 4G)
+app.use(compression());
 
 // ── CORS — chỉ cho phép từ frontend dev (localhost:5173) ──────────────────────
 const ALLOWED_ORIGINS = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:4173,https://procject-mes.vercel.app')
