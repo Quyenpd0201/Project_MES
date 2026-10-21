@@ -111,7 +111,7 @@ function KpiReport() {
         <KpiCard title="Tổng Lệnh Sản Xuất" value={data.total_production_orders} color="blue" />
         <KpiCard title="Lệnh Đang Sản Xuất" value={data.active_production_orders} color="emerald" />
         <KpiCard title="Máy Đang Hoạt Động" value={data.active_machines} color="amber" />
-        <KpiCard title="Tổng Số Tồn Kho" color="purple" value={
+        <KpiCard title="Tổng Số Tồn Kho" color="blue" value={
           (data.inventory_by_unit || []).length
             ? <span className={data.inventory_by_unit.length > 1 ? 'block text-xl leading-snug' : ''}>
                 {data.inventory_by_unit.map((u) => <span key={u.unit} className="block">{fmt(u.qty)} {u.unit}</span>)}
@@ -298,7 +298,7 @@ function KpiCard({ title, value, color }) {
   return (
     <div className={`p-6 rounded-xl border ${colors[color]} shadow-sm`}>
       <h3 className="text-sm font-semibold mb-2 opacity-80">{title}</h3>
-      <p className="text-3xl font-bold">{value}</p>
+      <p className="text-2xl font-bold">{value}</p>
     </div>
   );
 }

@@ -643,7 +643,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
         {open && <DialogBehavior onClose={onClose} dirty={drawerDirty} />}
         
         {/* Drawer Header */}
-        <div className="px-6 py-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-600 to-indigo-700 flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-4 border-b border-indigo-700 bg-blue-600 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
             <div className="text-indigo-200 text-xs font-medium uppercase tracking-wide">Cấu hình quyền</div>
             <div className="text-white font-bold text-lg truncate">{roleName}</div>

@@ -56,7 +56,7 @@ function KpiCard({ label, value, sub, icon: Icon, color = "blue", onClick, activ
   const c = colors[color] || colors.blue;
   return (
     <button type="button" onClick={onClick} title="Bấm để xem danh sách chi tiết"
-      className={`relative overflow-hidden rounded-xl border bg-white px-4 pt-4 pb-3.5 text-left transition-colors hover:shadow-md hover:-translate-y-0.5
+      className={`relative overflow-hidden rounded-xl border bg-white px-4 pt-4 pb-3.5 text-left transition-colors hover:border-slate-300
         ${active ? `ring-2 shadow-md ${c.ring}` : "border-slate-200"}`}>
       <div className={`absolute left-0 top-0 h-full w-1 ${c.bar}`} />
       <div className="flex items-center justify-between gap-2">
@@ -249,7 +249,7 @@ function OrderDetailDrawer({ order, onClose }) {
         <DialogBehavior onClose={onClose} dirty={false} />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-blue-600 text-white shrink-0">
           <div>
             <div className="text-xs font-medium opacity-80 mb-0.5">Chi tiết lệnh sản xuất</div>
             <div className="text-lg font-bold tracking-wide">{order.order_code}</div>

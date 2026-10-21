@@ -231,7 +231,7 @@ export default function TraceabilityLot() {
       )}
 
       {!searched && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100 p-8 text-center">
+        <div className="bg-blue-50 rounded-xl border border-blue-100 p-8 text-center">
           <GitMerge size={48} className="mx-auto mb-4 text-blue-300" />
           <div className="text-slate-600 font-medium mb-2">Hệ thống truy xuất nguồn gốc</div>
           <div className="text-sm text-slate-500 max-w-md mx-auto">

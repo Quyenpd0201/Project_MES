@@ -620,7 +620,7 @@ export default function ScrapModule({ onOpenOrder }) {
       
       {/* GLOBAL WORKER FILTER */}
       {activeTab !== "manage" && (
-        <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm bg-gradient-to-r from-blue-50 to-white">
+        <div className="bg-white p-5 rounded-xl border border-blue-200 shadow-sm">
           <div className="max-w-md">
             <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
             <div className="relative">

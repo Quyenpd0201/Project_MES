@@ -258,7 +258,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
   }).filter(Boolean);
 
   const itemCls = (isActive) =>
-    `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 scale-[0.98]" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 hover:scale-[0.99]"}`;
+    `w-full flex items-center ${collapsed ? "justify-center" : "gap-3 px-3"} py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 ${isActive ? "bg-primary text-primary-foreground" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"}`;
 
   return (
     <>
@@ -1198,12 +1198,12 @@ function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
                           className={`text-left rounded-lg border p-3 hover:shadow-sm transition ${t ? "border-blue-300 bg-blue-50/50 hover:border-blue-400" : "border-slate-200 hover:border-slate-300"}`}>
                           <div className="flex items-start gap-3">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${t ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
-                              <MIcon size={28} className={t ? "animate-pulse" : ""} />
+                              <MIcon size={28} />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-1">
                                 <span className="font-medium text-slate-800 text-sm truncate">{m.name}</span>
-                                <span className={`w-2 h-2 rounded-full shrink-0 ${t ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${t ? "bg-emerald-500" : "bg-slate-300"}`} />
                               </div>
                               {t ? (
                                 <div className="mt-1 text-xs text-slate-600">{t.order_code} · {t.stage}<div className="text-slate-400 truncate">{t.product}</div></div>

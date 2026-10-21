@@ -293,36 +293,36 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
   return (
     <div className="space-y-4">
       {/* ── Employee banner ── */}
-      <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 rounded-xl p-4 text-white">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 text-slate-800">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-bold text-lg shrink-0">
+            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-lg shrink-0">
               {worker?.[0]?.toUpperCase() || "?"}
             </div>
             <div className="min-w-0">
               <p className="font-bold text-base truncate">{worker}</p>
-              {team && <p className="text-xs opacity-75 truncate">{team}</p>}
+              {team && <p className="text-xs text-slate-500 truncate">{team}</p>}
             </div>
           </div>
           <button onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-white/20 transition-colors shrink-0"
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors shrink-0"
             title="Đóng">
             <X size={15} />
           </button>
         </div>
         {/* Quick stats bar */}
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="bg-white/10 rounded-lg py-2">
-            <p className={`text-xl font-bold ${overall >= 100 ? "text-emerald-300" : overall >= 80 ? "text-amber-300" : "text-rose-300"}`}>{overall}%</p>
-            <p className="text-xs opacity-75">Tỷ lệ HT</p>
+          <div className="bg-slate-50 rounded-lg py-2">
+            <p className={`text-xl font-bold ${overall >= 100 ? "text-emerald-600" : overall >= 80 ? "text-amber-600" : "text-rose-600"}`}>{overall}%</p>
+            <p className="text-xs text-slate-500">Tỷ lệ HT</p>
           </div>
-          <div className="bg-white/10 rounded-lg py-2">
+          <div className="bg-slate-50 rounded-lg py-2">
             <p className="text-xl font-bold">{fmt(actual_qty)}</p>
-            <p className="text-xs opacity-75">Thực tế</p>
+            <p className="text-xs text-slate-500">Thực tế</p>
           </div>
-          <div className="bg-white/10 rounded-lg py-2">
+          <div className="bg-slate-50 rounded-lg py-2">
             <p className="text-xl font-bold">{fmt(planned_qty)}</p>
-            <p className="text-xs opacity-75">Kế hoạch</p>
+            <p className="text-xs text-slate-500">Kế hoạch</p>
           </div>
         </div>
       </div>

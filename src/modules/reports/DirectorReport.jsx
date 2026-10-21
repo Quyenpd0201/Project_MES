@@ -23,12 +23,12 @@ const AGE = [
 const C = { overdue: "#e11d48", intime: "#0a63b8", good: "#10b981", violet: "#7c3aed", track: "#eef2f6" };
 
 const ACCENTS = {
-  blue: { chip: "bg-blue-50 text-blue-600 ring-blue-100", glow: "bg-blue-400/15" },
-  emerald: { chip: "bg-emerald-50 text-emerald-600 ring-emerald-100", glow: "bg-emerald-400/15" },
-  violet: { chip: "bg-violet-50 text-violet-600 ring-violet-100", glow: "bg-violet-400/15" },
-  rose: { chip: "bg-rose-50 text-rose-600 ring-rose-100", glow: "bg-rose-400/15" },
-  amber: { chip: "bg-amber-50 text-amber-600 ring-amber-100", glow: "bg-amber-400/15" },
-  slate: { chip: "bg-slate-50 text-slate-500 ring-slate-200", glow: "bg-slate-400/10" },
+  blue: { chip: "bg-blue-50 text-blue-600 ring-blue-100" },
+  emerald: { chip: "bg-emerald-50 text-emerald-600 ring-emerald-100" },
+  violet: { chip: "bg-violet-50 text-violet-600 ring-violet-100" },
+  rose: { chip: "bg-rose-50 text-rose-600 ring-rose-100" },
+  amber: { chip: "bg-amber-50 text-amber-600 ring-amber-100" },
+  slate: { chip: "bg-slate-50 text-slate-500 ring-slate-200" },
 };
 
 const TONES = {
@@ -154,10 +154,9 @@ function KpiCard({ icon: Icon, accent = "blue", label, hint, value, valueClass, 
   return (
     <Comp
       onClick={onClick}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-colors duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:-translate-y-1 hover:shadow-card-hover hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:-translate-y-0.5 hover:shadow-card-hover"}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-colors duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:border-slate-300 hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:border-slate-300"}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className={`pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-100 opacity-70 ${a.glow}`} />
       <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[13px] font-medium text-slate-600">{label}</div>
@@ -167,7 +166,7 @@ function KpiCard({ icon: Icon, accent = "blue", label, hint, value, valueClass, 
           <Icon size={18} strokeWidth={2} />
         </div>
       </div>
-      <div className={`relative ${compact ? "mt-3" : "mt-4"} font-display font-semibold leading-none tracking-tight text-slate-900 tabular-nums ${valueClass || (compact ? "text-[26px]" : "text-[30px]")}`}>
+      <div className={`relative ${compact ? "mt-3" : "mt-4"} font-display font-semibold leading-none tracking-tight text-slate-900 tabular-nums ${valueClass || "text-2xl"}`}>
         {value}
       </div>
       {meta && <div className={`relative mt-2 ${compact ? "text-xs" : "text-[13px]"} text-slate-500`}>{meta}</div>}
@@ -1012,9 +1011,9 @@ function ProdView({ p, period }) {
 /* ───────────────────────── Tab 3 · Nhân sự ───────────────────────── */
 
 const MEDALS = [
-  "bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-sm shadow-amber-500/30",
-  "bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-sm shadow-slate-400/30",
-  "bg-gradient-to-br from-orange-300 to-orange-500 text-white shadow-sm shadow-orange-500/30",
+  "bg-amber-400 text-white shadow-sm shadow-amber-500/30",
+  "bg-slate-300 text-white shadow-sm shadow-slate-400/30",
+  "bg-orange-400 text-white shadow-sm shadow-orange-500/30",
 ];
 
 /* 3 tiêu chí xếp hạng — CÙNG thứ tự & màu với màn Hiệu suất nhân viên */
