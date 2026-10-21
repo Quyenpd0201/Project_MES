@@ -9,6 +9,8 @@ export const inputCls =
   "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition";
 
 // C-08: không phải số (NaN, Infinity, "abc") → "—" thay vì "NaN"
+// Số thập phân kiểu VN, cố định d chữ số lẻ (12,5 — thay cho x.toFixed(1) ra "12.5")
+export const fmtDec = (n, d = 1) => { const x = Number(n); return Number.isFinite(x) ? x.toLocaleString("vi-VN", { minimumFractionDigits: d, maximumFractionDigits: d }) : "—"; };
 export const fmt = (n) => { if (n == null || n === "") return "—"; const x = Number(n); return Number.isFinite(x) ? x.toLocaleString("vi-VN") : "—"; };
 
 // Parse ISO date string trực tiếp để tránh lệch múi giờ và phụ thuộc locale browser
@@ -29,6 +31,15 @@ export const monthStartYmd = () => { const n = new Date(); return ymd(new Date(n
 
 export const fmtDateTime = (d) => {
   if (!d) return "—";
+  // Thời điểm có múi giờ (Date, hoặc ISO kèm "Z" / "+07:00" — vd created_at từ API là UTC) → đổi sang GIỜ MÁY (VN).
+  // Trước đây cắt chuỗi thẳng → hiện giờ UTC, lệch 7 tiếng.
+  if (d instanceof Date || /T\d{2}:\d{2}.*(Z|[+-]\d{2}:?\d{2})$/.test(String(d))) {
+    const t = d instanceof Date ? d : new Date(d);
+    if (!Number.isNaN(t.getTime())) {
+      const p = (n) => String(n).padStart(2, "0");
+      return `${p(t.getDate())}/${p(t.getMonth() + 1)}/${t.getFullYear()} ${p(t.getHours())}:${p(t.getMinutes())}`;
+    }
+  }
   const s = String(d);
   const date = s.slice(0, 10).split('-');
   const time = s.slice(11, 16); // HH:mm

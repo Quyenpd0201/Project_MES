@@ -3,7 +3,7 @@ import { RotateCcw, PackagePlus, Save, Warehouse, History, ExternalLink, Plus, T
 import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
+import {  inputCls, fmt, fmtDate, statusClass , toast, fmtDateTime } from "../../ui.js";
 import { PRODUCT_SPECS, splitNU, specShort } from "../../specs.js";
 import { TRX_COLOR, trxIsIn, defaultRange, TrxRange, byColumn } from "./trxHistory.jsx";
 
@@ -411,7 +411,7 @@ function TransactionsTab() {
   useEffect(() => { load(); }, [load]);
 
   const columns = [
-    { key: "created_at", label: "Thời gian", filter: "date", tdClass: "text-slate-500", render: (t) => new Date(t.created_at).toLocaleString("vi-VN") },
+    { key: "created_at", label: "Thời gian", filter: "date", tdClass: "text-slate-500", render: (t) => fmtDateTime(t.created_at) },
     { key: "trx_type", label: "Loại", filter: "select", render: (t) => <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${TRX_COLOR[t.trx_type] || ""}`}>{t.trx_type}</span> },
     { key: "product_code", label: "Mã SP", filter: "text", tdClass: "font-medium text-blue-600" },
     { key: "product_name", label: "Sản phẩm", filter: "select", tdClass: "text-slate-800" },

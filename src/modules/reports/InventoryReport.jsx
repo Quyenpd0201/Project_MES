@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { ListHeader, Section } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
-import { fmt, fmtDate, toast, todayYmd } from "../../ui.js";
+import { fmt, fmtDate, toast, todayYmd, fmtDateTime } from "../../ui.js";
 import * as XLSX from "xlsx";
 import { usePerm } from "../../perm.jsx";
 
@@ -260,7 +260,7 @@ function InventoryReportBody({ lookups }) {
 
     // Sheet 2: Giao dịch
     const ws2 = XLSX.utils.json_to_sheet(recentTxns.map(t => ({
-      "Thời gian": new Date(t.created_at).toLocaleString("vi-VN"),
+      "Thời gian": fmtDateTime(t.created_at),
       "Loại": t.trx_type, "Mã SP": t.product_code, "Tên SP": t.product_name,
       "Số lượng": t.quantity, "Kho": t.warehouse_name || "", "Ghi chú": t.note || "",
     })));

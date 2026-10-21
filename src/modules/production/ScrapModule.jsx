@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { PageHeader, DataTable, useRemembered, DateInput } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
-import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
+import { inputCls, fmt, toast, todayYmd, fmtDate, fmtDateTime, fmtDec } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
 
 // ----- STATISTICS COMPONENT -----
@@ -53,8 +53,8 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     stats.forEach(r => { wos += Number(r.total_wos) || 0; });
     const finished = Number(totals.total_finished) || 0;
     const scrapTotal = Number(totals.total_scrap) || 0;
-    const ratio = finished > 0 ? (scrapTotal / finished * 100).toFixed(2) : 0;
-    const kgPerKg = finished > 0 ? (scrapTotal / finished).toFixed(4) : 0;
+    const ratio = fmtDec(finished > 0 ? scrapTotal / finished * 100 : 0, 2);
+    const kgPerKg = finished > 0 ? scrapTotal / finished : 0; // số — định dạng khi hiển thị
     return { wos, finished, scrapTotal, ratio, kgPerKg };
   }, [stats, totals]);
 
@@ -87,7 +87,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
         </button>
       )
     },
-    { key: "date", label: "Ngày", render: r => new Date(r.date).toLocaleDateString("vi-VN") },
+    { key: "date", label: "Ngày", render: r => fmtDate(r.date) },
     { key: "total_wos", label: "Lệnh hoàn thành", align: "center", render: r => <span className="font-semibold">{r.total_wos}</span> },
     { key: "total_finished", label: "Thành phẩm", align: "right", render: r => fmt(r.total_finished) },
     { key: "total_scrap", label: "Phế phẩm", align: "right", render: r => <span className="text-rose-600 font-semibold">{fmt(r.total_scrap)}</span> },
@@ -102,7 +102,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
     { key: "ratio", label: "Tỷ lệ Phế / kg", align: "right", render: r => {
       const actual = Number(r.actual_qty) || 0;
       const pScrap = Number(r.product_scrap_qty) || 0;
-      return actual > 0 ? (pScrap / actual).toFixed(4) : "0.0000";
+      return fmtDec(actual > 0 ? pScrap / actual : 0, 4);
     }}
   ];
 
@@ -135,8 +135,8 @@ function ScrapStatistics({ worker, onOpenOrder }) {
         </div>
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <div className="text-slate-500 text-sm font-medium mb-1">Phế / 1 đơn vị thành phẩm</div>
-          <div className="text-2xl font-bold text-amber-600">{summary.kgPerKg}</div>
-          <div className="text-xs text-slate-400 mt-1">≈ {(summary.kgPerKg * 1000).toFixed(1)} / 1000 đơn vị TP</div>
+          <div className="text-2xl font-bold text-amber-600">{fmtDec(summary.kgPerKg, 4)}</div>
+          <div className="text-xs text-slate-400 mt-1">≈ {fmtDec(summary.kgPerKg * 1000, 1)} / 1000 đơn vị TP</div>
         </div>
       </div>
 
@@ -183,7 +183,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
                         <td colSpan={cols.length} className="p-0">
                           <div className="px-10 py-4 shadow-inner">
                             <div className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
-                              <List size={14} /> Chi tiết Công đoạn & Lệnh SX ngày {new Date(row.date).toLocaleDateString("vi-VN")}
+                              <List size={14} /> Chi tiết Công đoạn & Lệnh SX ngày {fmtDate(row.date)}
                             </div>
                             {detailsLoading ? (
                               <div className="text-slate-500 text-sm py-4 animate-pulse">Đang tải chi tiết...</div>
@@ -194,7 +194,7 @@ function ScrapStatistics({ worker, onOpenOrder }) {
                                 {dailyDetails.map(task => {
                                    const actual = Number(task.actual_qty) || 0;
                                    const pScrap = Number(task.product_scrap_qty) || 0;
-                                   const ratio = actual > 0 ? (pScrap / actual).toFixed(4) : "0.0000";
+                                   const ratio = fmtDec(actual > 0 ? pScrap / actual : 0, 4);
                                    return (
                                       <div key={task.task_id} className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                                         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
@@ -351,8 +351,8 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
     { key: "order_code", label: "Lệnh SX", tdClass: "font-medium text-blue-600", render: r => onOpenOrder && r.order_id ? <button onClick={(e) => { e.stopPropagation(); onOpenOrder(r.order_id); }} className="hover:underline">{r.order_code}</button> : r.order_code },
     { key: "product_name", label: "Sản phẩm", render: r => `${r.product_code} - ${r.product_name}` },
     { key: "total_qty", label: "Thành phẩm", align: "right", render: r => <span className="font-semibold text-emerald-600">{fmt(r.total_qty)} {r.unit}</span> },
-    { key: "completed_date", label: "Ngày cập nhật", align: "center", render: r => r.completed_date ? <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{new Date(r.completed_date).toLocaleDateString("vi-VN")}</span> : "—" },
-    { key: "last_completed_at", label: "TG cập nhật (cuối)", align: "right", render: r => new Date(r.last_completed_at).toLocaleTimeString("vi-VN") },
+    { key: "completed_date", label: "Ngày cập nhật", align: "center", render: r => r.completed_date ? <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">{fmtDate(r.completed_date)}</span> : "—" },
+    { key: "last_completed_at", label: "TG cập nhật (cuối)", align: "right", render: r => fmtDateTime(r.last_completed_at) },
   ];
 
   return (
@@ -392,7 +392,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                       Tổng cộng: <span className="font-bold text-slate-800">{wos.length}</span> lệnh
                     </div>
                   )}
-                  <span className="text-xs text-slate-400 italic">Hiển thị WO trong ngày {new Date(date).toLocaleDateString("vi-VN")}</span>
+                  <span className="text-xs text-slate-400 italic">Hiển thị WO trong ngày {fmtDate(date)}</span>
                 </div>
               </div>
               <div className="p-4">
@@ -496,7 +496,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                     
                     {(record && cameFromManage) && (
                       <p className="text-xs text-center text-slate-400 mt-2">
-                        Đã ghi nhận lần cuối lúc {new Date(record.updated_at).toLocaleTimeString("vi-VN")}
+                        Đã ghi nhận lần cuối lúc {fmtDateTime(record.updated_at)}
                       </p>
                     )}
                   </>
@@ -548,12 +548,12 @@ function ScrapManagement({ onEdit }) {
   }, [search, records]);
 
   const cols = [
-    { key: "record_date", label: "Ngày ghi nhận", render: r => new Date(r.record_date).toLocaleDateString("vi-VN") },
+    { key: "record_date", label: "Ngày ghi nhận", render: r => fmtDate(r.record_date) },
     { key: "worker_name", label: "Công nhân SX", tdClass: "font-medium text-slate-700" },
     { key: "recorder_name", label: "Người ghi nhận", render: r => r.recorder_name || r.worker_name, tdClass: "font-medium text-blue-600" },
     { key: "total_scrap", label: "Số lượng phế (Kg)", align: "right", render: r => <span className="font-bold text-rose-600">{fmt(r.total_scrap)}</span> },
     { key: "note", label: "Ghi chú", tdClass: "text-slate-500 text-sm" },
-    { key: "updated_at", label: "Cập nhật lúc", render: r => new Date(r.updated_at).toLocaleTimeString("vi-VN") },
+    { key: "updated_at", label: "Cập nhật lúc", render: r => fmtDateTime(r.updated_at) },
     { 
       key: "actions", label: "", align: "right", 
       render: r => (

@@ -4,7 +4,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FileText, Printer, Co
 import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
-import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast, todayYmd } from "../../ui.js";
+import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast, todayYmd, fmtDec } from "../../ui.js";
 import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose } from '../../components.jsx';
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 import { SpecFields } from "../../SpecFields.jsx";
@@ -472,7 +472,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                   <label>
                     <span className="block text-xs font-medium text-slate-500 mb-1">Đơn giá</span>
                     <input type="text" className={inputCls} disabled={fdis("items") || moneyPerm !== "edit"} 
-                      value={it.unit_price ? Number(it.unit_price).toLocaleString("vi-VN") : ""}
+                      value={it.unit_price ? fmt(it.unit_price) : ""}
                       placeholder="0" onChange={(e) => upItem(it._k, "unit_price", e.target.value.replace(/\D/g, ""))} />
                   </label>
                   <label>
@@ -910,7 +910,7 @@ function ExcelImportModal({ onClose, onDone }) {
                   {file ? (
                     <><CheckCircle className="mx-auto mb-2 text-green-500" size={28} />
                     <p className="font-medium text-green-700">{file.name}</p>
-                    <p className="text-xs text-green-500 mt-1">{(file.size / 1024).toFixed(1)} KB</p></>
+                    <p className="text-xs text-green-500 mt-1">{fmtDec(file.size / 1024, 1)} KB</p></>
                   ) : (
                     <><Upload className="mx-auto mb-2 text-slate-400" size={28} />
                     <p className="text-slate-500">Kéo thả hoặc click để chọn file Excel</p>

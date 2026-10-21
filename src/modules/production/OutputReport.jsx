@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { ListHeader, Section, DataTable, SearchSelect, useRemembered, DialogBehavior, DateInput } from "../../components.jsx";
 import { production, scrap as scrapApi } from "../../mesApi.js";
-import { fmt, fmtDate, statusClass, toast, todayYmd, monthStartYmd } from "../../ui.js";
+import { fmt, fmtDate, statusClass, toast, todayYmd, monthStartYmd, fmtDec } from "../../ui.js";
 import * as XLSX from "xlsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -103,7 +103,7 @@ function OutputCharts({ rows, onPick }) {
   }, [rows]);
 
   const colorOf = (n) => STATUS_COLORS[n] || "#94a3b8";
-  const num = (v) => Number(v).toLocaleString("vi-VN");
+  const num = (v) => fmt(v);
   const card = "bg-white rounded-xl border border-slate-200 p-4";
   const empty = <div className="h-52 flex items-center justify-center text-sm text-slate-400">Chưa có dữ liệu</div>;
 
@@ -492,7 +492,8 @@ function OutputReportBody({ lookups }) {
   const runningCount = filtered.filter(r => r.status === "Đang sản xuất").length;
   const achieveRate  = totalPlanned > 0 ? Math.round((totalActual / totalPlanned) * 100) : 0;
   const scrapRate    = (scrapFinished + totalScrap) > 0
-    ? ((totalScrap / (scrapFinished + totalScrap)) * 100).toFixed(1) : "0.0";
+    ? (totalScrap / (scrapFinished + totalScrap)) * 100 : 0;
+  const scrapRateTxt = fmtDec(scrapRate, 1);
   // Còn phải sản xuất (gộp toàn bộ lệnh đang lọc) và phần vượt mức
   const totalRemaining = Math.max(0, totalPlanned - totalActual);
   const totalOver      = Math.max(0, totalActual - totalPlanned);
@@ -526,7 +527,7 @@ function OutputReportBody({ lookups }) {
     { key: "date", label: "Ngày", render: (r) => fmtDate(r.date) },
     { key: "finished_qty", label: "SL thành phẩm", align: "right", render: (r) => fmt(r.finished_qty) },
     { key: "scrap_qty", label: "SL phế", align: "right", render: (r) => <span className="font-semibold text-rose-600">{fmt(r.scrap_qty)}</span> },
-    { key: "rate", label: "Tỷ lệ phế", align: "right", render: (r) => `${r.rate.toFixed(1)}%` },
+    { key: "rate", label: "Tỷ lệ phế", align: "right", render: (r) => `${fmtDec(r.rate, 1)}%` },
   ];
 
   const columns = [
@@ -767,8 +768,8 @@ function OutputReportBody({ lookups }) {
           sub={filtered.length > 0 ? `${Math.round(overdueCount / filtered.length * 100)}% số lệnh` : "Trễ hạn chót"}
           icon={AlertCircle} color={overdueCount > 0 ? "rose" : "green"} {...cardProps("overdue")} />
         <KpiCard label="Phế phẩm"    value={scrapErr ? "—" : fmt(totalScrap)}
-          sub={scrapErr ? "Lỗi tải số liệu phế" : `Tỷ lệ phế ${scrapRate}%`}
-          icon={AlertTriangle} color={Number(scrapRate) > 5 ? "rose" : "amber"} {...cardProps("scrap")} />
+          sub={scrapErr ? "Lỗi tải số liệu phế" : `Tỷ lệ phế ${scrapRateTxt}%`}
+          icon={AlertTriangle} color={scrapRate > 5 ? "rose" : "amber"} {...cardProps("scrap")} />
       </div>
 
       <OutputCharts rows={filtered} onPick={pick} />

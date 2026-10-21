@@ -7,7 +7,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { reports } from "../../mesApi.js";
-import { fmt, fmtDate, toast, statusClass } from "../../ui.js";
+import { fmt, fmtDate, toast, statusClass, fmtDec } from "../../ui.js";
 import { usePager, LoadError, DialogBehavior } from "../../components.jsx";
 
 /* ───────────────────────── Bảng màu & hằng số ───────────────────────── */
@@ -862,7 +862,7 @@ function ProdDetail({ view, rows, isScrap, periodLb }) {
                 <td className={td}>{fmtDate(d.date)}</td>
                 <td className={`${td} text-right tabular-nums`}>{fmt(d.finished)} kg</td>
                 <td className={`${td} text-right font-semibold tabular-nums text-rose-600`}>{fmt(d.scrap)} kg</td>
-                <td className={`${td} text-right tabular-nums`}>{d.finished > 0 ? `${(d.scrap / (d.finished + d.scrap) * 100).toFixed(1)}%` : "—"}</td>
+                <td className={`${td} text-right tabular-nums`}>{d.finished > 0 ? `${fmtDec(d.scrap / (d.finished + d.scrap) * 100, 1)}%` : "—"}</td>
               </tr>
             )) : slice.map((r) => (
               <tr key={r.id} className="hover:bg-slate-50/70">
@@ -1017,7 +1017,7 @@ const MEDALS = [
 ];
 
 /* 3 tiêu chí xếp hạng — CÙNG thứ tự & màu với màn Hiệu suất nhân viên */
-const fmt3 = (v) => Number(v || 0).toFixed(3);
+const fmt3 = (v) => fmtDec(v || 0, 3);
 const STAFF_CRITERIA = [
   { key: "output", label: "Sản lượng", desc: "kg thành phẩm — cao nhất dẫn đầu", color: "#0055b3",
     sort: (a, b) => b.output - a.output, val: (x) => x.output, show: (v) => <>{fmt(v)} <span className="text-xs font-medium text-slate-400">kg</span></> },

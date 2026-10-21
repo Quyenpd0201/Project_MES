@@ -924,8 +924,8 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
             <tbody className="divide-y divide-slate-100">
               {p.inventory.map((w) => (
                 <tr key={w.warehouse}><td className="px-4 py-2">{w.warehouse}</td>
-                  <td className="px-4 py-2 text-right font-medium">{w.current_qty.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right text-slate-500">{w.expected_qty.toLocaleString()}</td>
+                  <td className="px-4 py-2 text-right font-medium">{fmt(w.current_qty)}</td>
+                  <td className="px-4 py-2 text-right text-slate-500">{fmt(w.expected_qty)}</td>
                   <td className="px-4 py-2">{w.unit}</td></tr>
               ))}
             </tbody>

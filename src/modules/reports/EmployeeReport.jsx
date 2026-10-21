@@ -9,7 +9,7 @@ import {
   X, ChevronLeft, ChevronRight, AlertCircle, BarChart2,
 } from "lucide-react";
 import { reports } from "../../mesApi.js";
-import { fmt, fmtDate, statusClass, toast, ymd, todayYmd, monthStartYmd } from "../../ui.js";
+import { fmt, fmtDate, statusClass, toast, ymd, todayYmd, monthStartYmd, fmtDec } from "../../ui.js";
 import * as XLSX from "xlsx";
 import { usePerm } from "../../perm.jsx";
 import { ListHeader, Section } from "../../components.jsx";
@@ -331,12 +331,12 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Sản lượng đã làm" value={fmt(actual_qty)} sub="tổng thực tế" icon={Layers} color="indigo" />
         <KpiCard label="Tổng phế" value={scrap_qty > 0 ? fmt(scrap_qty) : "0"} sub="phế phẩm (kg)" icon={AlertCircle} color={scrap_qty > 0 ? "rose" : "green"} />
-        <KpiCard label="Phế/kg" value={actual_qty > 0 ? (Number(scrap_qty) / Number(actual_qty)).toFixed(4) : "0.0000"} sub="tỷ lệ" icon={Target} color="amber" />
+        <KpiCard label="Phế/kg" value={fmtDec(actual_qty > 0 ? Number(scrap_qty) / Number(actual_qty) : 0, 4)} sub="tỷ lệ" icon={Target} color="amber" />
         <KpiCard label="Tỷ lệ hoàn thành" value={`${overall}%`} sub="KH so với TT" icon={TrendingUp} color="emerald" />
         <KpiCard label="Số lệnh làm việc" value={tasks_count} sub="tổng số lệnh" icon={Package} color="blue" />
         <KpiCard label="Ngày làm việc" value={work_days ?? "—"} sub="ngày có phân công" icon={CalendarDays} color="indigo" />
         <KpiCard label="Giờ làm việc" value={work_hours > 0 ? `${work_hours}h` : "—"} sub="ước tính từ ca" icon={Clock} color="amber" />
-        <KpiCard label="Năng suất" value={work_hours > 0 && actual_qty > 0 ? `${(Number(actual_qty) / work_hours).toFixed(1)}/h` : "—"} sub="sản phẩm / giờ" icon={TrendingUp} color="green" />
+        <KpiCard label="Năng suất" value={work_hours > 0 && actual_qty > 0 ? `${fmtDec(Number(actual_qty) / work_hours, 1)}/h` : "—"} sub="sản phẩm / giờ" icon={TrendingUp} color="green" />
       </div>
 
       {loading ? (
@@ -806,7 +806,7 @@ function EmployeeReportBody() {
                       {tile("Lệnh / việc", totLenh)}
                       {tile("Tổng sản lượng", fmt(totSL) + " kg", "text-blue-600")}
                       {tile("Tổng phế", fmt(totPhe) + " kg", "text-rose-600")}
-                      {tile("Phế / 1kg (TB)", ratio.toFixed(3), "text-amber-600")}
+                      {tile("Phế / 1kg (TB)", fmtDec(ratio, 3), "text-amber-600")}
                     </div>
                   );
                 })()}
@@ -870,7 +870,7 @@ function EmployeeReportBody() {
                     <Criterion title="Ít phế nhất" sub="kg phế — ít nhất được vinh danh" color="#10b981"
                       rows={byPhe} valOf={(w) => Number(w.scrap_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
                     <Criterion title="Phế / 1kg thấp nhất" sub="kg phế / kg TP — ít nhất được vinh danh" color="#f59e0b"
-                      rows={byRatio} valOf={(w) => ratioOf(w)} fmtVal={(v) => Number(v).toFixed(3)} />
+                      rows={byRatio} valOf={(w) => ratioOf(w)} fmtVal={(v) => fmtDec(v, 3)} />
                   </div>
                 );
               })()}

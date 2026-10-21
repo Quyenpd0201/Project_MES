@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, ComposedChart
 } from 'recharts';
-import { fmt, fmtDate, statusClass, ymd } from '../../ui.js';
+import { fmt, fmtDate, statusClass, ymd, fmtDec } from '../../ui.js';
 
 const COLORS = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'];
 
@@ -89,13 +89,13 @@ function KpiReport() {
 
   // Tỷ lệ phế phẩm (%) = scrap / (hoàn thành + scrap)
   const scrapRate = totalQty > 0
-    ? ((scrapQty / totalQty) * 100).toFixed(1)
-    : '0.0';
+    ? fmtDec((scrapQty / totalQty) * 100, 1)
+    : fmtDec(0, 1);
 
   // Tỷ lệ đạt chất lượng (%) = hoàn thành / tổng
   const passRate = totalQty > 0
-    ? ((completedQty / totalQty) * 100).toFixed(1)
-    : '100.0';
+    ? fmtDec((completedQty / totalQty) * 100, 1)
+    : fmtDec(100, 1);
 
   const qualData = totalQty > 0
     ? [
@@ -234,7 +234,7 @@ function KpiReport() {
                   </Pie>
                   <Tooltip
                     formatter={(value, name) => [
-                      `${Number(value).toLocaleString('vi-VN')} sp`,
+                      `${fmt(value)} sp`,
                       name
                     ]}
                   />
@@ -261,7 +261,7 @@ function KpiReport() {
                   <span className="text-sm font-medium text-emerald-800">Hoàn thành</span>
                 </div>
                 <div className="text-right">
-                  <span className="block text-base font-bold text-emerald-700">{completedQty.toLocaleString('vi-VN')}</span>
+                  <span className="block text-base font-bold text-emerald-700">{fmt(completedQty)}</span>
                   <span className="text-[10px] text-emerald-500">{passRate}%</span>
                 </div>
               </div>
@@ -271,13 +271,13 @@ function KpiReport() {
                   <span className="text-sm font-medium text-red-800">Phế phẩm</span>
                 </div>
                 <div className="text-right">
-                  <span className="block text-base font-bold text-red-700">{scrapQty.toLocaleString('vi-VN')}</span>
+                  <span className="block text-base font-bold text-red-700">{fmt(scrapQty)}</span>
                   <span className="text-[10px] text-red-500">{scrapRate}%</span>
                 </div>
               </div>
               <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-100">
                 <span className="text-xs text-slate-500">Tổng đã xử lý</span>
-                <span className="text-sm font-semibold text-slate-700">{totalQty.toLocaleString('vi-VN')} sp</span>
+                <span className="text-sm font-semibold text-slate-700">{fmt(totalQty)} sp</span>
               </div>
             </div>
           </div>
@@ -392,8 +392,8 @@ function DetailedReport() {
   const donutData  = (charts.statusDist || []).map(s => ({ name: s.name, value: s.value }));
   const donutTotal = donutData.reduce((a, b) => a + b.value, 0);
 
-  const inProductionPct = summary.total_orders > 0 ? ((summary.in_production / summary.total_orders) * 100).toFixed(2) : '0.00';
-  const overduePct      = summary.total_orders > 0 ? ((summary.overdue / summary.total_orders) * 100).toFixed(2) : '0.00';
+  const inProductionPct = summary.total_orders > 0 ? fmtDec((summary.in_production / summary.total_orders) * 100, 2) : fmtDec(0, 2);
+  const overduePct      = summary.total_orders > 0 ? fmtDec((summary.overdue / summary.total_orders) * 100, 2) : fmtDec(0, 2);
 
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(data.map(d => ({
@@ -543,7 +543,7 @@ function DetailedReport() {
                       return m[s] || s;
                     }} />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip formatter={(v) => [`${Number(v).toLocaleString('vi-VN')} Kg`, 'Sản lượng']} />
+                    <Tooltip formatter={(v) => [`${fmt(v)} Kg`, 'Sản lượng']} />
                     <Legend wrapperStyle={{ fontSize: 11 }} />
                     <Bar dataKey="Sản lượng (Kg)" radius={[4, 4, 0, 0]}>
                       {barData.map((entry, i) => (
@@ -601,7 +601,7 @@ function DetailedReport() {
                 {/* Legend */}
                 <div className="space-y-1.5 text-xs min-w-[110px]">
                   {donutData.map((d, i) => {
-                    const pct = donutTotal > 0 ? ((d.value / donutTotal) * 100).toFixed(2) : '0.00';
+                    const pct = fmtDec(donutTotal > 0 ? (d.value / donutTotal) * 100 : 0, 2);
                     return (
                       <div key={i} className="flex items-center gap-1.5">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }} />

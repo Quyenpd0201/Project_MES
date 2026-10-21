@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { ListHeader, DataTable, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
-import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
+import { inputCls, fmt, toast, todayYmd, fmtDate } from "../../ui.js";
 
 const warehousesApi = resource("warehouses");
 
@@ -66,7 +66,7 @@ export default function RecyclingModule() {
 
   const cols = [
     { key: "ticket_code", label: "Mã phiếu", render: r => <span className="font-semibold text-blue-600">{r.ticket_code}</span> },
-    { key: "export_date", label: "Ngày xuất", render: r => new Date(r.export_date).toLocaleDateString("vi-VN") },
+    { key: "export_date", label: "Ngày xuất", render: r => fmtDate(r.export_date) },
     { key: "scrap_warehouse_name", label: "Kho xuất" },
     { key: "third_party_name", label: "Bên thứ 3" },
     { key: "status", label: "Trạng thái", render: r => (
