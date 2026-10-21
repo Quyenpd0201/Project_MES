@@ -203,8 +203,9 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   const [editing, setEditing] = useState(null); // record hoặc {} để thêm mới
   const api = resource(cfg.resource);
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await api.list()); } catch (e) { toast.error("Lỗi tải: " + e.message); }
+    setListLoading(true); try { setRows(await api.list()); } catch (e) { toast.error("Lỗi tải: " + e.message); } finally { setListLoading(false); }
   }, [cfg.resource]); // eslint-disable-line
 
   useEffect(() => { load(); }, [load]);
@@ -330,7 +331,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
         <button onClick={exportExcel} className="btn-ghost"><Download size={16} /> Xuất Excel</button>
         {can("md_" + cfg.resource, "create") && <button onClick={() => setEditing({})} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
-      <DataTable rows={rows} rowKey={(r) => r.id} emptyText="Chưa có dữ liệu" columns={dtCols} />
+      <DataTable loading={listLoading} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có dữ liệu" columns={dtCols} />
     </div>
   );
 }

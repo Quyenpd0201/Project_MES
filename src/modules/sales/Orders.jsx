@@ -1042,8 +1042,10 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
   const [showImport, setShowImport] = useState(false);
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await ordersApi.list({})); } catch (e) { toast.error("Lỗi tải đơn hàng: " + e.message); }
+    setListLoading(true);
+    try { setRows(await ordersApi.list({})); } catch (e) { toast.error("Lỗi tải đơn hàng: " + e.message); } finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -1094,7 +1096,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
           )}
           {can("orders", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo đơn hàng</button>}
         </>} />
-        <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
+        <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có đơn hàng" />
       </div>
 
       {view === "form" && (

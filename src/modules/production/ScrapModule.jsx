@@ -406,7 +406,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
                     <p className="text-slate-500">Công nhân chưa có lệnh sản xuất nào trong ngày này.</p>
                   </div>
                 ) : (
-                  <DataTable rows={wos} columns={woCols} rowKey={r => r.order_code + r.product_id} dense />
+                  <DataTable loading={loading} rows={wos} columns={woCols} rowKey={r => r.order_code + r.product_id} dense />
                 )}
               </div>
             </div>
@@ -584,7 +584,7 @@ function ScrapManagement({ onEdit }) {
         </button>
       </div>
       <div className="p-0">
-        <DataTable rows={filtered} columns={cols} rowKey={r => r.id} />
+        <DataTable loading={loading} rows={filtered} columns={cols} rowKey={r => r.id} />
       </div>
     </div>
   );

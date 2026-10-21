@@ -720,8 +720,9 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
   const [voucherId, setVoucherId] = useState(null);
   const [rows, setRows] = useState([]);
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows((await api.list({})) || []); } catch (e) { toast.error("Lỗi tải phiếu: " + e.message); }
+    setListLoading(true); try { setRows((await api.list({})) || []); } catch (e) { toast.error("Lỗi tải phiếu: " + e.message); } finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -762,7 +763,7 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         {can("deliveries", "create") && <button onClick={() => { setEditId(null); setView("form"); }} className="btn-primary"><Plus size={16} /> Tạo phiếu</button>}
       </>} />
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có phiếu giao hàng" />
+      <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có phiếu giao hàng" />
     </div>
   );
 }

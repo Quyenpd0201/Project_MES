@@ -249,7 +249,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
     return { list: ontime, priority: computePriority(ontime) };
   }, [batches, overdueMode, today]);
 
-  const { slice, Pager } = usePager(priority.ordered);
+  const { slice, pager } = usePager(priority.ordered);
 
   const load = useCallback(async () => {
     try { const r = await planning.fromOrders(); setBatches(r.batches); setDemandLines(r.demand_lines); }
@@ -335,7 +335,7 @@ function OrderPlanningTab({ lookups, mode = "ontime" }) {
           );
         })}
       </div>
-      <Pager />
+      {pager}
       {allocating && <AllocateModal lookups={lookups} batch={allocating} onClose={() => setAllocating(null)} onDone={() => { setAllocating(null); load(); }} />}
     </div>
   );
@@ -353,7 +353,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
   const [totalOrders, setTotalOrders] = useState(0);
   const [scheduling, setScheduling] = useState(null);
   const [scope, setScope] = useState("todo");
-  const { slice, Pager } = usePager(groups);
+  const { slice, pager } = usePager(groups);
 
   const load = useCallback(async () => {
     try {
@@ -447,7 +447,7 @@ function GroupingTab({ lookups, onOpenOrder }) {
           </div>
         ))}
       </div>
-      <Pager />
+      {pager}
       {scheduling && <ScheduleModal lookups={lookups} order={scheduling} onClose={() => setScheduling(null)} onSaved={() => { setScheduling(null); load(); }} />}
     </div>
   );
@@ -456,8 +456,9 @@ function GroupingTab({ lookups, onOpenOrder }) {
 /* ====== Tab 2: Nhu cầu NVL cần mua ====== */
 function MaterialTab({ onOpenProduct }) {
   const [data, setData] = useState({ requirements: [], missing_bom: [], order_count: 0 });
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setData(await planning.materialRequirements()); } catch (e) { toast.error("Lỗi tính NVL: " + e.message); }
+    setListLoading(true); try { setData(await planning.materialRequirements()); } catch (e) { toast.error("Lỗi tính NVL: " + e.message); } finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -484,7 +485,7 @@ function MaterialTab({ onOpenProduct }) {
         </div>
       )}
 
-      <DataTable columns={columns} rows={data.requirements} rowKey={(r) => r.material_id} emptyText="Chưa có nhu cầu NVL (cần lệnh SX + định mức)." />
+      <DataTable loading={listLoading} columns={columns} rows={data.requirements} rowKey={(r) => r.material_id} emptyText="Chưa có nhu cầu NVL (cần lệnh SX + định mức)." />
     </div>
   );
 }

@@ -328,7 +328,8 @@ export default function ProcessModule({ lookups }) {
   const [copyId, setCopyId] = useState(null);
   const [rows, setRows] = useState([]);
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
-  const load = useCallback(async () => { try { setRows(await procApi.list({})); } catch (e) { toast.error("Lỗi tải quy trình: " + e.message); } }, []);
+  const [listLoading, setListLoading] = useState(true);
+  const load = useCallback(async () => { setListLoading(true); try { setRows(await procApi.list({})); } catch (e) { toast.error("Lỗi tải quy trình: " + e.message); } finally { setListLoading(false); } }, []);
   useEffect(() => { load(); }, [load]);
   const del = async (id) => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
@@ -352,7 +353,7 @@ export default function ProcessModule({ lookups }) {
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         {can("process", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo quy trình</button>}
       </>} />
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có quy trình" />
+      <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có quy trình" />
     </div>
   );
 }

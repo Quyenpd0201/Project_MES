@@ -1089,9 +1089,12 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   const [rows, setRows] = useState([]);
   const [cameFromFocus, setCameFromFocus] = useState(false); // mở từ module khác → back về đúng chỗ
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await production.list({})); }
+    setListLoading(true);
+      try { setRows(await production.list({})); }
     catch (e) { toast.error("Lỗi tải lệnh sản xuất: " + e.message); }
+      finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -1171,7 +1174,7 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
 
       {mode === "gantt" && <ProductionGantt onOpenOrder={(id) => openForm({ edit: id })} />}
 
-      {mode === "table" && <DataTable dense columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có lệnh sản xuất" />}
+      {mode === "table" && <DataTable loading={listLoading} dense columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có lệnh sản xuất" />}
       {scheduling && <ScheduleModal lookups={lookups} order={scheduling} onClose={() => setScheduling(null)} onSaved={() => { setScheduling(null); load(); }} />}
     </div>
   );

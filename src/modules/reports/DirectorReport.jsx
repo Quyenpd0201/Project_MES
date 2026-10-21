@@ -817,7 +817,7 @@ const th = "px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide 
 const td = "px-4 py-2.5 text-sm text-slate-700";
 
 function ProdDetail({ view, rows, isScrap, periodLb }) {
-  const { slice, Pager, Filler } = usePager(rows, 5, [5, 10, 20]);
+  const { slice, pager, filler } = usePager(rows, 5, [5, 10, 20]);
   const label = PROD_VIEWS[view].label;
   const exportExcel = () => {
     if (!rows.length) { toast.error("Danh sách đang trống, không có gì để xuất"); return; }
@@ -875,11 +875,11 @@ function ProdDetail({ view, rows, isScrap, periodLb }) {
                 <td className={td}><span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${statusClass(r.status)}`}>{r.status}</span></td>
               </tr>
             ))}
-            {rows.length > 0 && <Filler cols={isScrap ? 4 : 8} />}
+            {rows.length > 0 && filler(isScrap ? 4 : 8)}
           </tbody>
         </table>
       </div>
-      <div className="mt-3"><Pager /></div>
+      <div className="mt-3">{pager}</div>
     </>
   );
 }

@@ -263,7 +263,7 @@ export default function ReceivablesModule() {
         <span className="ml-auto text-xs text-slate-400">Bấm tên khách để xem chi tiết phiếu giao / phiếu thanh toán</span>
       </div>
 
-      <DataTable columns={columns} rows={shown} rowKey={(r) => r.customer_id} emptyText={loading ? "Đang tải…" : "Không có khách nào"} />
+      <DataTable columns={columns} rows={shown} rowKey={(r) => r.customer_id} loading={loading} emptyText="Không có khách nào" />
 
       {openId && <DetailDrawer customerId={openId} onClose={() => setOpenId(null)} />}
     </div>

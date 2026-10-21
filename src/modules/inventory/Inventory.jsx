@@ -404,8 +404,9 @@ function TreeTab({ lookups }) {
 function TransactionsTab() {
   const [rows, setRows] = useState([]);
   const [range, setRange] = useRemembered("inv:trx:range", defaultRange);
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await inventory.transactions({ ...range, limit: 2000 })); } catch (e) { toast.error("Lỗi tải lịch sử: " + e.message); }
+    setListLoading(true); try { setRows(await inventory.transactions({ ...range, limit: 2000 })); } catch (e) { toast.error("Lỗi tải lịch sử: " + e.message); } finally { setListLoading(false); }
   }, [range]);
   useEffect(() => { load(); }, [load]);
 
@@ -428,7 +429,7 @@ function TransactionsTab() {
   return (
     <div className="space-y-3">
       <div className="flex justify-end"><TrxRange value={range} onChange={setRange} /></div>
-      <DataTable dense columns={columns} rows={rows} rowKey={(t) => t.id} emptyText="Chưa có giao dịch" />
+      <DataTable loading={listLoading} dense columns={columns} rows={rows} rowKey={(t) => t.id} emptyText="Chưa có giao dịch" />
     </div>
   );
 }

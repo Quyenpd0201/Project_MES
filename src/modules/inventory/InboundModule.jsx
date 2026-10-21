@@ -226,8 +226,8 @@ function TransactionHistory({ type }) {
         </button>
       </div>
       <div className="p-4">
-        <DataTable dense columns={columns} rows={rows} rowKey={r => r.id}
-          emptyText={loading ? "Đang tải…" : "Chưa có phiếu nhập"} />
+        <DataTable dense loading={loading} columns={columns} rows={rows} rowKey={r => r.id}
+          emptyText="Chưa có phiếu nhập" />
       </div>
     </div>
   );

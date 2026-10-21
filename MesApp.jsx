@@ -356,9 +356,12 @@ function ProductList({ onOpen, onCreate, onCopy }) {
   const { can } = usePerm();
   const [rows, setRows] = useState([]);
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await api.list({})); }
+    setListLoading(true);
+      try { setRows(await api.list({})); }
     catch (e) { console.error(e); toast.error("Lỗi tải danh sách: " + e.message); }
+      finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -438,7 +441,7 @@ function ProductList({ onOpen, onCreate, onCopy }) {
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         {can("products", "create") && <button onClick={onCreate} className="btn-primary"><Plus size={16} /> Thêm mới</button>}
       </>} />
-      <DataTable columns={columns} rows={rows} rowKey={(p) => p.id} emptyText="Không có dữ liệu" />
+      <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(p) => p.id} emptyText="Không có dữ liệu" />
     </div>
   );
 }

@@ -289,8 +289,9 @@ export default function PaymentReceiptsModule({ lookups }) {
   }, [focusId]); // eslint-disable-line react-hooks/exhaustive-deps
   const [rows, setRows] = useState([]);
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows((await api.list()) || []); } catch (e) { toast.error("Lỗi tải phiếu thanh toán: " + e.message); }
+    setListLoading(true); try { setRows((await api.list()) || []); } catch (e) { toast.error("Lỗi tải phiếu thanh toán: " + e.message); } finally { setListLoading(false); }
   }, []);
   useEffect(() => { if (moneyPerm !== "hidden") load(); }, [load, moneyPerm]);
 
@@ -326,7 +327,7 @@ export default function PaymentReceiptsModule({ lookups }) {
         <Wallet size={16} className="shrink-0" />
         Khách trả 1 lần cho nhiều phiếu giao: tiền tự trừ vào phiếu giao <b>cũ nhất trước</b> <ArrowRight size={14} /> phiếu đủ tiền tự chuyển <b>Đã thanh toán</b>. Trả dư được giữ làm tiền trả trước.
       </div>
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có phiếu thanh toán" />
+      <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có phiếu thanh toán" />
     </div>
   );
 }

@@ -173,6 +173,7 @@ export default function RolesModule() {
         )} />
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <DataTable
+            loading={loading}
             rows={filteredRoles}
             rowKey={(r) => r.id}
             columns={[

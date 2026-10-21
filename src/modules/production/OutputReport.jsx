@@ -816,6 +816,7 @@ function OutputReportBody({ lookups }) {
           <DataTable
             key="orders"
             dense
+            loading={loading}
             columns={columns}
             rows={viewRows}
             rowKey={(r) => r.id}

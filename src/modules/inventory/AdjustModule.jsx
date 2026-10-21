@@ -249,8 +249,8 @@ function AdjustHistory() {
         </button>
       </div>
       <div className="p-4">
-        <DataTable dense columns={columns} rows={rows} rowKey={r => r.id}
-          emptyText={loading ? "Đang tải…" : "Chưa có lần điều chỉnh nào"} />
+        <DataTable dense loading={loading} columns={columns} rows={rows} rowKey={r => r.id}
+          emptyText="Chưa có lần điều chỉnh nào" />
       </div>
     </div>
   );

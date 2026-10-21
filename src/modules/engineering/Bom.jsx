@@ -213,8 +213,9 @@ export default function BomModule({ lookups }) {
   const [rows, setRows] = useState([]);
   const openForm = ({ edit = null, copy = null } = {}) => { setEditId(edit); setCopyId(copy); setView("form"); };
 
+  const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
-    try { setRows(await bomApi.list({})); } catch (e) { toast.error("Lỗi tải định mức: " + e.message); }
+    setListLoading(true); try { setRows(await bomApi.list({})); } catch (e) { toast.error("Lỗi tải định mức: " + e.message); } finally { setListLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -252,7 +253,7 @@ export default function BomModule({ lookups }) {
         <button onClick={load} className="btn-ghost"><RotateCcw size={16} /> Làm mới</button>
         {can("bom", "create") && <button onClick={() => openForm({})} className="btn-primary"><Plus size={16} /> Tạo định mức</button>}
       </>} />
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có định mức" />
+      <DataTable loading={listLoading} columns={columns} rows={rows} rowKey={(r) => r.id} emptyText="Chưa có định mức" />
     </div>
   );
 }

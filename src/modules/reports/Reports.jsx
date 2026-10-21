@@ -373,7 +373,7 @@ function DetailedReport() {
   const orderCodes = res?.orderCodes || [];
 
   // Pagination — use shared usePager hook
-  const { slice: paged, Pager } = usePager(data, 10);
+  const { slice: paged, pager } = usePager(data, 10);
 
   // Bar chart data
   const barData = (charts.byStatus || []).map(s => ({
@@ -672,7 +672,7 @@ function DetailedReport() {
 
             {/* Pagination — shared component */}
             <div className="px-5 py-3 border-t border-slate-100">
-              <Pager />
+              {pager}
             </div>
           </div>
         </>
