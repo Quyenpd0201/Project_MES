@@ -477,7 +477,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
   };
 
   const del = async () => {
-    if (!confirm("Xóa lệnh sản xuất này?")) return;
+    if (!confirm(`Xóa lệnh sản xuất ${meta?.order_code || ""}?`)) return;
     try { await production.remove(editId); toast.success("Đã xóa lệnh sản xuất thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
@@ -1112,7 +1112,8 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   };
 
   const del = async (id) => {
-    if (!confirm("Xóa lệnh sản xuất này?")) return;
+    const r = rows.find((x) => x.id === id);
+    if (!confirm(`Xóa lệnh sản xuất ${r?.order_code || ""}${r?.product_name ? ` – ${r.product_name}` : ""}?`)) return;
     try { await production.remove(id); toast.success("Đã xóa lệnh sản xuất thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 

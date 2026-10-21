@@ -313,13 +313,14 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   const [f, setF] = useState({ customer_id: "", order_date: today, due_date: "", status: "Mới", note: "", priority: "Trung bình", mix_ratio: [], has_vat: true });
   const [items, setItems] = useState([{ _k: 1, product_id: "", quantity: "", unit: "", specs: {}, core_weight: "", total_weight: "", note: "", planned_start_date: "", planned_end_date: "", material_type: null, unit_price: "" }]);
   const [seq, setSeq] = useState(2);
+  const [recCode, setRecCode] = useState(""); // mã bản ghi đang mở (cho câu hỏi xóa)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const vatRate = f.has_vat ? 1.08 : 1; // Có VAT: cộng 8% (như cũ) · Không VAT: giữ nguyên thành tiền
 
   const loadData = useCallback(() => {
     if (!editId) return;
     ordersApi.get(editId).then((d) => {
-      setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [], has_vat: d.has_vat !== false });
+      setRecCode(d.order_code || ""); setF({ customer_id: d.customer_id, order_date: d.order_date?.slice(0, 10) || today, due_date: d.due_date?.slice(0, 10) || "", status: d.status, note: d.note || "", priority: d.priority || "Trung bình", mix_ratio: d.mix_ratio || [], has_vat: d.has_vat !== false });
       setItems((d.items || []).map((it, i) => ({ _k: i + 1, id: it.id, product_id: it.product_id, quantity: it.quantity, unit: it.unit || "", specs: it.specs || {}, core_weight: it.core_weight ?? "", total_weight: it.total_weight ?? "", note: it.note || "", planned_start_date: it.planned_start_date?.slice(0, 10) || "", planned_end_date: it.planned_end_date?.slice(0, 10) || "", actual_start_date: it.actual_start_date || null, actual_end_date: it.actual_end_date || null, materials: it.materials || [], production_orders: it.production_orders || [], material_type: it.material_type || null, mix_ratio: it.mix_ratio || [], unit_price: it.unit_price ?? "" })));
       setSeq((d.items?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải đơn: " + e.message));
@@ -374,7 +375,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
   };
 
   const del = async () => {
-    if (!confirm("Xóa đơn hàng này?")) return;
+    if (!confirm(`Xóa đơn hàng ${recCode}?`)) return;
     try { await ordersApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
@@ -1054,7 +1055,7 @@ export default function OrdersModule({ lookups, focusId, onFocusConsumed, onCrea
     if (focusId) { setEditId(focusId); setView("form"); onFocusConsumed?.(); }
   }, [focusId]);
 
-  const del = async (id) => { if (!confirm("Xóa đơn hàng này?")) return; try { await ordersApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { const r = rows.find((x) => x.id === id); if (!confirm(`Xóa đơn hàng ${r?.order_code || ""}${r?.customer_name ? ` – ${r.customer_name}` : ""}?`)) return; try { await ordersApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const columns = [
     { key: "order_code", label: "Mã đơn", filter: "text", minWidth: "130px", render: (r) => <button onClick={() => openForm({ edit: r.id })} className="font-medium text-blue-600 hover:underline">{r.order_code}</button> },

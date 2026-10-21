@@ -390,7 +390,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
       }
     } catch (e) { toast.error("Lỗi lưu phiếu: " + e.message); }
   };
-  const del = async () => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const del = async () => { if (!confirm(`Xóa phiếu giao ${noteCode || ""}?`)) return; try { await api.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
   const ship = async () => {
     if (!confirm("Xác nhận GIAO HÀNG cho khách?\nHệ thống sẽ tạo phiếu xuất kho (Giao hàng cho khách) và TRỪ TỒN theo số lượng giao (dòng theo đơn ưu tiên lô do chính LSX của đơn làm ra).")) return;
     try { const r = await api.ship(editId); toast.success(r?.message || "Đã giao hàng"); load(); }
@@ -731,7 +731,7 @@ export default function DeliveriesModule({ lookups, focusOrderId, onFocusConsume
     if (focusOrderId) { setEditId(null); setNewOrderId(focusOrderId); setView("form"); onFocusConsumed?.(); }
   }, [focusOrderId]); // eslint-disable-line
 
-  const del = async (id) => { if (!confirm("Xóa phiếu này?")) return; try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { const r = rows.find((x) => x.id === id); if (!confirm(`Xóa phiếu giao ${r?.note_code || ""}${r?.customer_name ? ` – ${r.customer_name}` : ""}?`)) return; try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const resetToList = () => { setView("list"); setEditId(null); setNewOrderId(null); };
   if (view === "form") return <DeliveryForm key={editId || "new"} lookups={lookups} editId={editId} initialOrderId={newOrderId}

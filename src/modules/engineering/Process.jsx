@@ -54,6 +54,7 @@ function FlowChart({ steps, pname, mname }) {
 function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   const { can } = usePerm();
   const [editing, setEditing] = useState(!editId);
+  const [recCode, setRecCode] = useState(""); // mã bản ghi đang mở (cho câu hỏi xóa)
   const [f, setF] = useState({ name: "", product_id: "", status: "Hoạt động", note: "", linked_bom_id: "" });
   const [steps, setSteps] = useState([]);
   const [seq, setSeq] = useState(1);
@@ -85,7 +86,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   const loadData = useCallback(() => {
     if (!editId) return;
     procApi.get(editId).then((d) => {
-      setF({ name: d.name, product_id: d.product_id || "", status: d.status, note: d.note || "", linked_bom_id: d.linked_bom_id || "" });
+      setRecCode(d.process_code || ""); setF({ name: d.name, product_id: d.product_id || "", status: d.status, note: d.note || "", linked_bom_id: d.linked_bom_id || "" });
       setSteps((d.steps || []).map(mapStep));
       setSeq((d.steps?.length || 0) + 1);
     }).catch((e) => toast.error("Lỗi tải quy trình: " + e.message));
@@ -155,7 +156,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
       else { const created = await procApi.create(payload); toast.success("Đã lưu thành công"); onSaved(created?.id); } // tạo mới → ở lại màn chi tiết của bản ghi vừa tạo
     } catch (e) { toast.error("Lỗi lưu: " + e.message); }
   };
-  const del = async () => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const del = async () => { if (!confirm(`Xóa quy trình ${recCode}${f.name ? ` – ${f.name}` : ""}?`)) return; try { await procApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   return (
     <div className="space-y-5">
@@ -331,7 +332,7 @@ export default function ProcessModule({ lookups }) {
   const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => { setListLoading(true); try { setRows(await procApi.list({})); } catch (e) { toast.error("Lỗi tải quy trình: " + e.message); } finally { setListLoading(false); } }, []);
   useEffect(() => { load(); }, [load]);
-  const del = async (id) => { if (!confirm("Xóa quy trình này?")) return; try { await procApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const del = async (id) => { const r = rows.find((x) => x.id === id); if (!confirm(`Xóa quy trình ${r?.process_code || ""}${r?.name ? ` – ${r.name}` : ""}?`)) return; try { await procApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   if (view === "form") return <ProcessForm key={editId || "new"} lookups={lookups} editId={editId} copyId={copyId} onBack={() => { setView("list"); setEditId(null); setCopyId(null); }} onSaved={(newId) => { if (newId) { setEditId(newId); setCopyId(null); } else { setView("list"); setEditId(null); setCopyId(null); } load(); }} />;
 

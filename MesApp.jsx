@@ -366,7 +366,8 @@ function ProductList({ onOpen, onCreate, onCopy }) {
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
-    if (!confirm("Xóa sản phẩm này?")) return;
+    const r = rows.find((x) => x.id === id);
+    if (!confirm(`Xóa sản phẩm ${r?.product_code || ""}${r?.product_name ? ` – ${r.product_name}` : ""}?`)) return;
     try { await api.remove(id); toast.success("Đã xóa thành công"); load(); }
     catch (e) { toast.error("Lỗi xóa sản phẩm: " + e.message); }
   };
@@ -769,10 +770,10 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       } }
     catch (e) { toast.error("Lỗi xem tài liệu: " + e.message); }
   };
-  const delFile = async (att) => { if (!confirm("Xóa tài liệu này?")) return; try { await productFiles.remove(id, att.id); toast.success("Đã xóa tài liệu"); loadFiles(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
+  const delFile = async (att) => { if (!confirm(`Xóa tài liệu "${att.name || ""}"?`)) return; try { await productFiles.remove(id, att.id); toast.success("Đã xóa tài liệu"); loadFiles(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const del = async () => {
-    if (!confirm("Xóa sản phẩm này?")) return;
+    if (!confirm(`Xóa sản phẩm ${p?.product_code || ""}${p?.product_name ? ` – ${p.product_name}` : ""}?`)) return;
     try { await api.remove(id); toast.success("Đã xóa sản phẩm"); onDeleted?.(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
   const [saving, guard] = useSaving();

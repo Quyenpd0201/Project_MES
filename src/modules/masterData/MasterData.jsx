@@ -211,7 +211,8 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
-    if (!confirm("Xóa bản ghi này?")) return;
+    const r = rows.find((x) => x.id === id), ck = cfg.columns[0]?.key;
+    if (!confirm(`Xóa ${cfg.title.toLowerCase()} ${[r?.[ck], r?.name].filter(Boolean).join(" – ")}?`)) return;
     try { await api.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 

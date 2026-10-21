@@ -38,13 +38,14 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   const [editing, setEditing] = useState(!editId); // tạo mới = sửa ngay; mở sẵn = xem
   const [procList, setProcList] = useState([]);
   const isLinked = !!f.process_id; // đã gắn Quy trình → dòng NVL lấy từ quy trình (khóa)
+  const [recCode, setRecCode] = useState(""); // mã bản ghi đang mở (cho câu hỏi xóa)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   useEffect(() => { procApi.list({}).then(setProcList).catch((e) => toast.error("Không tải được danh sách quy trình — bấm Làm mới: " + e.message)); }, []);
 
   const loadData = useCallback(() => {
     if (!editId) return;
     bomApi.get(editId).then((d) => {
-      setF({ product_id: d.product_id, name: d.name, bom_type: d.bom_type,
+      setRecCode(d.bom_code || ""); setF({ product_id: d.product_id, name: d.name, bom_type: d.bom_type,
         output_quantity: d.output_quantity, output_unit: d.output_unit || unitOf(d.product_id), status: d.status, note: d.note || "", process_id: d.process_id || "" });
       setLines((d.lines || []).map((l, i) => ({
         _k: i + 1, material_id: l.material_id, quantity: l.quantity, unit: l.unit || unitOf(l.material_id),
@@ -96,7 +97,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   };
 
   const del = async () => {
-    if (!confirm("Xóa định mức này?")) return;
+    if (!confirm(`Xóa định mức ${recCode}${f.name ? ` – ${f.name}` : ""}?`)) return;
     try { await bomApi.remove(editId); toast.success("Đã xóa thành công"); onSaved(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
@@ -220,7 +221,8 @@ export default function BomModule({ lookups }) {
   useEffect(() => { load(); }, [load]);
 
   const del = async (id) => {
-    if (!confirm("Xóa định mức này?")) return;
+    const r = rows.find((x) => x.id === id);
+    if (!confirm(`Xóa định mức ${r?.bom_code || ""}${r?.name ? ` – ${r.name}` : ""}?`)) return;
     try { await bomApi.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); }
   };
 
