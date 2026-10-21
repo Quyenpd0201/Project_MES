@@ -481,7 +481,8 @@ export function Modal({ open = true, title, onClose, dirty, locked = false, clos
 export function LoadError({ message = "Không tải được dữ liệu", onRetry, className = "" }) {
   return (
     <div role="alert" className={`flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 ${className}`}>
-      <span>{message}</span>
+      {/* lỗi mạng của trình duyệt (tiếng Anh) → nói rõ bằng tiếng Việt */}
+      <span>{String(message).replace(/Failed to fetch|NetworkError[^)]*|Load failed/g, "không kết nối được máy chủ")}</span>
       {onRetry && <button type="button" onClick={onRetry} className="btn-ghost py-1 text-sm">Thử lại</button>}
     </div>
   );
@@ -524,6 +525,9 @@ export function DialogBehavior({ onClose, dirty, locked = false }) {
       clearTimeout(t);
       el.removeEventListener("input", mark); el.removeEventListener("change", mark);
       document.removeEventListener("keydown", onKey);
+      // gỡ thuộc tính đã gắn (khung có thể vẫn nằm trong trang, vd ngăn kéo chỉ trượt ra ngoài)
+      ["role", "aria-modal", "aria-labelledby"].forEach((k) => el.removeAttribute(k));
+      delete el.dataset.dirty; delete el.dataset.locked;
       document.body.style.overflow = prevOverflow;
       if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.({ preventScroll: true });
     };
