@@ -8,7 +8,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast, todayYmd } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose } from "../../components.jsx";
 
 // Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
 // Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy — hàng trả lại dùng nút "Khách trả hàng" (nhập lại kho).
@@ -122,11 +122,12 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
     finally { setSaving(false); }
   };
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 space-y-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl p-6 space-y-4 max-h-[90vh] overflow-auto">
+        <DialogBehavior onClose={onClose} />
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-800">Khách trả hàng — phiếu giao {noteCode}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+          <button onClick={(e) => confirmClose(e, onClose)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
         {!data ? (loadErr ? <LoadError message={`Không tải được hàng đã giao (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} /> : <div className="text-sm text-slate-400">Đang tải…</div>) : !data.lines.length ? (
           <div className="text-sm text-slate-500">Phiếu này chưa có dữ liệu xuất kho để trả.</div>
@@ -167,7 +168,7 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
           )}
           <div className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">Trả hàng chỉ nhập lại kho — công nợ của phiếu giao không tự thay đổi.</div>
           <div className="flex justify-end gap-2">
-            <button onClick={onClose} className="btn-ghost">Đóng</button>
+            <button onClick={(e) => confirmClose(e, onClose)} className="btn-ghost">Đóng</button>
             <button onClick={save} disabled={saving} className="btn-primary"><RotateCcw size={16} /> {saving ? "Đang lưu…" : "Xác nhận trả hàng"}</button>
           </div>
         </>)}

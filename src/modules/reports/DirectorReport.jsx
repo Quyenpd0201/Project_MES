@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { reports } from "../../mesApi.js";
 import { fmt, fmtDate, toast, statusClass } from "../../ui.js";
-import { usePager, LoadError } from "../../components.jsx";
+import { usePager, LoadError, DialogBehavior } from "../../components.jsx";
 
 /* ───────────────────────── Bảng màu & hằng số ───────────────────────── */
 
@@ -667,6 +667,7 @@ function SalesView({ s, r, period }) {
       {ordersModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm transition-opacity">
           <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-rise">
+            <DialogBehavior onClose={() => setOrdersModal(false)} dirty={false} />
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="font-display text-lg font-semibold text-slate-800">
                 Chi tiết {s.order_count} đơn hàng {period === "week" ? "tuần này" : "tháng này"}
@@ -731,6 +732,7 @@ function SalesView({ s, r, period }) {
       {deliveriesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm transition-opacity">
           <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-rise">
+            <DialogBehavior onClose={() => setDeliveriesModal(false)} dirty={false} />
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="font-display text-lg font-semibold text-slate-800">
                 Chi tiết Phiếu giao hàng / Hóa đơn {period === "week" ? "tuần này" : "tháng này"}

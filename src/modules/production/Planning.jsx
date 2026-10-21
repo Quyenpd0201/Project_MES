@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
-import { ListHeader, usePager, DataTable, useSaving } from "../../components.jsx";
+import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
 import { planning, production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -72,8 +72,9 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <DialogBehavior onClose={onClose} />
         <h3 className="text-lg font-bold text-slate-800">Phân bổ & tạo lệnh sản xuất</h3>
         <p className="text-sm text-slate-500">
           Lô: <b>{batch.product_name}</b> · {batch.attr_color || "—"} · {batch.attr_size || "—"} · {batch.attr_thickness || "—"}<br />
@@ -169,7 +170,7 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
         </div>
 
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={onClose} className="btn-ghost">Hủy</button>
+          <button onClick={(e) => confirmClose(e, onClose)} className="btn-ghost">Hủy</button>
           <button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : `Tạo ${planItems.length} lệnh`}</button>
         </div>
       </div>

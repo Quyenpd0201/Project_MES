@@ -3,7 +3,7 @@ import {
   Recycle, Plus, Trash2, Save, FileText, Scale, CheckCircle2, 
   ArrowRight, Box, Package, Calendar, User, X
 } from "lucide-react";
-import { ListHeader, DataTable } from "../../components.jsx";
+import { ListHeader, DataTable, DialogBehavior, confirmClose } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
 
@@ -199,11 +199,12 @@ Hoàn thành phiếu?`)) return;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogBehavior onClose={onClose} />
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-800">
             {ticket ? `Phiếu Tái Chế: ${ticket.ticket_code}` : "Tạo Phiếu Tái Chế Mới"}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+          <button onClick={(e) => confirmClose(e, onClose)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
             <X size={20} />
           </button>
         </div>
@@ -381,7 +382,7 @@ Hoàn thành phiếu?`)) return;
       </div>
 
       <div className="mt-8 pt-4 border-t border-slate-100 flex justify-end gap-3">
-        <button onClick={onClose} className="btn-ghost">Đóng</button>
+        <button onClick={(e) => confirmClose(e, onClose)} className="btn-ghost">Đóng</button>
         {(!isCompleted && (
           (step === 1 && !ticket) || 
           (step === 2 && ticket.status === 'Chờ cân') || 

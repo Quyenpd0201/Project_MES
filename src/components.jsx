@@ -415,13 +415,15 @@ export function DataTable({ columns, rows, rowKey, pageSize = 10, emptyText = "K
    useDialog: Esc để đóng, focus vào hộp khi mở + trả focus khi đóng, khóa cuộn nền,
    có thay đổi chưa lưu (dirty) thì hỏi trước khi đóng. requestClose() dùng cho nút Hủy / × / nền.
    locked = đang xử lý (vd đang nhập Excel) → không cho đóng. */
-export function useDialog({ open = true, onClose, dirty = false, locked = false }) {
+export function useDialog({ open = true, onClose, dirty, locked = false, labelledBy }) {
   const ref = useRef(null);
+  // dirty không truyền → tự coi là có thay đổi khi người dùng gõ / chọn trong hộp (onChangeCapture)
+  const touched = useRef(false);
   const st = useRef({}); st.current = { onClose, dirty, locked };
   const requestClose = React.useCallback(() => {
     const { onClose: oc, dirty: d, locked: l } = st.current;
     if (l) return;
-    if (d && !window.confirm("Bỏ thay đổi chưa lưu?")) return;
+    if ((d ?? touched.current) && !window.confirm("Bỏ thay đổi chưa lưu?")) return;
     oc?.();
   }, []);
   useEffect(() => {
@@ -443,21 +445,24 @@ export function useDialog({ open = true, onClose, dirty = false, locked = false 
       prevFocus?.focus?.();
     };
   }, [open, requestClose]);
-  return { ref, requestClose };
+  // gắn vào khung hộp có sẵn: <div {...dialogProps}> (giữ nguyên giao diện cũ)
+  const dialogProps = { ref, role: "dialog", "aria-modal": "true", "aria-labelledby": labelledBy, tabIndex: -1,
+    onChangeCapture: () => { touched.current = true; }, style: { outline: "none" } };
+  return { ref, requestClose, dialogProps };
 }
 
 const MODAL_SIZES = { sm: "max-w-md", md: "max-w-lg", lg: "max-w-3xl", xl: "max-w-5xl", "2xl": "max-w-6xl" };
 let _dlgSeq = 0;
 /** Hộp thoại giữa màn hình. Mặc định bấm nền KHÔNG đóng (closeOnBackdrop=false) để không mất dữ liệu đang nhập.
  *  children có thể là hàm (requestClose) => … để nút Hủy trong thân hộp cũng đi qua bước hỏi dirty. */
-export function Modal({ open = true, title, onClose, dirty = false, locked = false, closeOnBackdrop = false, size = "lg", footer, children, bodyClass = "p-5", className = "", z = "z-50" }) {
-  const { ref, requestClose } = useDialog({ open, onClose, dirty, locked });
+export function Modal({ open = true, title, onClose, dirty, locked = false, closeOnBackdrop = false, size = "lg", footer, children, bodyClass = "p-5", className = "", z = "z-50" }) {
+  const { requestClose, dialogProps } = useDialog({ open, onClose, dirty, locked });
   const [titleId] = useState(() => `dlg-title-${++_dlgSeq}`);
   if (!open) return null;
   return (
     <div className={`fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 ${z}`}
       onMouseDown={(e) => { if (closeOnBackdrop && e.target === e.currentTarget) requestClose(); }}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined} tabIndex={-1}
+      <div {...dialogProps} aria-labelledby={title ? titleId : undefined}
         className={`bg-white rounded-2xl shadow-xl w-full ${MODAL_SIZES[size] || size} max-h-[90vh] flex flex-col outline-none ${className}`}>
         {title != null && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
@@ -480,4 +485,61 @@ export function LoadError({ message = "Không tải được dữ liệu", onRet
       {onRetry && <button type="button" onClick={onRetry} className="btn-ghost py-1 text-sm">Thử lại</button>}
     </div>
   );
+}
+
+/* ---- Gắn hành vi hộp thoại vào KHUNG CÓ SẴN (không đổi giao diện) ----
+   Đặt <DialogBehavior onClose={…} /> làm con đầu tiên của khung hộp: khung được gắn role="dialog",
+   Esc để đóng, focus vào ô đầu khi mở / trả focus khi đóng, khóa cuộn nền, tự đánh dấu "có thay đổi"
+   khi người dùng gõ / chọn trong hộp. Nút Hủy / × gọi confirmClose(e, đóng) để cũng được hỏi.
+   dirty (tùy chọn) = ghi đè cách tự đánh dấu; locked = đang xử lý, không cho đóng. */
+export function DialogBehavior({ onClose, dirty, locked = false }) {
+  const spanRef = useRef(null);
+  const st = useRef({}); st.current = { onClose, dirty, locked };
+  useEffect(() => {
+    const el = spanRef.current?.parentElement;
+    if (!el) return;
+    el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
+    if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+    el.style.outline = "none";
+    const h = el.querySelector("h1, h2, h3");
+    if (h) { if (!h.id) h.id = `dlg-h-${++_dlgSeq}`; el.setAttribute("aria-labelledby", h.id); }
+    const prevFocus = document.activeElement;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const t = setTimeout(() => {
+      if (el.contains(document.activeElement)) return;
+      (el.querySelector("input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled])") || el).focus?.({ preventScroll: true });
+    }, 0);
+    const mark = () => { if (st.current.dirty === undefined) el.dataset.dirty = "1"; };
+    el.addEventListener("input", mark); el.addEventListener("change", mark);
+    const onKey = (e) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      const all = document.querySelectorAll('[role="dialog"]');
+      if (all[all.length - 1] !== el) return; // chỉ hộp trên cùng
+      e.preventDefault();
+      confirmClose({ currentTarget: el }, () => st.current.onClose?.());
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      clearTimeout(t);
+      el.removeEventListener("input", mark); el.removeEventListener("change", mark);
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+      if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.({ preventScroll: true });
+    };
+  }, []);
+  useEffect(() => {
+    const el = spanRef.current?.parentElement; if (!el) return;
+    if (dirty !== undefined) { if (dirty) el.dataset.dirty = "1"; else delete el.dataset.dirty; }
+    if (locked) el.dataset.locked = "1"; else delete el.dataset.locked;
+  });
+  return <span ref={spanRef} hidden />;
+}
+
+/** Đóng hộp thoại có kiểm tra: đang khóa → bỏ qua; có thay đổi chưa lưu → hỏi. e = sự kiện bấm nút trong hộp. */
+export function confirmClose(e, close) {
+  const el = e?.currentTarget?.closest ? e.currentTarget.closest('[role="dialog"]') : null;
+  if (el?.dataset.locked) return;
+  if (el?.dataset.dirty && !window.confirm("Bỏ thay đổi chưa lưu?")) return;
+  close?.();
 }

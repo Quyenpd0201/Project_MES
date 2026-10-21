@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
-import { ListHeader, DataTable, Section, useSaving, useRemembered } from "../../components.jsx";
+import { ListHeader, DataTable, Section, useSaving, useRemembered, DialogBehavior, confirmClose } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
@@ -247,12 +247,13 @@ export default function RolesModule() {
       {editingUser && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+            <DialogBehavior onClose={() => setEditingUser(null)} />
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-indigo-50">
               <div>
                 <h3 className="text-lg font-bold text-indigo-900">Quyền bổ sung: {editingUser.full_name || editingUser.username}</h3>
                 <div className="text-sm text-indigo-700 flex items-center gap-1"><AlertCircle size={14}/> Các quyền dưới đây sẽ ĐƯỢC CỘNG THÊM hoặc GHI ĐÈ lên quyền gốc của vai trò {selectedRole.name}</div>
               </div>
-              <button onClick={() => setEditingUser(null)} className="p-2 text-slate-400 hover:bg-white rounded-lg transition"><Trash2 size={20}/></button>
+              <button onClick={(e) => confirmClose(e, () => setEditingUser(null))} aria-label="Đóng" className="p-2 text-slate-400 hover:bg-white rounded-lg transition"><Trash2 size={20}/></button>
             </div>
             <div className="flex-1 overflow-y-auto p-4 bg-slate-50">
               <PermissionEditor roleName={editingUser.username} initialPerms={editingUser.permissions || {}} onSave={handleSaveUserPerms} onCancel={() => setEditingUser(null)} />

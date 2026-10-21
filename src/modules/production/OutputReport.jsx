@@ -4,7 +4,7 @@ import {
   X, User, Users, CalendarDays, Factory, ShoppingCart, Tag, ClipboardList, Layers,
   ChevronRight, AlertCircle,
 } from "lucide-react";
-import { ListHeader, Section, DataTable, SearchSelect, useRemembered } from "../../components.jsx";
+import { ListHeader, Section, DataTable, SearchSelect, useRemembered, DialogBehavior } from "../../components.jsx";
 import { production, scrap as scrapApi } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast, todayYmd, monthStartYmd } from "../../ui.js";
 import * as XLSX from "xlsx";
@@ -246,6 +246,7 @@ function OrderDetailDrawer({ order, onClose }) {
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-full max-w-[520px] bg-white shadow-2xl z-50 flex flex-col"
         style={{ animation: "slideInRight 0.22s ease" }}>
+        <DialogBehavior onClose={onClose} dirty={false} />
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-600 to-blue-700 text-white shrink-0">

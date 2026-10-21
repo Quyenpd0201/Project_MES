@@ -5,7 +5,7 @@ import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast, todayYmd } from "../../ui.js";
-import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose } from '../../components.jsx';
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 import { SpecFields } from "../../SpecFields.jsx";
 import * as XLSX from "xlsx";
@@ -190,11 +190,12 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+        <DialogBehavior onClose={onClose} />
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><CalendarClock size={20} className="text-blue-600" /> Phân công nhanh</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+          <button onClick={(e) => confirmClose(e, onClose)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
 
         {loading ? (
@@ -208,7 +209,7 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
                 <div className="text-sm text-emerald-700 mt-0.5">Tất cả dòng hàng trong đơn đã được phân bổ đủ số lượng vào lệnh SX. Không cần tạo thêm.</div>
               </div>
             </div>
-            <div className="flex justify-end"><button onClick={onClose} className="btn-ghost">Đóng</button></div>
+            <div className="flex justify-end"><button onClick={(e) => confirmClose(e, onClose)} className="btn-ghost">Đóng</button></div>
           </div>
         ) : (
           <>
@@ -290,7 +291,7 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
-              <button onClick={onClose} className="btn-ghost">Hủy</button>
+              <button onClick={(e) => confirmClose(e, onClose)} className="btn-ghost">Hủy</button>
               <button onClick={() => guard(save)} disabled={saving} className="btn-primary"><Save size={16} /> {saving ? "Đang lưu…" : <>Tạo {batchItems.map(i => qty[i.item_id]).filter(q => Number(q) > 0).length} lệnh</>}</button>
             </div>
           </>
@@ -879,6 +880,7 @@ function ExcelImportModal({ onClose, onDone }) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${step === 2 ? 'max-w-6xl' : 'max-w-lg'}`}>
+        <DialogBehavior onClose={onClose} locked={loading} />
         <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
@@ -894,7 +896,7 @@ function ExcelImportModal({ onClose, onDone }) {
               {step === 2 && <p className="text-xs text-slate-400">Vui lòng kiểm tra và loại bỏ các dòng bị lỗi</p>}
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+          <button onClick={(e) => confirmClose(e, onClose)} disabled={loading} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto min-h-0">
@@ -917,7 +919,7 @@ function ExcelImportModal({ onClose, onDone }) {
                 </div>
               </label>
               <div className="flex gap-3 justify-end">
-                <button onClick={onClose} className="btn-ghost">Hủy</button>
+                <button onClick={(e) => confirmClose(e, onClose)} disabled={loading} className="btn-ghost">Hủy</button>
                 <button onClick={handlePreview} disabled={!file || loading} className="btn-primary disabled:opacity-50">
                   {loading ? 'Đang đọc...' : 'Tiếp tục'}
                 </button>

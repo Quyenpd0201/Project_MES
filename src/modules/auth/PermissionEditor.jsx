@@ -4,7 +4,7 @@ import {
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
   BarChart2, Settings, Save, ArrowLeft, Recycle
 } from "lucide-react";
-import { ListHeader, useSaving } from "../../components.jsx";
+import { ListHeader, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 
@@ -545,7 +545,7 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shadow-sm z-10 flex-shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={onCancel} className="text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 transition-colors text-sm">
+          <button onClick={(e) => confirmClose(e, onCancel)} className="text-slate-500 hover:text-slate-800 font-semibold flex items-center gap-2 transition-colors text-sm">
             <ArrowLeft size={18} /> Quay lại
           </button>
           <div className="h-6 w-px bg-slate-200" />
@@ -596,6 +596,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
   const [draft, setDraft]         = useState(initialPerms || {});
   const [searchQuery, setSearchQuery] = useState("");
 
+  const drawerDirty = open && JSON.stringify(draft) !== JSON.stringify(initialPerms || {});
   useEffect(() => {
     if (open) { setDraft(initialPerms || {}); setSearchQuery(""); }
   }, [open, initialPerms]);
@@ -635,10 +636,11 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
       {/* Backdrop */}
       <div
         className={`fixed inset-0 bg-slate-900/40 z-40 transition-opacity duration-300 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
-        onClick={onClose}
+        onClick={() => { if (drawerDirty && !window.confirm("Bỏ thay đổi chưa lưu?")) return; onClose(); }}
       />
       {/* Drawer panel */}
       <div className={`fixed top-0 right-0 h-full w-[700px] max-w-[96vw] bg-white shadow-2xl z-50 flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "translate-x-full"}`}>
+        {open && <DialogBehavior onClose={onClose} dirty={drawerDirty} />}
         
         {/* Drawer Header */}
         <div className="px-6 py-4 border-b border-indigo-700 bg-gradient-to-r from-indigo-600 to-indigo-700 flex items-center justify-between flex-shrink-0">
@@ -646,7 +648,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
             <div className="text-indigo-200 text-xs font-medium uppercase tracking-wide">Cấu hình quyền</div>
             <div className="text-white font-bold text-lg truncate">{roleName}</div>
           </div>
-          <button onClick={onClose} className="p-2 text-indigo-200 hover:text-white hover:bg-indigo-500 rounded-lg transition-colors ml-4 flex-shrink-0">
+          <button onClick={(e) => confirmClose(e, onClose)} className="p-2 text-indigo-200 hover:text-white hover:bg-indigo-500 rounded-lg transition-colors ml-4 flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -699,7 +701,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
             <RotateCcw size={14} /> Đặt lại
           </button>
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium transition-colors">
+            <button onClick={(e) => confirmClose(e, onClose)} className="px-5 py-2 text-sm border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium transition-colors">
               Hủy
             </button>
             <button

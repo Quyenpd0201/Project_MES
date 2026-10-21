@@ -4,7 +4,7 @@ import { production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory, machinesForStage } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, DialogBehavior, confirmClose } from "../../components.jsx";
 import { PackageCheck, CheckCircle2, Lock, RotateCcw } from "lucide-react";
 import Qr from "../../Qr.jsx";
 import { SpecFields } from "../../SpecFields.jsx";
@@ -911,9 +911,10 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         return (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[70]">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <DialogBehavior onClose={() => setCutModal(null)} />
             <div className="flex items-center justify-between p-4 border-b border-slate-100">
               <h2 className="text-lg font-semibold text-slate-800">Hoàn thành Cắt — trừ cuộn BTP</h2>
-              <button onClick={() => setCutModal(null)} className="text-slate-400 hover:text-slate-600">&times;</button>
+              <button onClick={(e) => confirmClose(e, () => setCutModal(null))} className="text-slate-400 hover:text-slate-600">&times;</button>
             </div>
             <div className="p-4 overflow-y-auto space-y-3 text-sm">
               <p>Thông số: <b>{cutModal.spec_label}</b></p>
@@ -938,7 +939,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-lg">
-              <button onClick={() => setCutModal(null)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg">Hủy</button>
+              <button onClick={(e) => confirmClose(e, () => setCutModal(null))} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg">Hủy</button>
               <button onClick={() => finishComplete(cutModal.codes, [...cutModal.finish])} disabled={completing}
                 className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-60 flex items-center gap-2">
                 <CheckCircle2 size={16} /> {completing ? "Đang xử lý..." : "Xác nhận hoàn thành"}
@@ -1017,9 +1018,10 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
   return (
     <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-[60]">
       <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+        <DialogBehavior onClose={onClose} />
         <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <h2 className="text-lg font-semibold text-slate-800">Phân công - {order.order_code}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">&times;</button>
+          <button onClick={(e) => confirmClose(e, onClose)} className="text-slate-400 hover:text-slate-600">&times;</button>
         </div>
         <div className="p-4 overflow-y-auto">
           {loading ? <p className="text-slate-500">Đang tải...</p> : (
@@ -1071,7 +1073,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
           )}
         </div>
         <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-lg">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
+          <button onClick={(e) => confirmClose(e, onClose)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">Hủy</button>
           <button onClick={save} disabled={loading || saving} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"><Save size={16}/> {saving ? "Đang lưu..." : "Lưu thay đổi"}</button>
         </div>
       </div>

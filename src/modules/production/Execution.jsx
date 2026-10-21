@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
 import { production } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, useRemembered, LoadError } from "../../components.jsx";
+import { ListHeader, useRemembered, LoadError, DialogBehavior, confirmClose } from "../../components.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 
 /* ---- Modal: NVL thực tế sử dụng (gợi ý từ BOM) → trừ tồn kho ---- */
@@ -27,8 +27,9 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={() => onClose(false)}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 space-y-4 max-h-[90vh] overflow-auto">
+        <DialogBehavior onClose={() => onClose(false)} />
         <div>
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Boxes size={18} className="text-blue-500" /> NVL thực tế sử dụng</h3>
           <p className="text-sm text-slate-500 mt-1">Lệnh <b className="text-blue-600">{task.order_code}</b> · {task.product_name} · SL {fmt(task.quantity)} {task.unit}. Gợi ý lấy từ định mức (BOM); sửa lại theo thực tế rồi Lưu để <b>trừ tồn kho NVL</b>.</p>
@@ -72,7 +73,7 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
             )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <button onClick={() => onClose(false)} className="btn-ghost">{completeMode ? "Hủy" : "Đóng"}</button>
+          <button onClick={(e) => confirmClose(e, () => onClose(false))} className="btn-ghost">{completeMode ? "Hủy" : "Đóng"}</button>
           {canEdit && data?.has_bom && lines.length > 0 &&
             <button onClick={save} disabled={saving} className="btn-primary" style={completeMode ? { background: "#059669" } : undefined}>
               <Save size={16} /> {saving ? "Đang lưu…" : (completeMode ? "Lưu NVL & Hoàn thành" : "Lưu & trừ kho")}</button>}

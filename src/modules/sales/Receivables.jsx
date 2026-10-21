@@ -9,7 +9,7 @@ import * as XLSX from "xlsx";
 import { receivables as api } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { fmtDate, statusClass, toast, todayYmd } from "../../ui.js";
-import { ListHeader, DataTable, LoadError } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, DialogBehavior } from "../../components.jsx";
 import { LevelBadge, LEVELS, vnd } from "./debtUi.jsx";
 
 function Card({ label, value, sub, icon: Icon, tone = "slate", onClick, active }) {
@@ -43,6 +43,7 @@ function DetailDrawer({ customerId, onClose }) {
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
       <div className="fixed right-0 top-0 h-full w-full max-w-[640px] bg-white shadow-2xl z-50 flex flex-col">
+        <DialogBehavior onClose={onClose} dirty={false} />
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
           <div>
             <div className="text-xs text-slate-400">Công nợ khách hàng</div>
