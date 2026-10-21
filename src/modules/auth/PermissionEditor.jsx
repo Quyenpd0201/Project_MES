@@ -401,7 +401,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                               const { method, path } = getApiInfo(mod.key, actKey);
 
                               return (
-                                <div key={actKey} className={`rounded-lg border transition-all ${
+                                <div key={actKey} className={`rounded-lg border transition-colors ${
                                   isChecked    ? "bg-white border-indigo-200 shadow-sm" :
                                   isInherited  ? "bg-blue-50/60 border-blue-200" :
                                                  "bg-white border-slate-100"
@@ -455,7 +455,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                         {SCOPE_OPTIONS.map(s => {
                                           const sel = (actVal?.scope || "ALL") === s.code;
                                           return (
-                                            <label key={s.code} className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-[10px] transition-all ${
+                                            <label key={s.code} className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-[10px] transition-colors ${
                                               sel ? "bg-indigo-50 border-indigo-400 text-indigo-700 font-semibold" :
                                                     "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                             }`}>
@@ -1057,7 +1057,7 @@ export default function PermissionsModule() {
                                       const { method, path } = getApiInfo(mod.key, actKey);
 
                                       return (
-                                        <div key={actKey} className={`flex items-start gap-3 p-2.5 rounded-lg border transition-all ${
+                                        <div key={actKey} className={`flex items-start gap-3 p-2.5 rounded-lg border transition-colors ${
                                           isDirect ? "bg-white border-emerald-200 shadow-sm" : "bg-blue-50/50 border-blue-100"
                                         }`}>
                                           <Check size={14} className={`mt-0.5 flex-shrink-0 ${isDirect ? "text-emerald-500" : "text-blue-400"}`} />

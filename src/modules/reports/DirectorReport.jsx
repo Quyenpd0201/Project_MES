@@ -154,7 +154,7 @@ function KpiCard({ icon: Icon, accent = "blue", label, hint, value, valueClass, 
   return (
     <Comp
       onClick={onClick}
-      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-all duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:-translate-y-1 hover:shadow-card-hover hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:-translate-y-0.5 hover:shadow-card-hover"}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-colors duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:-translate-y-1 hover:shadow-card-hover hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:-translate-y-0.5 hover:shadow-card-hover"}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className={`pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-100 opacity-70 ${a.glow}`} />
@@ -1130,7 +1130,7 @@ export default function DirectorReport() {
           <div role="tablist" aria-label="Chọn kỳ báo cáo" className="inline-flex items-center rounded-xl bg-slate-100 p-1 ring-1 ring-inset ring-slate-200/70">
             {[["week", "Tuần"], ["month", "Tháng"]].map(([k, lb]) => (
               <button key={k} id={`dr-period-${k}`} role="tab" aria-selected={period === k} onClick={() => setPeriod(k)}
-                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${period === k ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80" : "text-slate-500 hover:text-slate-800"}`}>
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${period === k ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80" : "text-slate-500 hover:text-slate-800"}`}>
                 {lb}
               </button>
             ))}

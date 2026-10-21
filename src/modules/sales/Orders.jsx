@@ -493,7 +493,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
               <div className="pl-8">
                 <div className="text-xs font-semibold text-slate-400 uppercase mb-1.5">Loại nguyên liệu</div>
                 <div className="flex gap-4">
-                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-colors select-none ${
                     it.material_type === 'zin'
                       ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
@@ -509,7 +509,7 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                     <span className="text-sm font-medium">Hàng zin</span>
                     <span className="text-xs text-slate-400">(100% nhựa nguyên sinh)</span>
                   </label>
-                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                  <label className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-colors select-none ${
                     it.material_type === 'pha'
                       ? 'border-amber-500 bg-amber-50 text-amber-800'
                       : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'

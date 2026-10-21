@@ -124,7 +124,7 @@ function StageBar({ stage, actual, planned, maxActual }) {
         </span>
       </div>
       <div className="h-3.5 bg-slate-100 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${pctBg(p)}`} style={{ width: `${barW}%` }} />
+        <div className={`h-full rounded-full transition-[width] ${pctBg(p)}`} style={{ width: `${barW}%` }} />
       </div>
     </div>
   );
@@ -719,7 +719,7 @@ function EmployeeReportBody() {
                     const rank = (empPage - 1) * EMP_PER_PAGE + idx + 1;
                     return (
                       <button key={w.worker} onClick={() => handleSelectWorker(w)}
-                        className={`w-full text-left px-4 py-3 transition-all hover:bg-slate-50 ${isSelected ? "bg-indigo-50 border-l-4 border-indigo-500" : "border-l-4 border-transparent"
+                        className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 ${isSelected ? "bg-indigo-50 border-l-4 border-indigo-500" : "border-l-4 border-transparent"
                           }`}
                       >
                         <div className="flex items-center gap-2.5">
