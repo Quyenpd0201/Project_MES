@@ -71,8 +71,7 @@ export default function RecyclingModule() {
     { key: "third_party_name", label: "Bên thứ 3" },
     { key: "status", label: "Trạng thái", render: r => (
       <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-        // 'Đang tái chế' / 'Chờ cân' chưa có trong STATUS_COLORS (ui.js) → giữ màu cũ, chờ Đợt 5 bổ sung bảng màu chung
-        r.status === 'Đang tái chế' ? 'bg-amber-100 text-amber-700' : statusClass(r.status)
+        statusClass(r.status)
       }`}>{r.status}</span>
     )},
     { key: "expected_qty", label: "Tổng (kg)", align: "right", render: r => <span className="font-semibold">{fmt(r.expected_qty)}</span> },

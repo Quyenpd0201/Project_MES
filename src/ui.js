@@ -53,33 +53,44 @@ export const fmtDateTime = (d) => {
 // Danh mục đơn vị tính dùng chung (chọn từ dropdown, không nhập tự do)
 export const UNITS = ["Kg", "Cái", "Chiếc", "Dem", "Gram", "Cuộn", "Thùng", "Cm"];
 
-// Badge trạng thái dùng chung (map màu theo trạng thái lệnh SX / đơn hàng)
+// Badge trạng thái dùng chung — 5 màu theo NGHĨA (chủ dự án chốt 2026-10-21). Trạng thái mới → xếp vào 1 trong 5 nhóm.
+const BADGE = {
+  gray : "bg-slate-100 text-slate-600", // xám — chờ / nháp
+  blue : "bg-blue-50 text-blue-700", // xanh dương — đang làm / đã lên kế hoạch
+  amber: "bg-amber-50 text-amber-700", // vàng — cần chú ý / 1 phần
+  green: "bg-emerald-50 text-emerald-700", // xanh lá — xong / đã thanh toán
+  red  : "bg-rose-50 text-rose-700", // đỏ — hủy / ngừng
+};
 const STATUS_COLORS = {
-  "Chờ duyệt": "bg-slate-100 text-slate-600",
-  "Đã lên kế hoạch": "bg-blue-50 text-blue-700",
-  "Chờ nguyên vật liệu": "bg-purple-50 text-purple-700",
-  "Đang sản xuất": "bg-amber-50 text-amber-700",
-  "Hoàn thành": "bg-emerald-50 text-emerald-700",
-  "Đã hủy": "bg-rose-50 text-rose-700",
-  "Hoạt động": "bg-emerald-50 text-emerald-700",
-  "Không hoạt động": "bg-rose-50 text-rose-700",
-  "Bảo trì": "bg-amber-50 text-amber-700",
-  "Ngừng": "bg-rose-50 text-rose-700",
-  // Trạng thái sản xuất của máy (suy ra động)
-  "Chờ sản xuất": "bg-slate-100 text-slate-600",
-  "Mới": "bg-blue-50 text-blue-700",
-  // Trạng thái đơn hàng (vòng đời SX → giao → thanh toán)
-  "Hoàn thành sản xuất": "bg-teal-50 text-teal-700",
-  "Chuyển hàng 1 phần": "bg-amber-50 text-amber-700",
-  "Đang vận chuyển": "bg-indigo-50 text-indigo-700",
-  "Đã vận chuyển, chưa thanh toán": "bg-orange-50 text-orange-700",
-  "Đã thanh toán": "bg-cyan-50 text-cyan-700",
-  // Phiếu giao hàng & thanh toán
-  "Bản nháp": "bg-slate-100 text-slate-600",
-  "Giao hàng": "bg-emerald-50 text-emerald-700",
-  "Đã xuất hóa đơn": "bg-blue-50 text-blue-700",
-  "Chờ thanh toán": "bg-amber-50 text-amber-700",
-  "Đã thanh toán 1 phần": "bg-orange-50 text-orange-700",
+  // xám — chờ / nháp
+  "Chờ duyệt": BADGE.gray,
+  "Chờ sản xuất": BADGE.gray,
+  "Bản nháp": BADGE.gray,
+  "Chờ cân": BADGE.gray,
+  // xanh dương — đang làm / đã lên kế hoạch
+  "Mới": BADGE.blue,
+  "Đã lên kế hoạch": BADGE.blue,
+  "Đang sản xuất": BADGE.blue,
+  "Đang tái chế": BADGE.blue,
+  "Đang vận chuyển": BADGE.blue,
+  "Đã xuất hóa đơn": BADGE.blue,
+  // vàng — cần chú ý / 1 phần
+  "Chờ nguyên vật liệu": BADGE.amber,
+  "Bảo trì": BADGE.amber,
+  "Chuyển hàng 1 phần": BADGE.amber,
+  "Đã vận chuyển, chưa thanh toán": BADGE.amber,
+  "Chờ thanh toán": BADGE.amber,
+  "Đã thanh toán 1 phần": BADGE.amber,
+  // xanh lá — xong / đã thanh toán
+  "Hoàn thành": BADGE.green,
+  "Hoàn thành sản xuất": BADGE.green,
+  "Giao hàng": BADGE.green,
+  "Đã thanh toán": BADGE.green,
+  "Hoạt động": BADGE.green,
+  // đỏ — hủy / ngừng
+  "Đã hủy": BADGE.red,
+  "Ngừng": BADGE.red,
+  "Không hoạt động": BADGE.red,
 };
 
 export function statusClass(status) {
