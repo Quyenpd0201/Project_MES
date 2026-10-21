@@ -132,7 +132,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
         mids.forEach((mId, i) => {
           let chosenMId = mId;
           if (!chosenMId) {
-             const wantWs = s.workshop || (stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi");
+             const wantWs = s.workshop || stageFactory(stage);
              if (chosen[wantWs]) chosenMId = chosen[wantWs];
              else {
                let pool = avail.filter((m) => m.status === "Hoạt động" && m.factory === wantWs);
@@ -150,7 +150,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
           const taskQty = (i === mids.length - 1 && baseQty > 0) ? (baseQty - qtyPerTask * (mids.length - 1)) : qtyPerTask;
 
           // Kế thừa đội/công nhân CHỈ khi cùng nhà máy với công đoạn (1 công nhân chỉ thuộc 1 nhà máy)
-          const stageTeam = stage === "Cắt" ? "Nhà máy cắt" : "Nhà máy thổi";
+          const stageTeam = stageFactory(stage);
           const teamMatch = defaults.assigned_team && defaults.assigned_team === stageTeam;
           newTasks.push({
             _k: Date.now() + seq, stage, quantity: taskQty, actual_qty: "", scrap_qty: "",

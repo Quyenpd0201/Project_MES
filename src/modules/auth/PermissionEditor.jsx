@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { FACTORIES } from "../../productionDefaults.js";
 import {
   ShieldCheck, Search, Edit, Trash2, X, ChevronRight, ChevronDown,
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
@@ -478,8 +479,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                           <option value="">-- Chọn {actVal.scope === "FACTORY" ? "Nhà máy" : "Kho"} --</option>
                                           {actVal.scope === "FACTORY" ? (
                                             <>
-                                              <option value="Nhà máy thổi">Nhà máy thổi</option>
-                                              <option value="Nhà máy cắt">Nhà máy cắt</option>
+                                              {FACTORIES.map((x) => <option key={x} value={x}>{x}</option>)}
                                               <option value="Nhà máy in">Nhà máy in</option>
                                             </>
                                           ) : (
