@@ -50,7 +50,7 @@ function Pager({ page, totalPages, onChange }) {
         p === "…"
           ? <span key={`e${i}`} className="px-1 text-slate-400 text-xs">…</span>
           : <button key={p} onClick={() => onChange(p)}
-            className={`w-7 h-7 rounded text-xs font-medium transition-colors ${p === page ? "bg-indigo-600 text-white" : "text-slate-600 hover:bg-slate-100"
+            className={`w-7 h-7 rounded text-xs font-medium transition-colors ${p === page ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-100"
               }`}>{p}</button>
       )}
       <button
@@ -68,7 +68,7 @@ function KpiCard({ label, value, sub, icon: Icon, color = "blue", extra }) {
     green: ["bg-emerald-50", "text-emerald-500", "text-emerald-700"],
     amber: ["bg-amber-50", "text-amber-500", "text-amber-700"],
     rose: ["bg-rose-50", "text-rose-500", "text-rose-700"],
-    indigo: ["bg-indigo-50", "text-indigo-500", "text-indigo-700"],
+    indigo: ["bg-blue-50", "text-blue-500", "text-blue-700"],
   }[color] || ["bg-blue-50", "text-blue-500", "text-blue-700"];
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-start gap-3">
@@ -389,7 +389,7 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
                     <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <Tooltip content={<ChartTooltip />} />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                    <Bar dataKey="actual_qty" name="Thực tế" fill="#6366f1" radius={[3, 3, 0, 0]} maxBarSize={32} />
+                    <Bar dataKey="actual_qty" name="Thực tế" fill="#0055b3" radius={[3, 3, 0, 0]} maxBarSize={32} />
                     <Line type="monotone" dataKey="planned_qty" name="Kế hoạch" stroke="#cbd5e1" strokeWidth={2} dot={false} strokeDasharray="5 3" />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -424,23 +424,23 @@ function EmployeeDetail({ workerData, detail, loading, onClose }) {
             const t = today();
             const todayTasks = tasks.filter(x => x.planned_date && x.planned_date.startsWith(t));
             return (
-              <div className="bg-white rounded-xl border border-indigo-200 shadow-sm overflow-hidden mb-6">
-                <div className="px-5 py-3.5 bg-indigo-50/50 border-b border-indigo-100 flex items-center justify-between">
+              <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden mb-6">
+                <div className="px-5 py-3.5 bg-blue-50/50 border-b border-blue-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
                       <CalendarDays size={16} />
                     </div>
                     <div>
-                      <p className="font-bold text-indigo-900 text-sm">Lệnh làm việc hôm nay ({fmtDate(t)})</p>
-                      <p className="text-xs text-indigo-600/70 mt-0.5">{todayTasks.length} lệnh cần thực hiện</p>
+                      <p className="font-bold text-blue-900 text-sm">Lệnh làm việc hôm nay ({fmtDate(t)})</p>
+                      <p className="text-xs text-blue-600/70 mt-0.5">{todayTasks.length} lệnh cần thực hiện</p>
                     </div>
                   </div>
                 </div>
                 {todayTasks.length > 0 ? (
                   <WorkOrdersTable tasks={todayTasks} />
                 ) : (
-                  <div className="py-8 text-center text-indigo-400 text-sm flex flex-col items-center gap-2 bg-indigo-50/10">
-                    <CalendarDays size={24} className="text-indigo-300" />
+                  <div className="py-8 text-center text-blue-400 text-sm flex flex-col items-center gap-2 bg-blue-50/10">
+                    <CalendarDays size={24} className="text-blue-300" />
                     Không có lệnh làm việc hôm nay
                   </div>
                 )}
@@ -632,7 +632,7 @@ function EmployeeReportBody() {
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Thời gian</label>
               <select value={timeRange} onChange={e => handleTimeRangeChange(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
+                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40 bg-white">
                 <option value="week">Tuần này</option>
                 <option value="month">Tháng này</option>
               </select>
@@ -646,7 +646,7 @@ function EmployeeReportBody() {
                 <div key={label}>
                   <label className="block text-xs font-medium text-slate-500 mb-1">{label}</label>
                   <input type={type} value={value} onChange={e => set(e.target.value)}
-                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40" />
                 </div>
               ))}
             </>
@@ -656,7 +656,7 @@ function EmployeeReportBody() {
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Đội / Nhà máy</label>
                 <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
-                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40 bg-white">
+                  className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40 bg-white">
                   <option value="">Tất cả</option>
                   {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
@@ -669,11 +669,11 @@ function EmployeeReportBody() {
       {/* ── Chuyển giữa 2 báo cáo ── */}
       <div className="flex items-center gap-1 border-b border-slate-200">
         <button onClick={() => setReportTab("overview")}
-          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "overview" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "overview" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
           <Users size={16} /> Báo cáo chung
         </button>
         <button onClick={() => setReportTab("detail")}
-          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "detail" ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${reportTab === "detail" ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
           <User size={16} /> Báo cáo chi tiết từng nhân viên
         </button>
       </div>
@@ -701,7 +701,7 @@ function EmployeeReportBody() {
                 {/* Search within list */}
                 <input value={nameFilter} onChange={e => { setNameFilter(e.target.value); setEmpPage(1); }}
                   placeholder="Tìm tên nhân viên…"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                  className="w-full border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40" />
               </div>
 
               {/* Employee rows */}
@@ -719,12 +719,12 @@ function EmployeeReportBody() {
                     const rank = (empPage - 1) * EMP_PER_PAGE + idx + 1;
                     return (
                       <button key={w.worker} onClick={() => handleSelectWorker(w)}
-                        className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 ${isSelected ? "bg-indigo-50 border-l-4 border-indigo-500" : "border-l-4 border-transparent"
+                        className={`w-full text-left px-4 py-3 transition-colors hover:bg-slate-50 ${isSelected ? "bg-blue-50 border-l-4 border-blue-500" : "border-l-4 border-transparent"
                           }`}
                       >
                         <div className="flex items-center gap-2.5">
                           {/* Avatar */}
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600"
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
                             }`}>
                             {rank <= 3 && !isSelected
                               ? ["🥇", "🥈", "🥉"][rank - 1]
@@ -732,7 +732,7 @@ function EmployeeReportBody() {
                           </div>
                           {/* Name + team */}
                           <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-semibold truncate ${isSelected ? "text-indigo-700" : "text-slate-800"}`}>
+                            <p className={`text-xs font-semibold truncate ${isSelected ? "text-blue-700" : "text-slate-800"}`}>
                               {w.worker}
                             </p>
                             <p className="text-xs text-slate-400 truncate">{w.team || w.stages || "—"}</p>
@@ -804,7 +804,7 @@ function EmployeeReportBody() {
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
                       {tile("Nhân viên", workers.length, "text-slate-800")}
                       {tile("Lệnh / việc", totLenh)}
-                      {tile("Tổng sản lượng", fmt(totSL) + " kg", "text-indigo-600")}
+                      {tile("Tổng sản lượng", fmt(totSL) + " kg", "text-blue-600")}
                       {tile("Tổng phế", fmt(totPhe) + " kg", "text-rose-600")}
                       {tile("Phế / 1kg (TB)", ratio.toFixed(3), "text-amber-600")}
                     </div>
@@ -865,7 +865,7 @@ function EmployeeReportBody() {
 
                 return (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-                    <Criterion title="Sản lượng" sub="kg thành phẩm — cao nhất dẫn đầu" color="#6366f1"
+                    <Criterion title="Sản lượng" sub="kg thành phẩm — cao nhất dẫn đầu" color="#0055b3"
                       rows={bySL} valOf={(w) => Number(w.actual_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
                     <Criterion title="Ít phế nhất" sub="kg phế — ít nhất được vinh danh" color="#10b981"
                       rows={byPhe} valOf={(w) => Number(w.scrap_qty)} fmtVal={(v) => `${fmt(v)} kg`} />
@@ -885,8 +885,8 @@ function EmployeeReportBody() {
             />
           ) : (
             <div className="bg-white rounded-xl border border-slate-200 p-10 flex flex-col items-center justify-center text-center text-slate-400 min-h-[300px]">
-              <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mb-3">
-                <User size={24} className="text-indigo-400" />
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-3">
+                <User size={24} className="text-blue-400" />
               </div>
               <p className="font-semibold text-slate-600 mb-1">Chọn một nhân viên</p>
               <p className="text-sm">Bấm một nhân viên ở danh sách bên trái để xem báo cáo chi tiết cá nhân</p>

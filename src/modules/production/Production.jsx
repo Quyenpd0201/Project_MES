@@ -815,7 +815,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                           <td className="py-2 pr-2 font-medium text-slate-500 cursor-pointer" onClick={() => toggleStage(stg)} title="Tổng sản lượng cho phép của các lần (kế hoạch)">Σ KH {fmt(sumQty)}</td>
                           <td colSpan={4} className="cursor-pointer py-2 pr-2" onClick={() => toggleStage(stg)}>
                             {stg === "Cắt" && rollAvail && (
-                              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-0.5">
+                              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5">
                                 🧵 Tồn cuộn khả dụng: {fmt(rollAvail.total_kg)} kg ({rollAvail.spec_label})
                               </span>
                             )}
@@ -926,7 +926,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                 {cutModal.lots.map((lot) => (
                   <label key={lot.lot_code} className="flex items-center justify-between gap-3 p-2.5 cursor-pointer hover:bg-slate-50">
                     <span>
-                      <b>{lot.lot_code}</b>{lot.is_own ? <span className="ml-1 text-xs text-indigo-600">(lô của lệnh)</span> : ""}
+                      <b>{lot.lot_code}</b>{lot.is_own ? <span className="ml-1 text-xs text-blue-600">(lô của lệnh)</span> : ""}
                       <span className="text-slate-500"> · {lot.location} · {fmt(lot.qty)} kg</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-xs">

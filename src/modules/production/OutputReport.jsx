@@ -27,7 +27,7 @@ const monthStart = monthStartYmd;
 const STATUS_COLORS = {
   "Chờ duyệt": "#94a3b8",
   "Đã lên kế hoạch": "#3b82f6",
-  "Chờ nguyên vật liệu": "#a855f7",
+  "Chờ nguyên vật liệu": "#b45309", // amber đậm (cảnh báo) — khác "Đang sản xuất"
   "Đang sản xuất": "#f59e0b",
   "Hoàn thành": "#10b981",
   "Đã hủy": "#ef4444",

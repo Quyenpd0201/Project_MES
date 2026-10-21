@@ -139,7 +139,7 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
           <div className="min-w-0">
             <div className="text-xl font-extrabold text-slate-900 leading-tight">
               {t.product_name}
-              {t.material_type && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200 align-middle mb-1">{t.material_type}</span>}
+              {t.material_type && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200 align-middle mb-1">{t.material_type}</span>}
             </div>
             <div className="text-xs text-slate-400">{t.product_code}</div>
           </div>
@@ -170,9 +170,9 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
 
         {/* Tỷ lệ pha */}
         {t.material_type === 'pha' && t.mix_ratio && t.mix_ratio.length > 0 && (
-          <div className="rounded-lg bg-indigo-50 border border-indigo-200 overflow-hidden">
-            <div className="px-3 py-2 bg-indigo-100/50 border-b border-indigo-200">
-              <span className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">Tỷ lệ pha Nguyên vật liệu</span>
+          <div className="rounded-lg bg-blue-50 border border-blue-200 overflow-hidden">
+            <div className="px-3 py-2 bg-blue-100/50 border-b border-blue-200">
+              <span className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">Tỷ lệ pha Nguyên vật liệu</span>
             </div>
             <div className="p-0">
               <table className="w-full text-sm text-left">
@@ -180,9 +180,9 @@ function TaskCard({ t, canEdit, onSaved, lookups }) {
                   {t.mix_ratio.map((r, idx) => {
                     const materialName = lookups?.products?.find(p => p.id === r.material_id)?.product_name || "Vật tư không xác định";
                     return (
-                      <tr key={idx} className="border-b border-indigo-100 last:border-0">
-                        <td className="px-3 py-1.5 text-indigo-900 font-medium">{materialName}</td>
-                        <td className="px-3 py-1.5 text-indigo-700 text-right font-bold w-20">{r.ratio}%</td>
+                      <tr key={idx} className="border-b border-blue-100 last:border-0">
+                        <td className="px-3 py-1.5 text-blue-900 font-medium">{materialName}</td>
+                        <td className="px-3 py-1.5 text-blue-700 text-right font-bold w-20">{r.ratio}%</td>
                       </tr>
                     );
                   })}

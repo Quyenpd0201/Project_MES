@@ -183,7 +183,7 @@ function KpiReport() {
                 <XAxis dataKey="date" fontSize={12} tickMargin={10} />
                 <YAxis fontSize={12} domain={[0, 100]} />
                 <Tooltip />
-                <Line type="monotone" dataKey="perf" name="% Hoàn thành" stroke="#8b5cf6" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
+                <Line type="monotone" dataKey="perf" name="% Hoàn thành" stroke="#0ea5e9" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -204,7 +204,7 @@ function KpiReport() {
                 <XAxis dataKey="name" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="value" name="Số lượng" fill="#6366f1" radius={[4,4,0,0]} barSize={40} />
+                <Bar dataKey="value" name="Số lượng" fill="#0055b3" radius={[4,4,0,0]} barSize={40} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -293,7 +293,7 @@ function KpiCard({ title, value, color }) {
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
     emerald: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     amber: 'bg-amber-50 text-amber-700 border-amber-200',
-    purple: 'bg-purple-50 text-purple-700 border-purple-200'
+    purple: 'bg-blue-50 text-blue-700 border-blue-200'
   };
   return (
     <div className={`p-6 rounded-xl border ${colors[color]} shadow-sm`}>
@@ -311,7 +311,7 @@ const STATUS_COLORS_CHART = {
   'Đang sản xuất': '#f59e0b',
   'Chờ duyệt':    '#94a3b8',
   'Đã lên kế hoạch': '#3b82f6',
-  'Chờ nguyên vật liệu': '#a855f7',
+  'Chờ nguyên vật liệu': '#b45309', // amber đậm (cảnh báo) — khác 'Đang sản xuất'
   'Hoàn thành':   '#10b981',
   'Đã hủy':       '#ef4444',
   'Quá hạn':      '#ef4444',

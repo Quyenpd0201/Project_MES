@@ -18,7 +18,7 @@ import { usePerm } from "../../perm.jsx";
 // ĐVT chuẩn để so khớp ("Kg" / "kg " → "kg"); trống → "—"
 const unitOf = (u) => (u || "").trim().toLowerCase() || "—";
 
-const DONUT_COLORS =["#3b82f6", "#10b981", "#f59e0b", "#6366f1", "#ec4899", "#14b8a6"];
+const DONUT_COLORS =["#3b82f6", "#10b981", "#f59e0b", "#64748b", "#ec4899", "#14b8a6"];
 
 /* ─── KPI Card ─────────────────────────────────────────────────── */
 function KpiCard({ label, value, sub, icon: Icon, color = "blue", trend }) {
@@ -27,7 +27,7 @@ function KpiCard({ label, value, sub, icon: Icon, color = "blue", trend }) {
     green: { bg: "bg-emerald-50", icon: "text-emerald-500", val: "text-emerald-700", border: "border-emerald-100" },
     amber: { bg: "bg-amber-50",   icon: "text-amber-500",   val: "text-amber-700",   border: "border-amber-100" },
     rose:  { bg: "bg-rose-50",    icon: "text-rose-500",    val: "text-rose-700",    border: "border-rose-100" },
-    violet:{ bg: "bg-violet-50",  icon: "text-violet-500",  val: "text-violet-700",  border: "border-violet-100" },
+    violet:{ bg: "bg-sky-50",  icon: "text-sky-500",  val: "text-sky-700",  border: "border-sky-100" },
   };
   const c = palette[color] || palette.blue;
   return (
@@ -433,7 +433,7 @@ function InventoryReportBody({ lookups }) {
                   <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} />
                   <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="value" name="Tồn kho" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={40}>
+                  <Bar dataKey="value" name="Tồn kho" fill="#0055b3" radius={[4, 4, 0, 0]} barSize={40}>
                     {warehouseBarData.map((_, i) => (
                       <Cell key={i} fill={DONUT_COLORS[i % DONUT_COLORS.length]} />
                     ))}

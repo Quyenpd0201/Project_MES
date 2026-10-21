@@ -25,7 +25,7 @@ const C = { overdue: "#e11d48", intime: "#0a63b8", good: "#10b981", violet: "#7c
 const ACCENTS = {
   blue: { chip: "bg-blue-50 text-blue-600 ring-blue-100" },
   emerald: { chip: "bg-emerald-50 text-emerald-600 ring-emerald-100" },
-  violet: { chip: "bg-violet-50 text-violet-600 ring-violet-100" },
+  violet: { chip: "bg-sky-50 text-sky-600 ring-sky-100" },
   rose: { chip: "bg-rose-50 text-rose-600 ring-rose-100" },
   amber: { chip: "bg-amber-50 text-amber-600 ring-amber-100" },
   slate: { chip: "bg-slate-50 text-slate-500 ring-slate-200" },
@@ -758,7 +758,7 @@ function SalesView({ s, r, period }) {
                       {s.deliveries.map((d) => (
                         <tr key={d.id} className="transition hover:bg-slate-50/50">
                           <td className="px-4 py-3 text-slate-500 tabular-nums">{fmtDate(d.date)}</td>
-                          <td className="px-4 py-3 font-medium text-violet-600">{d.code}</td>
+                          <td className="px-4 py-3 font-medium text-sky-600">{d.code}</td>
                           <td className="px-4 py-3 text-slate-700">{d.customer || "—"}</td>
                           <td className="px-4 py-3 text-right font-medium tabular-nums text-slate-900">{fmt(d.total)}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-emerald-600">{d.paid > 0 ? fmt(d.paid) : "—"}</td>
@@ -1019,7 +1019,7 @@ const MEDALS = [
 /* 3 tiêu chí xếp hạng — CÙNG thứ tự & màu với màn Hiệu suất nhân viên */
 const fmt3 = (v) => Number(v || 0).toFixed(3);
 const STAFF_CRITERIA = [
-  { key: "output", label: "Sản lượng", desc: "kg thành phẩm — cao nhất dẫn đầu", color: "#6366f1",
+  { key: "output", label: "Sản lượng", desc: "kg thành phẩm — cao nhất dẫn đầu", color: "#0055b3",
     sort: (a, b) => b.output - a.output, val: (x) => x.output, show: (v) => <>{fmt(v)} <span className="text-xs font-medium text-slate-400">kg</span></> },
   { key: "scrap", label: "Ít phế nhất", desc: "kg phế — ít nhất được vinh danh", color: "#10b981",
     sort: (a, b) => a.scrap - b.scrap, val: (x) => x.scrap, show: (v) => <>{fmt(v)} <span className="text-xs font-medium text-slate-400">kg</span></> },

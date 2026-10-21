@@ -201,7 +201,7 @@ function IndeterminateCheckbox({ checked, indeterminate, onChange, id, className
       type="checkbox"
       checked={!!checked}
       onChange={onChange}
-      className={`w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600 flex-shrink-0 ${className}`}
+      className={`w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 flex-shrink-0 ${className}`}
     />
   );
 }
@@ -361,7 +361,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                   return (
                     <div key={mod.key}>
                       {/* Module Row */}
-                      <div className="flex items-center gap-2 pl-8 pr-3 py-2 hover:bg-indigo-50/30 transition-colors">
+                      <div className="flex items-center gap-2 pl-8 pr-3 py-2 hover:bg-blue-50/30 transition-colors">
                         <IndeterminateCheckbox
                           checked={modState === "ALL"}
                           indeterminate={modState === "PARTIAL"}
@@ -373,7 +373,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                         >
                           <span className="text-sm font-semibold text-slate-700 truncate">{mod.label}</span>
                           <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border flex-shrink-0 ${
-                            modState === "ALL"     ? "bg-indigo-50 text-indigo-600 border-indigo-200" :
+                            modState === "ALL"     ? "bg-blue-50 text-blue-600 border-blue-200" :
                             modState === "PARTIAL" ? "bg-amber-50 text-amber-600 border-amber-200" :
                                                      "bg-slate-50 text-slate-400 border-slate-200"
                           }`}>
@@ -402,7 +402,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
 
                               return (
                                 <div key={actKey} className={`rounded-lg border transition-colors ${
-                                  isChecked    ? "bg-white border-indigo-200 shadow-sm" :
+                                  isChecked    ? "bg-white border-blue-200 shadow-sm" :
                                   isInherited  ? "bg-blue-50/60 border-blue-200" :
                                                  "bg-white border-slate-100"
                                 }`}>
@@ -411,13 +411,13 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                       type="checkbox"
                                       checked={isChecked}
                                       onChange={() => handleToggleAction(mod.key, actKey)}
-                                      className="w-4 h-4 mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600 flex-shrink-0"
+                                      className="w-4 h-4 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 flex-shrink-0"
                                     />
                                     <div className="flex-1 min-w-0">
                                       {/* Action label + badges */}
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <span className={`text-sm font-semibold ${
-                                          isChecked   ? "text-indigo-700" :
+                                          isChecked   ? "text-blue-700" :
                                           isInherited ? "text-blue-600"   : "text-slate-500"
                                         }`}>
                                           {ACTION_LABELS[actKey] || actKey}
@@ -441,7 +441,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                         <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
                                           {path}
                                         </span>
-                                        <span className="text-[10px] font-mono text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                                        <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-blue-100">
                                           {permCode}
                                         </span>
                                       </div>
@@ -456,13 +456,13 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                           const sel = (actVal?.scope || "ALL") === s.code;
                                           return (
                                             <label key={s.code} className={`flex items-center gap-1 px-2 py-1 rounded border cursor-pointer text-[10px] transition-colors ${
-                                              sel ? "bg-indigo-50 border-indigo-400 text-indigo-700 font-semibold" :
+                                              sel ? "bg-blue-50 border-blue-400 text-blue-700 font-semibold" :
                                                     "bg-white border-slate-200 text-slate-500 hover:bg-slate-50"
                                             }`}>
                                               <input type="radio" name={`scope_${mod.key}_${actKey}`} className="hidden"
                                                 checked={sel} onChange={() => handleChangeScope(mod.key, actKey, "scope", s.code)} />
-                                              <div className={`w-2.5 h-2.5 rounded-full border flex items-center justify-center flex-shrink-0 ${sel ? "border-indigo-500" : "border-slate-300"}`}>
-                                                {sel && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+                                              <div className={`w-2.5 h-2.5 rounded-full border flex items-center justify-center flex-shrink-0 ${sel ? "border-blue-500" : "border-slate-300"}`}>
+                                                {sel && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                                               </div>
                                               {s.label}
                                             </label>
@@ -471,7 +471,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                       </div>
                                       {(actVal?.scope === "FACTORY" || actVal?.scope === "WAREHOUSE") && (
                                         <select
-                                          className="mt-2 w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                                          className="mt-2 w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 outline-none"
                                           value={actVal?.scopeValue || ""}
                                           onChange={e => handleChangeScope(mod.key, actKey, "scopeValue", e.target.value)}
                                         >
@@ -558,7 +558,7 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
           <button onClick={() => setDraft(initialPerms || {})} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium rounded-lg flex items-center gap-2 transition-colors text-sm">
             <RotateCcw size={15} /> Đặt lại
           </button>
-          <button onClick={() => guard(() => onSave(draft))} disabled={saving} className="px-5 py-2 disabled:opacity-60 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors text-sm shadow-md">
+          <button onClick={() => guard(() => onSave(draft))} disabled={saving} className="btn-primary disabled:opacity-60">
             <Save size={15} /> {saving ? "Đang lưu…" : "Lưu cấu hình"}
           </button>
         </div>
@@ -570,12 +570,12 @@ export function PermissionEditor({ roleName, initialPerms, onSave, onCancel }) {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền..." value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none" />
         </div>
         <button onClick={handleSelectAll} className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium whitespace-nowrap">Chọn tất cả</button>
         <button onClick={() => { if (window.confirm("Bỏ hết tất cả quyền?")) setDraft({}); }} className="px-3 py-2 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-medium whitespace-nowrap">Bỏ hết</button>
         <span className="text-sm text-slate-500 whitespace-nowrap">
-          <span className="font-bold text-indigo-600">{totalSelected}</span> quyền đã chọn
+          <span className="font-bold text-blue-600">{totalSelected}</span> quyền đã chọn
         </span>
       </div>
 
@@ -643,12 +643,12 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
         {open && <DialogBehavior onClose={onClose} dirty={drawerDirty} />}
         
         {/* Drawer Header */}
-        <div className="px-6 py-4 border-b border-indigo-700 bg-blue-600 flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-4 border-b border-blue-700 bg-blue-600 flex items-center justify-between flex-shrink-0">
           <div className="min-w-0">
-            <div className="text-indigo-200 text-xs font-medium uppercase tracking-wide">Cấu hình quyền</div>
+            <div className="text-blue-200 text-xs font-medium uppercase tracking-wide">Cấu hình quyền</div>
             <div className="text-white font-bold text-lg truncate">{roleName}</div>
           </div>
-          <button onClick={(e) => confirmClose(e, onClose)} className="p-2 text-indigo-200 hover:text-white hover:bg-indigo-500 rounded-lg transition-colors ml-4 flex-shrink-0">
+          <button onClick={(e) => confirmClose(e, onClose)} className="p-2 text-blue-200 hover:text-white hover:bg-blue-500 rounded-lg transition-colors ml-4 flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -659,7 +659,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" placeholder="Tìm chức năng, thao tác, mã quyền (vd: bom.create)..." value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white" />
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 outline-none bg-white" />
           </div>
           <div className="flex items-center gap-1.5">
             <IndeterminateCheckbox
@@ -676,7 +676,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
 
         {/* Stats bar */}
         <div className="px-4 py-2 bg-white border-b border-slate-100 flex items-center gap-5 flex-shrink-0 text-xs text-slate-500">
-          <span><span className="font-bold text-indigo-600 text-sm">{totalSelected}</span> quyền đang chọn</span>
+          <span><span className="font-bold text-blue-600 text-sm">{totalSelected}</span> quyền đang chọn</span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" /> 🟢 Trực tiếp
           </span>
@@ -706,7 +706,7 @@ function PermissionDrawer({ open, onClose, roleName, initialPerms, onSave, inher
             </button>
             <button
               onClick={() => guard(() => onSave(draft))} disabled={saving}
-              className="px-6 py-2 disabled:opacity-60 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg flex items-center gap-2 shadow-md transition-colors"
+              className="px-6 py-2 disabled:opacity-60 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg flex items-center gap-2 shadow-md transition-colors"
             >
               <Save size={15} /> {saving ? "Đang lưu…" : "Lưu cấu hình"}
             </button>
@@ -871,7 +871,7 @@ export default function PermissionsModule() {
           <div className="flex-1 min-w-[250px]">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Vai trò đang chọn</label>
             <select
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 outline-none"
               value={roleId} onChange={e => selectRole(e.target.value)}
             >
               <option value="">-- Chọn vai trò --</option>
@@ -881,7 +881,7 @@ export default function PermissionsModule() {
           <div className="flex-1 min-w-[250px]">
             <label className="block text-sm font-medium text-slate-500 mb-2">Kế thừa quyền từ</label>
             <select
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 focus:ring-indigo-500 outline-none"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 focus:ring-blue-500 outline-none"
               value={parentId}
               disabled={!roleId}
               // A-03: đổi chỉ là bản nháp — lưu bằng nút "Lưu kế thừa" (hoặc cùng "Lưu cấu hình")
@@ -911,7 +911,7 @@ export default function PermissionsModule() {
             <button
               onClick={() => setDrawerOpen(true)}
               disabled={!roleId}
-              className="h-[38px] px-5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm"
+              className="h-[38px] px-5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors shadow-sm text-sm"
             >
               <Edit size={16} /> Cấu hình quyền
             </button>
@@ -931,7 +931,7 @@ export default function PermissionsModule() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
               { label: "Tổng quyền hệ thống", val: statTotal,    icon: "🔒", color: "text-slate-700",   bg: "bg-white",        border: "border-slate-200" },
-              { label: "Quyền được cấp",       val: statGranted,  icon: "✅", color: "text-indigo-600", bg: "bg-indigo-50",    border: "border-indigo-200" },
+              { label: "Quyền được cấp",       val: statGranted,  icon: "✅", color: "text-blue-600", bg: "bg-blue-50",    border: "border-blue-200" },
               { label: "Quyền kế thừa",        val: statInherited,icon: "🔵", color: "text-blue-600",   bg: "bg-blue-50",      border: "border-blue-200" },
               { label: "Quyền trực tiếp",      val: statDirect,   icon: "🟢", color: "text-emerald-600",bg: "bg-emerald-50",   border: "border-emerald-200" },
             ].map((k, i) => (
@@ -950,10 +950,10 @@ export default function PermissionsModule() {
             {/* Panel header */}
             <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <ShieldCheck size={18} className="text-indigo-500" />
+                <ShieldCheck size={18} className="text-blue-500" />
                 Chi tiết quyền của vai trò
                 {statGranted > 0 && (
-                  <span className="bg-indigo-50 text-indigo-600 text-xs font-bold px-2 py-0.5 rounded-full border border-indigo-100">
+                  <span className="bg-blue-50 text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-100">
                     {statGranted} quyền
                   </span>
                 )}
@@ -964,7 +964,7 @@ export default function PermissionsModule() {
                   placeholder="Tìm quyền, mã API..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
               </div>
             </div>
@@ -988,11 +988,11 @@ export default function PermissionsModule() {
                         className="flex items-center gap-3 px-4 py-3 bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors select-none"
                         onClick={() => setExpandedCats(p => ({ ...p, [cat.category]: !isCatExpand }))}
                       >
-                        <div className="w-7 h-7 rounded-md bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 flex-shrink-0">
+                        <div className="w-7 h-7 rounded-md bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 flex-shrink-0">
                           <cat.icon size={14} />
                         </div>
                         <span className="font-bold text-slate-700 text-sm">{cat.category}</span>
-                        <span className="text-xs bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full font-semibold">
+                        <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-semibold">
                           {catGranted} quyền
                         </span>
                         <div className="ml-auto">
@@ -1017,7 +1017,7 @@ export default function PermissionsModule() {
                               <div key={mod.key}>
                                 {/* Module row */}
                                 <div
-                                  className="flex items-center gap-3 pl-12 pr-4 py-2.5 cursor-pointer hover:bg-indigo-50/30 transition-colors select-none"
+                                  className="flex items-center gap-3 pl-12 pr-4 py-2.5 cursor-pointer hover:bg-blue-50/30 transition-colors select-none"
                                   onClick={() => setExpandedMods(p => ({ ...p, [mod.key]: !p[mod.key] }))}
                                 >
                                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
@@ -1085,7 +1085,7 @@ export default function PermissionsModule() {
                                               <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
                                                 {path}
                                               </span>
-                                              <span className="text-[10px] font-mono text-purple-500 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+                                              <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-blue-100">
                                                 {permCode}
                                               </span>
                                             </div>
