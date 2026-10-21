@@ -4,7 +4,7 @@ import { production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory, machinesForStage } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, DialogBehavior, confirmClose, useRemembered } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, DialogBehavior, confirmClose, useRemembered, DateInput } from "../../components.jsx";
 import { PackageCheck, CheckCircle2, Lock, RotateCcw } from "lucide-react";
 import Qr from "../../Qr.jsx";
 import { SpecFields } from "../../SpecFields.jsx";
@@ -542,7 +542,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
             )}
           </Field>
           <Field label="Ngày giao (deadline)">
-            <input type="date" className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
+            <DateInput className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
           </Field>
           {!fhid("priority") && <Field label="Độ ưu tiên">
             <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
@@ -851,7 +851,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved }) {
                               })()}
                             </td>
                             <td className="py-1.5 pr-2"><select disabled={dis} className={cellCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{stageMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
-                            <td className="py-1.5 pr-2"><input disabled={dis} type="date" className={cellCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
+                            <td className="py-1.5 pr-2"><DateInput disabled={dis} className={cellCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
                             {/* Cột Đội đã ẨN (dữ liệu assigned_team vẫn giữ). Công nhân: người của nhà máy theo
                                 công đoạn xếp trên, người khác xếp dưới — không chặn ai. */}
                             <td className="py-1.5 pr-2">
@@ -1053,7 +1053,7 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
                           </select>
                         </td>
                         <td className="px-3 py-2">
-                          <input disabled={dis} type="date" className={inputCls} value={t.planned_date?.slice(0, 10) || ""} onChange={e => setTask(t.id, "planned_date", e.target.value)} />
+                          <DateInput disabled={dis} className={inputCls} value={t.planned_date?.slice(0, 10) || ""} onChange={e => setTask(t.id, "planned_date", e.target.value)} />
                         </td>
                         <td className="px-3 py-2">
                           <input disabled={dis} className={inputCls} placeholder="VD: Ca 1" value={t.shift || ""} onChange={e => setTask(t.id, "shift", e.target.value)} />

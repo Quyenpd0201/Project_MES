@@ -244,7 +244,7 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
 
             <div className="grid grid-cols-2 gap-3">
               <div><label className="block text-sm font-medium text-slate-600 mb-1.5">Ngày bắt đầu sản xuất</label>
-                <input type="date" className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} />
+                <DateInput className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} />
               </div>
             </div>
 
@@ -627,12 +627,12 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <label>
                     <span className="block text-xs font-medium text-slate-500 mb-1">Bắt đầu dự kiến</span>
-                    <input type="date" className={inputCls} disabled={fdis("items")} value={it.planned_start_date || ""}
+                    <DateInput className={inputCls} disabled={fdis("items")} value={it.planned_start_date || ""}
                       onChange={(e) => upItem(it._k, "planned_start_date", e.target.value)} />
                   </label>
                   <label>
                     <span className="block text-xs font-medium text-slate-500 mb-1">Kết thúc dự kiến</span>
-                    <input type="date" className={inputCls} disabled={fdis("items")} value={it.planned_end_date || ""}
+                    <DateInput className={inputCls} disabled={fdis("items")} value={it.planned_end_date || ""}
                       onChange={(e) => upItem(it._k, "planned_end_date", e.target.value)} />
                   </label>
                   <div>

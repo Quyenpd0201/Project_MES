@@ -4,7 +4,7 @@ import {
   X, User, Users, CalendarDays, Factory, ShoppingCart, Tag, ClipboardList, Layers,
   ChevronRight, AlertCircle,
 } from "lucide-react";
-import { ListHeader, Section, DataTable, SearchSelect, useRemembered, DialogBehavior } from "../../components.jsx";
+import { ListHeader, Section, DataTable, SearchSelect, useRemembered, DialogBehavior, DateInput } from "../../components.jsx";
 import { production, scrap as scrapApi } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast, todayYmd, monthStartYmd } from "../../ui.js";
 import * as XLSX from "xlsx";
@@ -670,12 +670,12 @@ function OutputReportBody({ lookups }) {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Từ ngày</label>
-            <input type="date" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            <DateInput className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
               value={from} onChange={e => setFrom(e.target.value)} />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Đến ngày</label>
-            <input type="date" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            <DateInput className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40"
               value={to} onChange={e => setTo(e.target.value)} />
           </div>
           <div>

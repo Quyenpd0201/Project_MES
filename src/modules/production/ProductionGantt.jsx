@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { LoadError } from "../../components.jsx";
+import { LoadError, DateInput } from "../../components.jsx";
 import { toast } from "../../ui.js";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { production } from "../../mesApi.js";
@@ -78,7 +78,7 @@ export default function ProductionGantt({ onOpenOrder }) {
           <button onClick={() => setAnchor(addDays(anchor, -span))} className="btn-ghost px-2"><ChevronLeft size={16} /></button>
           <span className="text-sm font-medium text-slate-700">{fmtDate(from)} → {fmtDate(to)}</span>
           <button onClick={() => setAnchor(addDays(anchor, span))} className="btn-ghost px-2"><ChevronRight size={16} /></button>
-          <input type="date" value={anchor} onChange={(e) => setAnchor(e.target.value)}
+          <DateInput value={anchor} onChange={(e) => setAnchor(e.target.value)}
             className="px-2 py-1.5 rounded-lg border border-slate-300 text-sm" />
         </div>
         <div className="flex items-center gap-2">

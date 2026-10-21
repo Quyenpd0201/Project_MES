@@ -3,7 +3,7 @@ import {
   Recycle, Plus, Trash2, Save, FileText, Scale, CheckCircle2, 
   ArrowRight, Box, Package, Calendar, User, X
 } from "lucide-react";
-import { ListHeader, DataTable, DialogBehavior, confirmClose } from "../../components.jsx";
+import { ListHeader, DataTable, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
 
@@ -239,7 +239,7 @@ Hoàn thành phiếu?`)) return;
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Ngày xuất</label>
-              <input type="date" className={inputCls} value={s1.export_date} onChange={e => setS1({...s1, export_date: e.target.value})} disabled={isCompleted || ticket} />
+              <DateInput className={inputCls} value={s1.export_date} onChange={e => setS1({...s1, export_date: e.target.value})} disabled={isCompleted || ticket} />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Kho phế phẩm</label>

@@ -4,7 +4,7 @@ import {
   BarChart2, FileText, CheckCircle2, TrendingUp, TrendingDown,
   RefreshCcw, ChevronDown, ChevronRight
 } from "lucide-react";
-import { PageHeader, DataTable, useRemembered } from "../../components.jsx";
+import { PageHeader, DataTable, useRemembered, DateInput } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -363,7 +363,7 @@ function ScrapForm({ worker, workerId, date, setDate, onOpenOrder, cameFromManag
           <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Ngày ghi nhận</label>
           <div className="relative">
             <Calendar className="absolute left-3 top-2.5 text-slate-400" size={18} />
-            <input type="date" className={inputCls + " pl-10 bg-slate-50 border-slate-200 focus:bg-white"} 
+            <DateInput className={inputCls + " pl-10 bg-slate-50 border-slate-200 focus:bg-white"} 
               value={date} onChange={e => setDate(e.target.value)} />
           </div>
         </div>
@@ -571,7 +571,7 @@ function ScrapManagement({ onEdit }) {
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-slate-100 flex flex-wrap gap-4 justify-between items-center bg-slate-50">
         <div className="flex items-center gap-4">
-          <input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
+          <DateInput className={inputCls} value={date} onChange={e => setDate(e.target.value)} />
           <input 
             type="text" 
             className={inputCls + " w-64"} 

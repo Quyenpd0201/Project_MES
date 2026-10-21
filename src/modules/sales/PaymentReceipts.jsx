@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { paymentReceipts as api } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast, todayYmd } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, SearchSelect } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, SearchSelect, DateInput } from "../../components.jsx";
 import { MoneyInput, DebtBanner, LevelBadge, vnd } from "./debtUi.jsx";
 
 const today = todayYmd; // ngày theo giờ VN (không dùng toISOString — lệch 1 ngày trước 7h sáng)
@@ -159,8 +159,8 @@ function ReceiptForm({ lookups, id, onBack, onSaved }) {
                   ))}
                 </div>
               </Field>
-              <Field label="Ngày thanh toán" required><input type="date" className={inputCls} value={f.pay_date} onChange={(e) => set("pay_date", e.target.value)} /></Field>
-              <Field label="Ngày xuất hóa đơn"><input type="date" className={inputCls} value={f.invoice_date} onChange={(e) => set("invoice_date", e.target.value)} /></Field>
+              <Field label="Ngày thanh toán" required><DateInput className={inputCls} value={f.pay_date} onChange={(e) => set("pay_date", e.target.value)} /></Field>
+              <Field label="Ngày xuất hóa đơn"><DateInput className={inputCls} value={f.invoice_date} onChange={(e) => set("invoice_date", e.target.value)} /></Field>
               <Field label="Số hóa đơn"><input className={inputCls} value={f.invoice_no} onChange={(e) => set("invoice_no", e.target.value)} placeholder="vd: 0001234" /></Field>
               <Field label="Người thanh toán"><input className={inputCls} value={f.payer_name} onChange={(e) => set("payer_name", e.target.value)} placeholder="Người bên khách trả tiền" /></Field>
               <Field label="Số đơn hàng" className="lg:col-span-2">

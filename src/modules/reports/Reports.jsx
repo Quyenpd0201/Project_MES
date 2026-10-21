@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PageHeader, ListHeader, Section, Pagination, usePager, LoadError } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, Pagination, usePager, LoadError, DateInput } from '../../components.jsx';
 import { reports } from '../../mesApi.js';
 import { Download, Activity, Factory, PieChart as PieChartIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -431,14 +431,14 @@ function DetailedReport() {
           {/* From date */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Từ ngày</label>
-            <input type="date" value={filters.fromDate}
+            <DateInput value={filters.fromDate}
               onChange={e => setFilters({ ...filters, fromDate: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
           </div>
           {/* To date */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Đến ngày</label>
-            <input type="date" value={filters.toDate}
+            <DateInput value={filters.toDate}
               onChange={e => setFilters({ ...filters, toDate: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500" />
           </div>

@@ -8,7 +8,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast, todayYmd } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 
 // Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
 // Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy — hàng trả lại dùng nút "Khách trả hàng" (nhập lại kho).
@@ -133,7 +133,7 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
           <div className="text-sm text-slate-500">Phiếu này chưa có dữ liệu xuất kho để trả.</div>
         ) : (<>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Field label="Ngày trả"><input type="date" className={inputCls} value={head.return_date} onChange={(e) => setHead((h) => ({ ...h, return_date: e.target.value }))} /></Field>
+            <Field label="Ngày trả"><DateInput className={inputCls} value={head.return_date} onChange={(e) => setHead((h) => ({ ...h, return_date: e.target.value }))} /></Field>
             <div className="md:col-span-2"><Field label="Lý do / ghi chú"><input className={inputCls} value={head.note} placeholder="VD: giao nhầm màu, hàng lỗi…" onChange={(e) => setHead((h) => ({ ...h, note: e.target.value }))} /></Field></div>
           </div>
           <div className="rounded-lg border border-slate-200 overflow-x-auto">
@@ -448,7 +448,7 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
               </select>
             </Field>
             {/* Ngày giao chốt = ngày bấm "Giao hàng" → sau đó khóa; không chọn ngày tương lai */}
-            <Field label="Ngày giao"><input type="date" className={inputCls} value={f.delivery_date} max={today()} disabled={!isDraft}
+            <Field label="Ngày giao"><DateInput className={inputCls} value={f.delivery_date} max={today()} disabled={!isDraft}
               title={!isDraft ? "Ngày giao đã chốt khi bấm Giao hàng" : undefined} onChange={(e) => set("delivery_date", e.target.value)} /></Field>
             <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             {showMoney && <Field label="Tổng tiền phiếu">

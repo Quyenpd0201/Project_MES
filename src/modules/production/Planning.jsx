@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
-import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
+import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
 import { planning, production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -113,7 +113,7 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Ngày bắt đầu sản xuất"><input type="date" className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} /></Field>
+          <Field label="Ngày bắt đầu sản xuất"><DateInput className={inputCls} value={planned_date} onChange={(e) => setPlannedDate(e.target.value)} /></Field>
         </div>
 
         {/* Phân bổ theo TỪNG công đoạn — mỗi công đoạn có máy/ca/đội/người riêng */}
