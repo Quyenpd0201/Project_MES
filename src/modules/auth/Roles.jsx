@@ -246,7 +246,7 @@ export default function RolesModule() {
 
       {editingUser && (
         <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
             <DialogBehavior onClose={() => setEditingUser(null)} />
             <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-indigo-50">
               <div>

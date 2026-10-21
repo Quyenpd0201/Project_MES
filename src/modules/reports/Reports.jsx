@@ -124,7 +124,7 @@ function KpiReport() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* A. Kế hoạch vs Thực tế */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-semibold mb-4 text-slate-800">A. Kế hoạch vs Thực tế (7 ngày)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -142,7 +142,7 @@ function KpiReport() {
         </div>
 
         {/* B. Tình trạng Lệnh SX */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-semibold mb-4 text-slate-800">B. Tình trạng Lệnh Sản Xuất</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -158,7 +158,7 @@ function KpiReport() {
         </div>
 
         {/* C. Sản lượng theo sản phẩm */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-semibold mb-4 text-slate-800">C. Top SL kế hoạch theo Sản phẩm</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +174,7 @@ function KpiReport() {
         </div>
 
         {/* D. Hiệu suất sản xuất */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
           <h3 className="text-base font-semibold mb-4 text-slate-800">D. Hiệu suất sản xuất (%)</h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -190,7 +190,7 @@ function KpiReport() {
         </div>
 
         {/* E. Tình trạng tồn kho */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
           <h3 className="text-base font-semibold mb-4 text-slate-800">E. Tình trạng tồn kho</h3>
           {charts.inventoryAlert > 0 && (
              <div className="absolute top-5 right-5 bg-rose-50 text-rose-600 text-xs font-semibold px-2 py-1 rounded-md border border-rose-200">
@@ -211,7 +211,7 @@ function KpiReport() {
         </div>
 
         {/* F. Tỷ lệ đạt chất lượng / Phế phẩm */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative">
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative">
           <h3 className="text-base font-semibold mb-1 text-slate-800">F. Tỷ lệ đạt chất lượng</h3>
           <p className="text-xs text-slate-400 mb-3">Phế phẩm so với sản phẩm hoàn thành</p>
           <div className="flex items-center gap-4">
@@ -296,7 +296,7 @@ function KpiCard({ title, value, color }) {
     purple: 'bg-purple-50 text-purple-700 border-purple-200'
   };
   return (
-    <div className={`p-6 rounded-2xl border ${colors[color]} shadow-sm`}>
+    <div className={`p-6 rounded-xl border ${colors[color]} shadow-sm`}>
       <h3 className="text-sm font-semibold mb-2 opacity-80">{title}</h3>
       <p className="text-3xl font-bold">{value}</p>
     </div>
@@ -426,7 +426,7 @@ function DetailedReport() {
     <div className="space-y-5">
 
       {/* ── Filter bar ── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
         <div className="flex flex-wrap gap-4 items-end">
           {/* From date */}
           <div>
@@ -532,7 +532,7 @@ function DetailedReport() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
             {/* Bar: Sản lượng theo trạng thái */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Sản lượng theo trạng thái</h3>
               <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
@@ -556,7 +556,7 @@ function DetailedReport() {
             </div>
 
             {/* Line: Sản lượng kế hoạch vs hoàn thành */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Sản lượng kế hoạch vs hoàn thành</h3>
               <div className="h-52">
                 <ResponsiveContainer width="100%" height="100%">
@@ -574,7 +574,7 @@ function DetailedReport() {
             </div>
 
             {/* Donut: Trạng thái lệnh */}
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Trạng thái lệnh</h3>
               <div className="flex items-center gap-4 h-52">
                 <div className="flex-1 h-full relative">
@@ -616,7 +616,7 @@ function DetailedReport() {
           </div>
 
           {/* ── Table ── */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <h3 className="text-sm font-semibold text-slate-800">Danh sách lệnh sản xuất</h3>
             </div>
@@ -703,7 +703,7 @@ function SummaryCard({ icon, label, value, unit, subValue, subColor, color }) {
     red:     'bg-rose-50',
   };
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-3">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-start gap-3">
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${bg[color] || 'bg-slate-50'}`}>
         {icon}
       </div>

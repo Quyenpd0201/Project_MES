@@ -879,7 +879,7 @@ function ExcelImportModal({ onClose, onDone }) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className={`bg-white rounded-2xl shadow-2xl w-full flex flex-col max-h-[90vh] ${step === 2 ? 'max-w-6xl' : 'max-w-lg'}`}>
+      <div className={`bg-white rounded-xl shadow-2xl w-full flex flex-col max-h-[90vh] ${step === 2 ? 'max-w-6xl' : 'max-w-lg'}`}>
         <DialogBehavior onClose={onClose} locked={loading} />
         <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">

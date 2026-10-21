@@ -154,7 +154,7 @@ function KpiCard({ icon: Icon, accent = "blue", label, hint, value, valueClass, 
   return (
     <Comp
       onClick={onClick}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-all duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:-translate-y-1 hover:shadow-card-hover hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:-translate-y-0.5 hover:shadow-card-hover"}`}
+      className={`group relative flex flex-col overflow-hidden rounded-xl border border-slate-200/70 bg-white ${compact ? "p-4" : "p-5"} shadow-card transition-all duration-300 animate-rise motion-reduce:animate-none text-left ${active ? "!border-blue-400 ring-2 ring-blue-500/30" : ""} ${onClick ?"cursor-pointer hover:-translate-y-1 hover:shadow-card-hover hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500/40" : "hover:-translate-y-0.5 hover:shadow-card-hover"}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className={`pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-100 opacity-70 ${a.glow}`} />
@@ -179,7 +179,7 @@ function KpiCard({ icon: Icon, accent = "blue", label, hint, value, valueClass, 
 function Panel({ title, subtitle, icon: Icon, action, children, className = "", delay = 0 }) {
   return (
     <section
-      className={`rounded-2xl border border-slate-200/70 bg-white p-5 shadow-card animate-rise motion-reduce:animate-none ${className}`}
+      className={`rounded-xl border border-slate-200/70 bg-white p-5 shadow-card animate-rise motion-reduce:animate-none ${className}`}
       style={{ animationDelay: `${delay}ms` }}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -263,7 +263,7 @@ function Skeleton() {
     <div className="animate-pulse space-y-5">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-2xl border border-slate-200/70 bg-white p-5">
+          <div key={i} className="rounded-xl border border-slate-200/70 bg-white p-5">
             <div className={`${blk} h-3 w-24`} />
             <div className={`${blk} mt-5 h-7 w-32`} />
             <div className={`${blk} mt-3 h-3 w-20`} />
@@ -272,8 +272,8 @@ function Skeleton() {
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
-        <div className="h-80 rounded-2xl border border-slate-200/70 bg-white lg:col-span-7" />
-        <div className="h-80 rounded-2xl border border-slate-200/70 bg-white lg:col-span-5" />
+        <div className="h-80 rounded-xl border border-slate-200/70 bg-white lg:col-span-7" />
+        <div className="h-80 rounded-xl border border-slate-200/70 bg-white lg:col-span-5" />
       </div>
     </div>
   );
@@ -434,7 +434,7 @@ function SalesView({ s, r, period }) {
 
       {/* Bản tin điểm nhấn — cao bằng khối 4 ô bên trái, dài thì cuộn trong khung */}
       <div className="lg:relative">
-        <section className="flex flex-col rounded-2xl border border-slate-200/70 bg-white p-4 shadow-card animate-rise motion-reduce:animate-none lg:absolute lg:inset-0"
+        <section className="flex flex-col rounded-xl border border-slate-200/70 bg-white p-4 shadow-card animate-rise motion-reduce:animate-none lg:absolute lg:inset-0"
           style={{ animationDelay: "260ms" }}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -666,7 +666,7 @@ function SalesView({ s, r, period }) {
       {/* Modal: Danh sách đơn hàng */}
       {ordersModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-rise">
+          <div className="w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl animate-rise">
             <DialogBehavior onClose={() => setOrdersModal(false)} dirty={false} />
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="font-display text-lg font-semibold text-slate-800">
@@ -731,7 +731,7 @@ function SalesView({ s, r, period }) {
       {/* Modal: Danh sách phiếu giao / hóa đơn */}
       {deliveriesModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl animate-rise">
+          <div className="w-full max-w-4xl overflow-hidden rounded-xl bg-white shadow-2xl animate-rise">
             <DialogBehavior onClose={() => setDeliveriesModal(false)} dirty={false} />
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
               <h3 className="font-display text-lg font-semibold text-slate-800">
@@ -1161,7 +1161,7 @@ export default function DirectorReport() {
             showMoney
               ? <SalesView s={data.sales} r={data.receivables || EMPTY_R} period={period} />
               : (
-                <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center">
+                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white px-4 py-16 text-center">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-400"><Lock size={20} /></div>
                   <div className="text-sm font-medium text-slate-700">Số liệu doanh thu và công nợ được bảo mật</div>
                   <div className="text-xs text-slate-400">Chỉ hiển thị cho vai trò quản lý</div>

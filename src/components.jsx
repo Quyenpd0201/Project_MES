@@ -463,7 +463,7 @@ export function Modal({ open = true, title, onClose, dirty, locked = false, clos
     <div className={`fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 ${z}`}
       onMouseDown={(e) => { if (closeOnBackdrop && e.target === e.currentTarget) requestClose(); }}>
       <div {...dialogProps} aria-labelledby={title ? titleId : undefined}
-        className={`bg-white rounded-2xl shadow-xl w-full ${MODAL_SIZES[size] || size} max-h-[90vh] flex flex-col outline-none ${className}`}>
+        className={`bg-white rounded-xl shadow-xl w-full ${MODAL_SIZES[size] || size} max-h-[90vh] flex flex-col outline-none ${className}`}>
         {title != null && (
           <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 shrink-0">
             <h3 id={titleId} className="font-semibold text-slate-800">{title}</h3>
