@@ -5,9 +5,11 @@ import * as XLSX from "xlsx";
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
-  Factory, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen, Recycle, Wallet, Scale,
+  Factory, Settings, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen, Recycle, Wallet, Scale,
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
+import { setAppSettings } from "./src/appSettings.js";
+import SettingsScreen from "./src/modules/masterData/SettingsScreen.jsx";
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/auth/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
@@ -210,6 +212,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "md:zones", label: "Khu vực", icon: MapPin, path: "/master-data/zones", perm: "md_zones" },
         { key: "md:locations", label: "Vị trí lưu trữ", icon: MapPin, path: "/master-data/locations", perm: "md_locations" },
         { key: "md:customers", label: "Khách hàng", icon: Users, path: "/master-data/customers", perm: "md_customers" },
+        { key: "settings", label: "Cài đặt hệ thống", icon: Settings, path: "/settings", adminOnly: true },
       ]
     },
     {
@@ -1271,7 +1274,7 @@ export default function MesApp() {
   // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập,
   // và làm mới mỗi khi đổi màn để các dropdown luôn có dữ liệu mới nhất.
   useEffect(() => {
-    if (user) getLookups().then((d) => { setLookups(d); setLookupsErr(""); }).catch((e) => {
+    if (user) getLookups().then((d) => { setLookups(d); setAppSettings(d?.settings); setLookupsErr(""); }).catch((e) => {
       // G-06: lỗi nạp danh mục → báo (1 thông báo, không lặp mỗi lần đổi màn); chưa có dữ liệu thì màn hiện nút Thử lại
       setLookupsErr(e.message || "Lỗi máy chủ");
       toast.error("Không tải được dữ liệu danh mục: " + e.message, { id: "lookups-err" });
@@ -1368,6 +1371,7 @@ export default function MesApp() {
               <Route path="/inventory/adjust" element={lookups ? <AdjustModule lookups={lookups} /> : loadingEl} />
               <Route path="/traceability/lot" element={<TraceabilityLot />} />
               <Route path="/master-data/roles" element={<RolesModule />} />
+              <Route path="/settings" element={<SettingsScreen />} />
               <Route path="/master-data/:entity" element={lookups ? <MasterDataWrapper lookups={lookups} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
               <Route path="/qrlabels" element={<QrLabelsModule />} />
