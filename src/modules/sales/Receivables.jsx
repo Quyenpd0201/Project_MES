@@ -9,7 +9,7 @@ import * as XLSX from "xlsx";
 import { receivables as api } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { fmtDate, statusClass, toast, todayYmd } from "../../ui.js";
-import { ListHeader, DataTable } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError } from "../../components.jsx";
 import { LevelBadge, LEVELS, vnd } from "./debtUi.jsx";
 
 function Card({ label, value, sub, icon: Icon, tone = "slate", onClick, active }) {
@@ -36,7 +36,8 @@ function Card({ label, value, sub, icon: Icon, tone = "slate", onClick, active }
 /* ---- Chi tiết công nợ 1 khách (ngăn trượt bên phải) ---- */
 function DetailDrawer({ customerId, onClose }) {
   const [d, setD] = useState(null);
-  useEffect(() => { api.detail(customerId).then(setD).catch((e) => toast.error(e.message)); }, [customerId]);
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
+  useEffect(() => { api.detail(customerId).then(setD).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")); }, [customerId, tryN]);
   const bad = d?.settings?.bad_days ?? 30;
   return (
     <>
@@ -49,7 +50,7 @@ function DetailDrawer({ customerId, onClose }) {
           </div>
           <div className="flex items-center gap-3">{d && <LevelBadge level={d.level} />}<button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100"><X size={18} /></button></div>
         </div>
-        {!d ? <div className="p-6 text-sm text-slate-400">Đang tải…</div> : (
+        {!d ? (loadErr ? <div className="p-6"><LoadError message={`Không tải được công nợ (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} /></div> : <div className="p-6 text-sm text-slate-400">Đang tải…</div>) : (
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
               {[["Phải trả", d.billed, "text-slate-800"], ["Đã trả", d.paid, "text-emerald-700"], ["Còn nợ", d.debt, "text-rose-600"], ["Trả trước", d.credit, "text-blue-700"]].map(([l, v, c]) => (

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
 import { production } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, useRemembered } from "../../components.jsx";
+import { ListHeader, useRemembered, LoadError } from "../../components.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 
 /* ---- Modal: NVL thực tế sử dụng (gợi ý từ BOM) → trừ tồn kho ---- */
@@ -10,11 +10,12 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
   const [data, setData] = useState(null);
   const [lines, setLines] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
   useEffect(() => {
     production.materials(task.production_order_id)
       .then((d) => { setData(d); setLines((d.lines || []).map((l) => ({ ...l, used_qty: l.used_qty ?? l.suggested_qty }))); })
-      .catch((e) => toast.error("Lỗi tải NVL: " + e.message));
-  }, [task.production_order_id]);
+      .catch((e) => setLoadErr(e.message || "Lỗi máy chủ"));
+  }, [task.production_order_id, tryN]);
   const setQty = (mid, v) => setLines((a) => a.map((l) => (l.material_id === mid ? { ...l, used_qty: v } : l)));
   const save = async () => {
     setSaving(true);
@@ -34,7 +35,7 @@ function MaterialModal({ task, canEdit, completeMode = false, onClose }) {
           {completeMode && <p className="text-sm text-emerald-700 font-medium mt-1">Cập nhật NVL thực tế xong sẽ <b>Hoàn thành sản xuất</b> cho lô này.</p>}
         </div>
 
-        {!data ? <div className="text-slate-400 text-sm py-6 text-center">Đang tải…</div>
+        {!data ? (loadErr ? <LoadError message={`Không tải được NVL (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} /> : <div className="text-slate-400 text-sm py-6 text-center">Đang tải…</div>)
           : !data.has_bom ? <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 flex items-center gap-2"><AlertTriangle size={16} /> Sản phẩm chưa có định mức (BOM) đang hoạt động — chưa gợi ý được NVL.</div>
             : (
               <div className="border border-slate-200 rounded-lg overflow-hidden">

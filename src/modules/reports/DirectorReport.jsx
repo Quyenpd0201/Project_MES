@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { reports } from "../../mesApi.js";
 import { fmt, fmtDate, toast, statusClass } from "../../ui.js";
-import { usePager } from "../../components.jsx";
+import { usePager, LoadError } from "../../components.jsx";
 
 /* ───────────────────────── Bảng màu & hằng số ───────────────────────── */
 
@@ -1092,12 +1092,14 @@ export default function DirectorReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [loadErr, setLoadErr] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
+    setLoadErr("");
     reports.director(period)
       .then((d) => { setData(d); setUpdatedAt(new Date()); })
-      .catch((e) => toast.error("Lỗi tải báo cáo: " + e.message))
+      .catch((e) => { setLoadErr(e.message || "Lỗi máy chủ"); toast.error("Lỗi tải báo cáo: " + e.message); })
       .finally(() => setLoading(false));
   }, [period]);
   useEffect(() => { load(); }, [load]);
@@ -1151,7 +1153,7 @@ export default function DirectorReport() {
       </nav>
 
       {/* Nội dung */}
-      {loading && !data ? <Skeleton /> : !data ? null : (
+      {loading && !data ? <Skeleton /> : !data ? (loadErr ? <LoadError message={`Không tải được báo cáo (${loadErr})`} onRetry={load} /> : null) : (
         <div key={`${tab}-${period}`} className={`transition-opacity duration-200 ${loading ? "opacity-60" : ""}`}>
           {tab === "sales" && (
             showMoney

@@ -5,7 +5,7 @@ import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast, todayYmd } from "../../ui.js";
-import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError } from '../../components.jsx';
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 import { SpecFields } from "../../SpecFields.jsx";
 import * as XLSX from "xlsx";
@@ -696,8 +696,11 @@ function OrderVoucher({ id, onBack }) {
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("orders", "amounts") !== "hidden";
   const [o, setO] = useState(null);
-  useEffect(() => { ordersApi.get(id).then(setO).catch((e) => toast.error("Lỗi: " + e.message)); }, [id]);
-  if (!o) return <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
+  useEffect(() => { ordersApi.get(id).then(setO).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")); }, [id, tryN]);
+  if (!o) return loadErr
+    ? <LoadError className="mt-6" message={`Không tải được phiếu (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />
+    : <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
   const totalQty = (o.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0);
   const totalAmount = (o.items || []).reduce((s, it) => s + (Number(it.unit_price) || 0) * (Number(it.quantity) || 0), 0);
 

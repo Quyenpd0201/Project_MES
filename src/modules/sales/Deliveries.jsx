@@ -8,7 +8,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast, todayYmd } from "../../ui.js";
 import { specShort } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError } from "../../components.jsx";
 
 // Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
 // Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy — hàng trả lại dùng nút "Khách trả hàng" (nhập lại kho).
@@ -101,12 +101,13 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
   const [loc, setLoc] = useState({});   // trx_id → vị trí nhận
   const [head, setHead] = useState({ return_date: today(), note: "" });
   const [saving, setSaving] = useState(false);
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
   useEffect(() => {
     api.returns(id).then((d) => {
       setData(d);
       setLoc(Object.fromEntries((d.lines || []).map((l) => [l.trx_id, l.location_id || ""])));
-    }).catch((e) => toast.error("Lỗi: " + e.message));
-  }, [id]);
+    }).catch((e) => setLoadErr(e.message || "Lỗi máy chủ"));
+  }, [id, tryN]);
   const left = (l) => Number(l.shipped_qty) - Number(l.returned_qty);
   const save = async () => {
     const items = (data?.lines || []).filter((l) => Number(qty[l.trx_id]) > 0)
@@ -127,7 +128,7 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
           <h3 className="text-lg font-bold text-slate-800">Khách trả hàng — phiếu giao {noteCode}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
-        {!data ? <div className="text-sm text-slate-400">Đang tải…</div> : !data.lines.length ? (
+        {!data ? (loadErr ? <LoadError message={`Không tải được hàng đã giao (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} /> : <div className="text-sm text-slate-400">Đang tải…</div>) : !data.lines.length ? (
           <div className="text-sm text-slate-500">Phiếu này chưa có dữ liệu xuất kho để trả.</div>
         ) : (<>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -590,8 +591,11 @@ function DeliveryVoucher({ id, onBack }) {
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("deliveries", "amounts") !== "hidden";
   const [d, setD] = useState(null);
-  useEffect(() => { api.get(id).then(setD).catch((e) => toast.error("Lỗi: " + e.message)); }, [id]);
-  if (!d) return <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
+  useEffect(() => { api.get(id).then(setD).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")); }, [id, tryN]);
+  if (!d) return loadErr
+    ? <LoadError className="mt-6" message={`Không tải được phiếu (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />
+    : <div className="text-slate-400 text-sm py-10">Đang tải phiếu…</div>;
   const totalQty = (d.items || []).reduce((s, it) => s + Number(it.quantity || 0), 0);
   const dt = d.delivery_date ? new Date(d.delivery_date) : null;
   const items = d.items || [];

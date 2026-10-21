@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PageHeader, ListHeader, Section, Pagination, usePager } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, Pagination, usePager, LoadError } from '../../components.jsx';
 import { reports } from '../../mesApi.js';
 import { Download, Activity, Factory, PieChart as PieChartIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -61,15 +61,17 @@ function KpiReport() {
   const [charts, setCharts] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
   useEffect(() => {
+    setLoading(true);
     reports.kpi().then(res => {
       setData(res.kpi);
       setCharts(res.charts);
-      setLoading(false);
-    });
-  }, []);
+    }).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")).finally(() => setLoading(false));
+  }, [tryN]);
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
+  if (loadErr) return <LoadError message={`Không tải được báo cáo KPI (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />;
   if (!data || !charts) return null;
 
   // Xử lý dữ liệu hiệu suất (D)
@@ -723,14 +725,16 @@ function MachineReport() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
   useEffect(() => {
+    setLoading(true);
     reports.machines().then(res => {
       setData(res);
-      setLoading(false);
-    });
-  }, []);
+    }).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")).finally(() => setLoading(false));
+  }, [tryN]);
 
   if (loading) return <div>Đang tải dữ liệu...</div>;
+  if (loadErr) return <LoadError message={`Không tải được báo cáo máy (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />;
   if (!data) return null;
 
   const pieData = data.status_distribution.map(d => ({

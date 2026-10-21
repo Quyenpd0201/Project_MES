@@ -40,7 +40,7 @@ import EmployeeReport from "./src/modules/reports/EmployeeReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
 import ScrapModule from "./src/modules/production/ScrapModule.jsx";
 import RecyclingModule from "./src/modules/production/RecyclingModule.jsx";
-import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect, useSaving } from "./src/components.jsx";
+import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect, useSaving, LoadError } from "./src/components.jsx";
 
 /* =====================================================================
    MES — Quản lý Sản phẩm & Dashboard (single-file demo)
@@ -732,8 +732,9 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
       const attrs = (d.attributes || []).map((a, i) => ({ _key: i + 1, name: a.name, value: a.value }));
       setAttributes(attrs.length ? attrs : [{ _key: 1, name: "", value: "" }]);
       setKeySeq((attrs.length || 1) + 1);
-    }).catch((e) => toast.error("Lỗi tải chi tiết: " + e.message));
+    }).catch((e) => { setLoadErr(e.message || "Lỗi máy chủ"); toast.error("Lỗi tải chi tiết: " + e.message); });
   };
+  const [loadErr, setLoadErr] = useState("");
   useEffect(() => { load(); }, [id]); // eslint-disable-line
   useEffect(() => { if (id) productRelated(id).then(setRelated).catch(() => { }); }, [id]);
 
@@ -793,7 +794,9 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
     { key: "related", label: "Đơn hàng & Lệnh SX" },
   ];
 
-  if (!p || !form) return <div className="text-slate-400 text-sm py-10">Đang tải chi tiết sản phẩm…</div>;
+  if (!p || !form) return loadErr
+    ? <LoadError className="mt-6" message={`Không tải được chi tiết sản phẩm (${loadErr})`} onRetry={() => { setLoadErr(""); load(); }} />
+    : <div className="text-slate-400 text-sm py-10">Đang tải chi tiết sản phẩm…</div>;
 
   return (
     <div className="space-y-5">
@@ -1023,8 +1026,11 @@ function Dashboard({ onNav, onOpenOrder, onOpenProductionOrder }) {
   const { fpermSecret } = usePerm();
   const showMoney = fpermSecret("deliveries", "amounts") !== "hidden";
   const [data, setData] = useState(null);
-  useEffect(() => { getDashboard().then(setData).catch((e) => console.error("Dashboard lỗi:", e.message)); }, []);
-  if (!data) return <div className="text-slate-400 text-sm py-10">Đang tải số liệu…</div>;
+  const [loadErr, setLoadErr] = useState(""); const [tryN, setTryN] = useState(0);
+  useEffect(() => { getDashboard().then(setData).catch((e) => setLoadErr(e.message || "Lỗi máy chủ")); }, [tryN]);
+  if (!data) return loadErr
+    ? <LoadError className="mt-6" message={`Không tải được số liệu tổng quan (${loadErr})`} onRetry={() => { setLoadErr(""); setTryN((n) => n + 1); }} />
+    : <div className="text-slate-400 text-sm py-10">Đang tải số liệu…</div>;
 
   const { kpi, machines, in_progress, due_soon, status_breakdown, overdue_payments = [], finance, debt_bad_days: badDays = 30 } = data;
   const kpis = [
