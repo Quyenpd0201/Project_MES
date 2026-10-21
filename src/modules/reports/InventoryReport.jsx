@@ -81,11 +81,18 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 /* ─── Main InventoryReport ─────────────────────────────────────── */
-export default function InventoryReport({ lookups }) {
+// R-11: kiểm quyền ở component ngoài, phần thân (có hook) ở component con —
+// không gọi hook sau return sớm (đổi quyền giữa phiên không làm sập màn)
+export default function InventoryReport(props) {
   const { can, isAdmin } = usePerm();
   if (!isAdmin && !can('rep_inv', 'view') && !can('reports', 'view')) return (
     <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem báo cáo kho.</div>
   );
+  return <InventoryReportBody {...props} />;
+}
+
+function InventoryReportBody({ lookups }) {
+  const { can, isAdmin } = usePerm(); // eslint-disable-line no-unused-vars
   const [stockData, setStockData]   = useState([]);
   const [txnData, setTxnData]       = useState([]);
   const [loading, setLoading]       = useState(true);

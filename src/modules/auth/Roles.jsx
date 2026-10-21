@@ -97,7 +97,7 @@ export default function RolesModule() {
     try {
       const res = await users.list();
       setUserList(Array.isArray(res) ? res : res?.data || []);
-    } catch (e) {}
+    } catch (e) { toast.error("Không tải được danh sách tài khoản — bấm Làm mới: " + e.message); }
   };
 
   useEffect(() => {

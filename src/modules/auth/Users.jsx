@@ -65,7 +65,7 @@ export default function UsersModule({ lookups }) {
   const [editing, setEditing] = useState(null);
   const teams = [...new Set(((lookups && lookups.employees) || []).map((e) => e.factory).filter(Boolean))];
   const load = useCallback(async () => { try { setRows(await users.list()); } catch (e) { toast.error("Lỗi tải tài khoản: " + e.message); } }, []);
-  useEffect(() => { load(); roles.list().then(setRoleList).catch(() => {}); }, [load]);
+  useEffect(() => { load(); roles.list().then(setRoleList).catch((e) => toast.error("Không tải được danh sách vai trò — bấm Làm mới: " + e.message)); }, [load]);
   const del = async (id) => { if (!confirm("Xóa tài khoản này?")) return; try { await users.remove(id); toast.success("Đã xóa thành công"); load(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
 
   const columns = [

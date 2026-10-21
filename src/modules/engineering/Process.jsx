@@ -59,7 +59,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   const [seq, setSeq] = useState(1);
   const [bomList, setBomList] = useState([]);
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  useEffect(() => { bomApi.list({}).then(setBomList).catch(() => {}); }, []);
+  useEffect(() => { bomApi.list({}).then(setBomList).catch((e) => toast.error("Không tải được danh sách định mức — bấm Làm mới: " + e.message)); }, []);
 
   const products = lookups.products || [];
   const machines = lookups.machines || [];
@@ -103,7 +103,13 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
   }, [copyId, editId]); // eslint-disable-line
 
   const addStep = () => { setSteps((a) => [...a, { ...emptyStep(), _k: seq }]); setSeq((s) => s + 1); };
-  const rmStep = (k) => setSteps((a) => a.filter((x) => x._k !== k));
+  // E-03: bước đã có tên / NVL → hỏi trước khi xóa
+  const rmStep = (k) => {
+    const i = steps.findIndex((x) => x._k === k), st = steps[i];
+    const nMat = (st?.inputs || []).filter((it) => it.material_id).length;
+    if (st && (st.name || nMat) && !confirm(`Xóa Bước ${i + 1}${st.name ? ` – ${st.name}` : ""}${nMat ? ` (kèm ${nMat} NVL)` : ""}?`)) return;
+    setSteps((a) => a.filter((x) => x._k !== k));
+  };
   const upStep = (k, fld, v) => setSteps((a) => a.map((x) => {
     if (x._k !== k) return x;
     const nx = { ...x, [fld]: v };

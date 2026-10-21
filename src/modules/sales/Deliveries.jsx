@@ -201,14 +201,19 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
   const isDraft = f.status === "Bản nháp";
   const picking = editing && isDraft; // đang chọn / sửa dòng hàng
 
-  useEffect(() => { inventory.list().then(setStock).catch(() => {}); }, []);
+  useEffect(() => { inventory.list().then(setStock).catch((e) => toast.error("Không tải được tồn kho — cột tồn của dòng không theo đơn sẽ trống: " + e.message)); }, []);
+  // S-05: lỗi tải công nợ → báo + nút Thử lại (trước đây im lặng, mất cảnh báo nợ xấu)
+  const [debtErr, setDebtErr] = useState(false);
+  const [debtTry, setDebtTry] = useState(0);
   // Công nợ của khách: chỉ cần khi đang lập phiếu (Bản nháp) — cảnh báo nợ xấu, chặn khi vượt hạn mức
   useEffect(() => {
-    if (!f.customer_id || !isDraft) { setDebtInfo(null); return; }
+    if (!f.customer_id || !isDraft) { setDebtInfo(null); setDebtErr(false); return; }
     let alive = true;
-    paymentReceipts.customer(f.customer_id).then((d) => alive && setDebtInfo(d)).catch(() => alive && setDebtInfo(null));
+    paymentReceipts.customer(f.customer_id)
+      .then((d) => { if (alive) { setDebtInfo(d); setDebtErr(false); } })
+      .catch((e) => { if (alive) { setDebtInfo(null); setDebtErr(true); toast.error("Không tải được công nợ khách: " + e.message); } });
     return () => { alive = false; };
-  }, [f.customer_id, isDraft]);
+  }, [f.customer_id, isDraft, debtTry]);
   // Hạn mức chỉ chặn TẠO phiếu mới; phiếu nháp đã có vẫn sửa / giao được
   // Chặn khi TẠO phiếu, hoặc khi ĐỔI phiếu nháp sang khách khác — khớp chốt chặn backend (create + update).
   // Phiếu nháp giữ nguyên khách cũ thì vẫn sửa / giao được.
@@ -415,6 +420,12 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
         onClose={() => setReturning(false)} onSaved={() => { setReturning(false); load(); }} />}
 
       {isDraft && <DebtBanner info={debtInfo} context="delivery" />}
+      {isDraft && debtErr && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800 flex items-center gap-3">
+          Không tải được công nợ của khách — chưa kiểm được nợ xấu / hạn mức.
+          <button onClick={() => setDebtTry((n) => n + 1)} className="btn-ghost py-1 text-sm">Thử lại</button>
+        </div>
+      )}
 
       <fieldset disabled={!editing} className="space-y-5">
         <Section title="Thông tin phiếu">

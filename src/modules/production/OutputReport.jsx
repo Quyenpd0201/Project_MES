@@ -390,11 +390,18 @@ function OrderDetailDrawer({ order, onClose }) {
 }
 
 /* ─── Main component ─── */
-export default function OutputReport({ lookups }) {
+// R-11: kiểm quyền ở component ngoài, phần thân (có hook) ở component con —
+// không gọi hook sau return sớm (đổi quyền giữa phiên không làm sập màn)
+export default function OutputReport(props) {
   const { can, isAdmin } = usePerm();
   if (!isAdmin && !can('prod_output', 'view') && !can('production', 'view')) return (
     <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem báo cáo sản xuất.</div>
   );
+  return <OutputReportBody {...props} />;
+}
+
+function OutputReportBody({ lookups }) {
+  const { can, isAdmin } = usePerm(); // eslint-disable-line no-unused-vars
   const [rows, setRows]               = useState([]);
   const [loading, setLoading]         = useState(false);
   const [from, setFrom]               = useRemembered("output:from", monthStart);
@@ -408,11 +415,12 @@ export default function OutputReport({ lookups }) {
   const [selected, setSelected]       = useState(null); // order được chọn để xem chi tiết
   // Phế KHÔNG ghi theo lệnh — lấy từ module Quản lý phế, gộp theo ngày trong khoảng lọc.
   const [scrapSum, setScrapSum]       = useState({ total_scrap: 0, total_finished: 0, by_day: [] });
+  const [scrapErr, setScrapErr]       = useState(false); // P-20: lỗi tải phế → KPI hiện "—", không hiện 0 như thật
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await production.list({ status: "", page_size: 500 });
+      const data = await production.list({ status: "" }) // API trả đủ mọi lệnh (không giới hạn số dòng);
       setRows(Array.isArray(data) ? data : data?.data || []);
     } catch (e) {
       toast.error("Lỗi tải sản lượng: " + e.message);
@@ -428,8 +436,8 @@ export default function OutputReport({ lookups }) {
     if (!from || !to) return;
     let alive = true;
     scrapApi.summary(from, to)
-      .then((d) => { if (alive) setScrapSum(d || { total_scrap: 0, total_finished: 0, by_day: [] }); })
-      .catch(() => { if (alive) setScrapSum({ total_scrap: 0, total_finished: 0, by_day: [] }); });
+      .then((d) => { if (alive) { setScrapSum(d || { total_scrap: 0, total_finished: 0, by_day: [] }); setScrapErr(false); } })
+      .catch((e) => { if (alive) { setScrapSum({ total_scrap: 0, total_finished: 0, by_day: [] }); setScrapErr(true); toast.error("Không tải được số liệu phế: " + e.message); } });
     return () => { alive = false; };
   }, [from, to]);
 
@@ -756,8 +764,8 @@ export default function OutputReport({ lookups }) {
         <KpiCard label="Quá hạn"     value={overdueCount}
           sub={filtered.length > 0 ? `${Math.round(overdueCount / filtered.length * 100)}% số lệnh` : "Trễ hạn chót"}
           icon={AlertCircle} color={overdueCount > 0 ? "rose" : "green"} {...cardProps("overdue")} />
-        <KpiCard label="Phế phẩm"    value={fmt(totalScrap)}
-          sub={`Tỷ lệ phế ${scrapRate}%`}
+        <KpiCard label="Phế phẩm"    value={scrapErr ? "—" : fmt(totalScrap)}
+          sub={scrapErr ? "Lỗi tải số liệu phế" : `Tỷ lệ phế ${scrapRate}%`}
           icon={AlertTriangle} color={Number(scrapRate) > 5 ? "rose" : "amber"} {...cardProps("scrap")} />
       </div>
 

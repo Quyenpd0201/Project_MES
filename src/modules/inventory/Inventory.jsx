@@ -19,6 +19,15 @@ const Field = ({ label, required, children }) => (
 /* ---- Tab Tồn kho: cây 3 cấp Sản phẩm → Nhóm thông số → Lô sản xuất ---- */
 
 /* ---- Tab Tồn kho: 2 chế độ xem (Theo sản phẩm / Theo vị trí) ---- */
+// K-05: tổng Kho / Khu / Vị trí tách theo đơn vị (không cộng lẫn kg + cuộn + cái)
+// ("Kg" và "KG" là cùng 1 đơn vị → gộp không phân biệt hoa/thường, hiện theo cách viết gặp đầu tiên)
+const addUnit = (o, r) => {
+  const u = (r.unit || "").trim() || "—", k = u.toLowerCase();
+  const e = o.byUnit[k] || (o.byUnit[k] = { u, q: 0 });
+  e.q += Number(r.quantity) || 0;
+};
+const fmtByUnit = (o) => Object.values(o.byUnit || {}).sort((a, b) => b.q - a.q).map((e) => `${fmt(e.q)} ${e.u}`).join(" · ") || "0";
+
 function TreeTab({ lookups }) {
   const { can } = usePerm();
   const [data, setData] = useState([]);
@@ -100,18 +109,18 @@ function TreeTab({ lookups }) {
     const whs = new Map();
     // 1. Dựng sẵn cây từ danh mục để hiển thị cả những Khu/Vị trí trống (0 tồn)
     (lookups.warehouses || []).forEach(w => {
-      whs.set(w.id, { id: w.id, name: w.name, total: 0, zones: new Map() });
+      whs.set(w.id, { id: w.id, name: w.name, total: 0, byUnit: {}, zones: new Map() });
     });
     (lookups.zones || []).forEach(z => {
       if (whs.has(z.warehouse_id)) {
-        whs.get(z.warehouse_id).zones.set(z.id, { id: z.id, name: z.name, total: 0, locs: new Map() });
+        whs.get(z.warehouse_id).zones.set(z.id, { id: z.id, name: z.name, total: 0, byUnit: {}, locs: new Map() });
       }
     });
     (lookups.locations || []).forEach(l => {
       if (whs.has(l.warehouse_id)) {
         const W = whs.get(l.warehouse_id);
         if (l.zone_id && W.zones.has(l.zone_id)) {
-          W.zones.get(l.zone_id).locs.set(l.id, { id: l.id, name: l.name, total: 0, prods: new Map() });
+          W.zones.get(l.zone_id).locs.set(l.id, { id: l.id, name: l.name, total: 0, byUnit: {}, prods: new Map() });
         }
       }
     });
@@ -119,19 +128,19 @@ function TreeTab({ lookups }) {
     // 2. Lấp dữ liệu tồn kho vào cây
     for (const r of rows) {
       const whId = r.warehouse_id || "unknown";
-      if (!whs.has(whId)) whs.set(whId, { id: whId, name: r.warehouse_name || "(Chưa phân kho)", total: 0, zones: new Map() });
+      if (!whs.has(whId)) whs.set(whId, { id: whId, name: r.warehouse_name || "(Chưa phân kho)", total: 0, byUnit: {}, zones: new Map() });
       const W = whs.get(whId);
-      W.total += Number(r.quantity) || 0;
+      W.total += Number(r.quantity) || 0; addUnit(W, r);
 
       const znId = r.zone_id || "unknown";
-      if (!W.zones.has(znId)) W.zones.set(znId, { id: znId, name: r.zone_name || "(Không phân khu)", total: 0, locs: new Map() });
+      if (!W.zones.has(znId)) W.zones.set(znId, { id: znId, name: r.zone_name || "(Không phân khu)", total: 0, byUnit: {}, locs: new Map() });
       const Z = W.zones.get(znId);
-      Z.total += Number(r.quantity) || 0;
+      Z.total += Number(r.quantity) || 0; addUnit(Z, r);
 
       const locId = r.location_id || "unknown";
-      if (!Z.locs.has(locId)) Z.locs.set(locId, { id: locId, name: r.location_name || "(Không có vị trí)", total: 0, prods: new Map() });
+      if (!Z.locs.has(locId)) Z.locs.set(locId, { id: locId, name: r.location_name || "(Không có vị trí)", total: 0, byUnit: {}, prods: new Map() });
       const L = Z.locs.get(locId);
-      L.total += Number(r.quantity) || 0;
+      L.total += Number(r.quantity) || 0; addUnit(L, r);
 
       const pkey = r.product_id + '|' + (r.spec_key || '');
       if (!L.prods.has(pkey)) L.prods.set(pkey, { 
@@ -274,7 +283,7 @@ function TreeTab({ lookups }) {
                   <span className="font-semibold text-indigo-700 shrink-0">{w.name}</span>
                 </div>
                 <div className="col-span-3 text-slate-400 text-sm">—</div>
-                <div className="col-span-2 text-right font-bold text-slate-800">{fmt(w.total)}</div>
+                <div className="col-span-2 text-right font-bold text-slate-800">{fmtByUnit(w)}</div>
               </button>
               {wOpen && w.zones.map(z => {
                 const zOpen = openState.has("Z" + w.id + z.id);
@@ -287,7 +296,7 @@ function TreeTab({ lookups }) {
                         <span className="font-semibold text-slate-700 text-sm truncate">{z.name}</span>
                       </div>
                       <div className="col-span-3 text-slate-400 text-sm">—</div>
-                      <div className="col-span-2 text-right font-semibold text-slate-700">{fmt(z.total)}</div>
+                      <div className="col-span-2 text-right font-semibold text-slate-700">{fmtByUnit(z)}</div>
                     </button>
                     {zOpen && z.locs.map(l => {
                       const lOpen = openState.has("L" + w.id + z.id + l.id);
@@ -300,7 +309,7 @@ function TreeTab({ lookups }) {
                               <span className="text-slate-600 font-medium text-sm truncate">{l.name}</span>
                             </div>
                             <div className="col-span-3 text-slate-400 text-sm">—</div>
-                            <div className="col-span-2 text-right font-medium text-slate-700">{fmt(l.total)}</div>
+                            <div className="col-span-2 text-right font-medium text-slate-700">{fmtByUnit(l)}</div>
                           </button>
                           {lOpen && l.prods.map(p => {
                             const pkey = p.product_id + '|' + (p.specs ? JSON.stringify(p.specs) : '');

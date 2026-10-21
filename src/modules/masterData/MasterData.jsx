@@ -25,7 +25,12 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
     cfg.fields.forEach((fl) => { init[fl.key] = record?.[fl.key] ?? fl.default ?? ""; });
     return init;
   });
-  const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
+  // Trường có resetOn: "x" bị xóa khi đổi trường x (vd đổi Kho → xóa Khu vực cũ)
+  const set = (k, v) => setF((s) => {
+    const n = { ...s, [k]: v };
+    cfg.fields.forEach((fl) => { if (fl.resetOn === k && s[k] !== v) n[fl.key] = ""; });
+    return n;
+  });
   const api = resource(cfg.resource);
 
   // Mã: hiện mã thật khi sửa, mã dự kiến khi thêm mới
@@ -37,14 +42,14 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
   const showOrders = cfg.resource === "customers" && isEdit;
   const [orders, setOrders] = useState([]);
   useEffect(() => {
-    if (showOrders) customerOrders(record.id).then(setOrders).catch(() => {});
+    if (showOrders) customerOrders(record.id).then(setOrders).catch((e) => toast.error("Không tải được đơn hàng của khách — bấm Làm mới: " + e.message));
   }, [showOrders, record?.id]); // eslint-disable-line
 
   // Dữ liệu liên quan: lệnh sản xuất đã chạy (chỉ với máy móc, chế độ sửa)
   const showMachine = cfg.resource === "machines" && isEdit;
   const [mTasks, setMTasks] = useState([]);
   useEffect(() => {
-    if (showMachine) machineOrders(record.id).then(setMTasks).catch(() => {});
+    if (showMachine) machineOrders(record.id).then(setMTasks).catch((e) => toast.error("Không tải được công việc của máy — bấm Làm mới: " + e.message));
   }, [showMachine, record?.id]); // eslint-disable-line
 
   const [saving, guard] = useSaving();
@@ -280,7 +285,7 @@ function MasterTable({ cfg, onOpenOrder, onOpenProductionOrder }) {
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} dòng.`;
       if (res.failed) msg += `\nLỗi ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
-      toast.error(msg);
+      (res.failed ? toast.error : toast.success)(msg); // D-03: chỉ báo đỏ khi có dòng lỗi
       load();
     } catch (e) { toast.error("Lỗi đọc file: " + e.message); }
     finally { setImporting(false); }
@@ -427,7 +432,7 @@ function buildConfigs(lookups) {
       ],
       fields: [
         { key: "warehouse_id", label: "Kho", type: "select", required: true, options: warehouseOptions },
-        { key: "zone_id", label: "Khu vực", type: "select", required: true, options: (f) => (lookups.zones || []).filter(z => z.warehouse_id === f.warehouse_id).map(z => ({ value: z.id, label: z.name })) },
+        { key: "zone_id", label: "Khu vực", type: "select", required: true, resetOn: "warehouse_id", options: (f) => (lookups.zones || []).filter(z => z.warehouse_id === f.warehouse_id).map(z => ({ value: z.id, label: z.name })) },
         { key: "name", label: "Tên vị trí", required: true, full: true },
       ],
     },

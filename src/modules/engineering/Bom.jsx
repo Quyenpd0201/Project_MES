@@ -39,7 +39,7 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
   const [procList, setProcList] = useState([]);
   const isLinked = !!f.process_id; // đã gắn Quy trình → dòng NVL lấy từ quy trình (khóa)
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
-  useEffect(() => { procApi.list({}).then(setProcList).catch(() => {}); }, []);
+  useEffect(() => { procApi.list({}).then(setProcList).catch((e) => toast.error("Không tải được danh sách quy trình — bấm Làm mới: " + e.message)); }, []);
 
   const loadData = useCallback(() => {
     if (!editId) return;
@@ -242,7 +242,7 @@ export default function BomModule({ lookups }) {
     { key: "_act", label: "", align: "right", render: (r) => (<>
         {can("bom", "create") && <button onClick={() => openForm({ copy: r.id })} title="Sao chép" className="text-slate-400 hover:text-blue-600 p-1"><Copy size={15} /></button>}
         <button onClick={() => openForm({ edit: r.id })} title="Sửa" className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={15} /></button>
-        <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>
+        {can("bom", "delete") && <button onClick={() => del(r.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 p-1"><Trash2 size={15} /></button>}
       </>) },
   ];
 

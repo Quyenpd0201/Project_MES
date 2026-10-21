@@ -403,7 +403,7 @@ function ProductList({ onOpen, onCreate, onCopy }) {
       const res = await api.importRows(payloads);
       let msg = `Đã nhập ${res.inserted}/${payloads.length} sản phẩm.`;
       if (res.failed) msg += `\nBỏ qua ${res.failed} dòng:\n` + res.errors.map((e) => `· Dòng ${e.row}: ${e.message}`).join("\n");
-      toast.error(msg); load();
+      (res.failed ? toast.error : toast.success)(msg); load(); // M-04: chỉ báo đỏ khi có dòng lỗi
     } catch (e) { toast.error("Lỗi đọc file: " + e.message); }
   };
 
@@ -420,7 +420,7 @@ function ProductList({ onOpen, onCreate, onCopy }) {
     {
       key: "_act", label: "Hành động", align: "center", render: (p) => (<>
         {can("products", "create") && <button onClick={() => onCopy(p.id)} title="Sao chép thành SP mới" className="text-slate-400 hover:text-blue-600 transition p-1"><Copy size={16} /></button>}
-        <button onClick={() => del(p.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 transition p-1"><Trash2 size={16} /></button>
+        {can("products", "delete") && <button onClick={() => del(p.id)} title="Xóa" className="text-slate-400 hover:text-rose-600 transition p-1"><Trash2 size={16} /></button>}
       </>)
     },
   ];
@@ -756,7 +756,14 @@ function ProductDetail({ id, onBack, onDeleted, onOpenOrder, onOpenProductionOrd
     finally { setUploading(false); }
   };
   const viewFile = async (att) => {
-    try { const f = await productFiles.file(id, att.id); const w = window.open("", "_blank"); if (w) w.document.write(`<title>${f.name}</title><iframe src="${f.data}" style="border:0;position:fixed;inset:0;width:100%;height:100%"></iframe>`); }
+    try { const f = await productFiles.file(id, att.id); const w = window.open("", "_blank"); // M-05: không chèn chuỗi vào HTML — tạo phần tử bằng DOM, chỉ mở dữ liệu dạng data:
+      if (!String(f.data || "").startsWith("data:")) return toast.error("Tệp không hợp lệ");
+      if (w) {
+        w.document.title = f.name || "Tệp đính kèm";
+        const fr = w.document.createElement("iframe");
+        fr.src = f.data; fr.style.cssText = "border:0;position:fixed;inset:0;width:100%;height:100%";
+        w.document.body.appendChild(fr);
+      } }
     catch (e) { toast.error("Lỗi xem tài liệu: " + e.message); }
   };
   const delFile = async (att) => { if (!confirm("Xóa tài liệu này?")) return; try { await productFiles.remove(id, att.id); toast.success("Đã xóa tài liệu"); loadFiles(); } catch (e) { toast.error("Lỗi xóa: " + e.message); } };
@@ -1234,6 +1241,8 @@ export default function MesApp() {
   const [planningTab, setPlanningTab] = useState("orders");
 
   const [lookups, setLookups] = useState(null);
+  const [lookupsErr, setLookupsErr] = useState("");
+  const [lookupsTry, setLookupsTry] = useState(0);
   const [user, setUser] = useState(null);
   const location = useLocation();
 
@@ -1252,8 +1261,12 @@ export default function MesApp() {
   // Nạp dữ liệu lookup (sản phẩm, khách, máy, kho...) sau khi đăng nhập,
   // và làm mới mỗi khi đổi màn để các dropdown luôn có dữ liệu mới nhất.
   useEffect(() => {
-    if (user) getLookups().then(setLookups).catch((e) => console.error("Lookups lỗi:", e.message));
-  }, [user, location.pathname]);
+    if (user) getLookups().then((d) => { setLookups(d); setLookupsErr(""); }).catch((e) => {
+      // G-06: lỗi nạp danh mục → báo (1 thông báo, không lặp mỗi lần đổi màn); chưa có dữ liệu thì màn hiện nút Thử lại
+      setLookupsErr(e.message || "Lỗi máy chủ");
+      toast.error("Không tải được dữ liệu danh mục: " + e.message, { id: "lookups-err" });
+    });
+  }, [user, location.pathname, lookupsTry]);
 
   // Khi đăng nhập: nếu không có quyền xem Dashboard → vào thẳng màn đầu tiên được phép
   useEffect(() => {
@@ -1287,8 +1300,10 @@ export default function MesApp() {
   const goNewDelivery = (id) => { setDeliveryOrderId(id); navigate("/deliveries"); };
 
   const needLookups = (Comp) =>
-    lookups ? <Comp lookups={lookups} /> : <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
-  const loadingEl = <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
+    lookups ? <Comp lookups={lookups} /> : loadingEl;
+  const loadingEl = lookupsErr
+    ? <div className="text-sm py-10 text-rose-600">Không tải được dữ liệu danh mục ({lookupsErr}). <button onClick={() => setLookupsTry((n) => n + 1)} className="btn-ghost ml-2">Thử lại</button></div>
+    : <div className="text-slate-400 text-sm py-10">Đang tải dữ liệu…</div>;
 
   if (authLoading) return <div className="min-h-screen flex items-center justify-center text-slate-400 text-sm">Đang tải…</div>;
   if (!user) return <Login onLogin={setUser} />;
