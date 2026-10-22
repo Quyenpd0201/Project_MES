@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, X, CalendarDays } from "lucide-react";
 import { inputCls, UNITS } from "./ui.js";
 
 // Bỏ dấu tiếng Việt để tìm không phân biệt dấu/hoa-thường
@@ -311,18 +311,41 @@ const stripAccent = (s) => String(s ?? "").toLowerCase().normalize("NFD")
 
 const alignCls = (a) => a === "center" ? "text-center" : a === "right" ? "text-right" : "text-left";
 
-export function DateInput({ value, onChange, placeholder = "dd/mm/yyyy", className, ...props }) {
+// Ô ngày luôn hiện dd/mm/yyyy (ô date gốc của trình duyệt hiện theo ngôn ngữ máy, vd mm/dd/yyyy).
+// Giá trị vào/ra vẫn là "yyyy-MM-dd", onChange nhận { target: { value } } như ô input thường.
+const ymdToDmy = (v) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || ""); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+const dmyToYmd = (s) => {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s);
+  if (!m) return null;
+  const d = new Date(+m[3], +m[2] - 1, +m[1]);
+  return d.getDate() === +m[1] && d.getMonth() === +m[2] - 1 ? `${m[3]}-${m[2]}-${m[1]}` : null;
+};
+export function DateInput({ value, onChange, placeholder = "dd/mm/yyyy", className, min, max, disabled, ...props }) {
+  const [text, setText] = useState(ymdToDmy(value));
+  const pickerRef = useRef(null);
+  useEffect(() => { setText(ymdToDmy(value)); }, [value]);
+  const emit = (v) => onChange?.({ target: { value: v } });
+  const onType = (e) => {
+    // Chỉ giữ chữ số, tự chèn dấu "/" → gõ 21102026 thành 21/10/2026
+    const dg = e.target.value.replace(/\D/g, "").slice(0, 8);
+    const t = [dg.slice(0, 2), dg.slice(2, 4), dg.slice(4)].filter(Boolean).join("/");
+    setText(t);
+    if (!t) return emit("");
+    const ymd = dmyToYmd(t);
+    if (ymd && (!min || ymd >= min) && (!max || ymd <= max)) emit(ymd);
+  };
   return (
-    <input
-      type={value ? "date" : "text"}
-      onFocus={(e) => (e.target.type = "date")}
-      onBlur={(e) => { if (!e.target.value) e.target.type = "text"; }}
-      placeholder={placeholder}
-      value={value || ""}
-      onChange={onChange}
-      className={className}
-      {...props}
-    />
+    <div className="relative">
+      <input type="text" inputMode="numeric" placeholder={placeholder} value={text} onChange={onType}
+        onBlur={() => setText(ymdToDmy(value))} disabled={disabled} className={(className || "") + " pr-8"} {...props} />
+      <button type="button" tabIndex={-1} disabled={disabled} title="Chọn ngày"
+        onClick={() => { try { pickerRef.current?.showPicker(); } catch { pickerRef.current?.focus(); } }}
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 disabled:opacity-40">
+        <CalendarDays size={15} />
+      </button>
+      <input ref={pickerRef} type="date" tabIndex={-1} aria-hidden="true" value={value || ""} min={min} max={max}
+        onChange={(e) => emit(e.target.value)} className="absolute right-0 bottom-0 w-0 h-0 opacity-0 pointer-events-none" />
+    </div>
   );
 }
 

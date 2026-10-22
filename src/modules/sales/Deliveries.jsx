@@ -394,6 +394,8 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
   };
 
   const numCls = inputCls + " text-right no-spin";
+  // Bề rộng ô số theo ch (1 ch = 1 chữ số), co giãn theo zoom: SL ~5 chữ số + thập phân, đơn giá ~8 chữ số
+  const qtyW = { minWidth: "11ch" }, priceW = { minWidth: "12ch" };
   const dash = <span className="text-slate-300">—</span>;
   return (
     <div className="space-y-5">
@@ -509,11 +511,11 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
                     <td className={"px-2 py-1.5 text-right " + (overStock ? "text-rose-600 font-semibold" : "text-slate-600")}>{inf ? fmt(inf.stock) : dash}</td>
                     <td className="px-2 py-1.5">
                       <input type="number" min="0" className={numCls + " font-semibold text-blue-700" + (overOrder || overStock ? " !border-amber-400 !ring-2 !ring-amber-200" : "")}
-                        value={r.quantity ?? ""} onChange={(e) => upRow(r._k, { quantity: e.target.value })} disabled={!r.product_id}
+                        style={qtyW} value={r.quantity ?? ""} onChange={(e) => upRow(r._k, { quantity: e.target.value })} disabled={!r.product_id}
                         title={overStock ? `Giao ${fmt(giao)} vượt tồn ${fmt(inf.stock)} — không đủ tồn sẽ không giao được` : overOrder ? `Giao dư ${fmt(giao - inf.remaining)} so với còn phải giao — vẫn cho giao` : inf?.suggested != null ? `Gợi ý ${fmt(inf.suggested)}` : undefined} />
                     </td>
                     <td className="px-2 py-1.5 text-slate-500">{r.unit || "—"}</td>
-                    {showMoney && <td className="px-2 py-1.5"><input type="number" min="0" className={numCls} disabled={!moneyEdit || !r.product_id} value={r.unit_price ?? ""} onChange={(e) => upRow(r._k, { unit_price: e.target.value })} /></td>}
+                    {showMoney && <td className="px-2 py-1.5"><input type="number" min="0" className={numCls} disabled={!moneyEdit || !r.product_id} style={priceW} value={r.unit_price ?? ""} onChange={(e) => upRow(r._k, { unit_price: e.target.value })} /></td>}
                     {showMoney && <td className="px-3 py-1.5 text-right font-semibold text-slate-800">{r.product_id ? fmt(amountOf(r)) : "—"}</td>}
                     <td className="px-2 py-1.5 text-center"><button type="button" onClick={() => rmRow(r._k)} className="text-slate-400 hover:text-rose-600" title="Xóa dòng"><Trash2 size={15} /></button></td>
                   </tr>
