@@ -3,7 +3,7 @@ import { FACTORIES } from "../../productionDefaults.js";
 import {
   ShieldCheck, Search, Edit, Trash2, X, ChevronRight, ChevronDown,
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
-  BarChart2, Settings, Save, ArrowLeft, Recycle, Lock, CheckCircle2, GitBranch, UserCheck, MapPin
+  BarChart2, Settings, Save, ArrowLeft, Recycle, Lock, CheckCircle2, GitBranch, UserCheck, MapPin, Clock // [HR-G1] Clock
 } from "lucide-react";
 import { ListHeader, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
@@ -18,7 +18,8 @@ export const ACTION_LABELS = {
   approve: "Duyệt", publish: "Phát hành", assign: "Phân công",
   execute: "Thực thi", import: "Import", export: "Xuất Excel",
   print: "In tem", view_amounts: "Xem Kế toán/Tiền",
-  request: "Yêu cầu", confirm: "Xác nhận"
+  request: "Yêu cầu", confirm: "Xác nhận",
+  approve_correction: "Duyệt sửa công" // [HR-G3]
 };
 
 // HTTP method tương ứng với từng action
@@ -26,7 +27,7 @@ const ACTION_HTTP = {
   view: "GET", create: "POST", edit: "PUT", delete: "DELETE",
   approve: "PUT", publish: "PUT", assign: "PUT",
   execute: "POST", import: "POST", export: "GET", print: "GET",
-  request: "POST", confirm: "POST"
+  request: "POST", confirm: "POST", approve_correction: "POST" // [HR-G3]
 };
 
 // Route API tương ứng với từng module
@@ -69,6 +70,13 @@ const MODULE_ROUTES = {
   sys_permissions: "/api/roles",
   sys_config:      "/api/system/config",
   sys_logs:        "/api/system/logs",
+  // [HR-G1] Chấm công & Nghỉ phép — 2026-10-22, CHƯA PHÁT HÀNH
+  hr_attendance: "/api/hr/attendance",
+  hr_leave:      "/api/hr/leave-requests",
+  hr_period:     "/api/hr/periods",
+  hr_photo:      "/api/hr/photos",
+  hr_all_units:  "/api/hr/*",
+  hr_config:     "/api/hr/(org-units|shifts|leave-types|holidays|employees)",
 };
 
 export const PERM_TREE = [
@@ -125,6 +133,19 @@ export const PERM_TREE = [
     modules: [
       { key: "qrscan",    label: "Tra cứu xuất xứ", actions: ["view"] },
       { key: "trace_lot", label: "Truy xuất lô",    actions: ["view"] },
+    ]
+  },
+  // [HR-G1] Chấm công & Nghỉ phép — 2026-10-22, CHƯA PHÁT HÀNH
+  {
+    category: "Chấm công & Nghỉ phép",
+    icon: Clock,
+    modules: [
+      { key: "hr_attendance", label: "Bảng công & sửa công",         actions: ["view","create","approve","approve_correction","export"] },
+      { key: "hr_leave",      label: "Đơn nghỉ phép",               actions: ["view","create","approve"] },
+      { key: "hr_period",     label: "Chốt / mở khóa công tháng",    actions: ["view","approve"] },
+      { key: "hr_photo",      label: "Xem ảnh chấm công",            actions: ["view"] },
+      { key: "hr_all_units",  label: "Xem dữ liệu MỌI đơn vị + sửa cơ cấu tổ (nhân sự)", actions: ["view"] },
+      { key: "hr_config",     label: "Cấu hình chấm công (ca, tổ, PIN, tablet)", actions: ["view","edit"] },
     ]
   },
   {

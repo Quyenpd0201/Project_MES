@@ -118,6 +118,7 @@ mountCrud('/employees', makeCrud({
   table: 'employees', validate: validators.employees,
   columns: ['name', 'factory', 'position', 'skill_level', 'phone', 'status'],
   searchCols: ['name', 'employee_code', 'phone'], exactCols: ['factory', 'status'], codeCol: 'employee_code',
+  hiddenCols: ['pin_hash'], // [HR-G1] PIN chấm công chỉ lưu hash, không bao giờ trả ra API — 2026-10-22, CHƯA PHÁT HÀNH
   blockDeleteStatuses: ['Hoạt động'],
   blockDeleteMessage: 'Không thể xóa nhân viên đang "Hoạt động" - họ có thể đang được phân công ở công việc khác. Vui lòng chuyển trạng thái sang "Không hoạt động" (hoặc "Đã nghỉ") trước, rồi mới xóa.',
   deleteDependents: EMPLOYEE_DEPENDENTS,

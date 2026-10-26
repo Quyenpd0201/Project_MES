@@ -14,6 +14,8 @@ const dbStatus = (err) => (err && /^(22|23)/.test(String(err.code || '')) ? 400 
  *  exactCols    : cột lọc khớp tuyệt đối (?<col>)
  *  softDelete   : true nếu bảng có cột is_deleted
  *  orderBy      : mệnh đề ORDER BY (mặc định created_at DESC)
+ *  hiddenCols   : cột KHÔNG bao giờ trả ra API (vd pin_hash) — bỏ khỏi mọi phản hồi
+ *                 [HR-G1] thêm 2026-10-22, CHƯA PHÁT HÀNH (hiddenCols + strip)
  */
 function makeCrud(cfg) {
   const {
@@ -21,7 +23,15 @@ function makeCrud(cfg) {
     softDelete = true, orderBy = 'created_at DESC',
     codeCol = null, // cột mã định danh (vd employee_code) — dùng để chặn trùng khi import
     extraSelect = '', // biểu thức SELECT bổ sung (vd cột suy ra), bắt đầu bằng dấu phẩy
+    hiddenCols = [],
   } = cfg;
+
+  const strip = (row) => {
+    if (!row || !hiddenCols.length) return row;
+    const out = { ...row };
+    for (const c of hiddenCols) delete out[c];
+    return out;
+  };
 
   const list = async (req, res) => {
     try {
@@ -55,7 +65,7 @@ function makeCrud(cfg) {
         `SELECT * ${extraSelect} FROM ${table} ${whereSql} ORDER BY ${orderBy} LIMIT $${i++} OFFSET $${i++}`,
         [...params, pageSize, offset]
       );
-      res.json({ data: dataRes.rows, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
+      res.json({ data: dataRes.rows.map(strip), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
     } catch (err) { console.error(err); res.status(500).json({ message: `Lỗi khi lấy danh sách ${table}` }); }
   };
 
@@ -64,7 +74,7 @@ function makeCrud(cfg) {
       const sd = softDelete ? 'AND is_deleted = FALSE' : '';
       const { rows } = await db.query(`SELECT * ${extraSelect} FROM ${table} WHERE id = $1 ${sd}`, [req.params.id]);
       if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy bản ghi' });
-      res.json(rows[0]);
+      res.json(strip(rows[0]));
     } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy chi tiết' }); }
   };
 
@@ -88,7 +98,7 @@ function makeCrud(cfg) {
       const ph = cols.map((_, k) => `$${k + 1}`).join(',');
       const { rows } = await db.query(
         `INSERT INTO ${table} (${cols.join(',')}) VALUES (${ph}) RETURNING *`, vals);
-      res.status(201).json(rows[0]);
+      res.status(201).json(strip(rows[0]));
     } catch (err) { console.error(err); res.status(dbStatus(err)).json({ message: err.detail || `Lỗi khi tạo ${table}` }); }
   };
 
@@ -103,7 +113,7 @@ function makeCrud(cfg) {
         `UPDATE ${table} SET ${setSql} WHERE id = $${cols.length + 1} RETURNING *`,
         [...vals, req.params.id]);
       if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy bản ghi' });
-      res.json(rows[0]);
+      res.json(strip(rows[0]));
     } catch (err) { console.error(err); res.status(dbStatus(err)).json({ message: err.detail || 'Lỗi khi cập nhật' }); }
   };
 

@@ -5,11 +5,20 @@ import * as XLSX from "xlsx";
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Search, Plus, Trash2,
   Upload, Download, RotateCcw, ArrowLeft, Save, CheckCircle2, Activity, Cog,
-  Factory, Settings, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen, Recycle, Wallet, Scale,
+  Factory, Settings, ClipboardList, Database, FlaskConical, ChevronDown, Users, Wrench, MapPin, Pencil, Clock, CalendarDays, QrCode, ScanLine, Shield, ShieldCheck, UserCog, LogOut, GitBranch, Hammer, Copy, Scissors, Wind, Image as ImageIcon, FileText, Eye, Check, Layers, Menu, PanelLeftClose, PanelLeftOpen, Recycle, Wallet, Scale, Table2 /* [HR-G5] */,
 } from "lucide-react";
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import { setAppSettings } from "./src/appSettings.js";
 import SettingsScreen from "./src/modules/masterData/SettingsScreen.jsx";
+import HrConfig from "./src/modules/hr/HrConfig.jsx"; // [HR-G1] Chấm công — 2026-10-22, CHƯA PHÁT HÀNH
+import PunchHistory from "./src/modules/hr/PunchHistory.jsx"; // [HR-G2] 2026-10-23, CHƯA PHÁT HÀNH
+import HrInbox from "./src/modules/hr/HrInbox.jsx"; // [HR-G3] 2026-10-23, CHƯA PHÁT HÀNH
+import WorkdayList from "./src/modules/hr/WorkdayList.jsx"; // [HR-G3]
+import ShiftPlanner from "./src/modules/hr/ShiftPlanner.jsx"; // [HR-G3]
+import LeaveRequests from "./src/modules/hr/LeaveRequests.jsx"; // [HR-G4] 2026-10-26, CHƯA PHÁT HÀNH
+import LeaveBalances from "./src/modules/hr/LeaveBalances.jsx"; // [HR-G4]
+import NotificationBell from "./src/modules/hr/NotificationBell.jsx"; // [HR-G4]
+import Timesheet from "./src/modules/hr/Timesheet.jsx"; // [HR-G5] 2026-10-26, CHƯA PHÁT HÀNH
 import Login from "./src/Login.jsx";
 import UsersModule from "./src/modules/auth/Users.jsx";
 import { PermProvider, usePerm } from "./src/perm.jsx";
@@ -199,6 +208,20 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "rep_employee", label: "Hiệu suất nhân viên", icon: Users, path: "/reports/employees" },
       ]
     },
+    // [HR-G1] Chấm công — 2026-10-22, CHƯA PHÁT HÀNH
+    {
+      key: "grp_hr", label: "Chấm công & Nghỉ phép", icon: Clock,
+      children: [
+        { key: "hr_inbox", label: "Cần xử lý", icon: Check, path: "/hr/inbox", perm: "hr_attendance" }, // [HR-G3]
+        { key: "hr_leave_list", label: "Đơn nghỉ", icon: FileText, path: "/hr/leave", perm: "hr_leave" }, // [HR-G4]
+        { key: "hr_leave_balances", label: "Số dư phép", icon: Layers, path: "/hr/leave-balances", perm: "hr_leave" }, // [HR-G4]
+        { key: "hr_timesheet", label: "Bảng công tháng", icon: Table2, path: "/hr/timesheet", perm: "hr_attendance" }, // [HR-G5]
+        { key: "hr_days", label: "Ngày công", icon: CalendarDays, path: "/hr/days", perm: "hr_attendance" }, // [HR-G3]
+        { key: "hr_shifts_plan", label: "Phân ca", icon: Clock, path: "/hr/shift-plan", perm: "hr_attendance" }, // [HR-G3]
+        { key: "hr_punches", label: "Lịch sử chấm công", icon: ClipboardList, path: "/hr/punches", perm: "hr_attendance" }, // [HR-G2]
+        { key: "hr_config", label: "Cấu hình chấm công", icon: Settings, path: "/hr/config", perm: "hr_config" },
+      ]
+    },
     {
       key: "grp_master", label: "Thông tin chung", icon: Package,
       children: [
@@ -339,11 +362,12 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
               {(user?.full_name || user?.username || "?").charAt(0).toUpperCase()}
             </div>
             {!collapsed && (
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-slate-800 truncate">{user?.full_name || user?.username}</div>
                 <div className="text-[11px] text-slate-400 truncate">{user?.role_name || (user?.is_admin ? "Quản trị" : "—")}</div>
               </div>
             )}
+            {!collapsed && <NotificationBell />}{/* [HR-G4] chuông thông báo */}
           </div>
           <button onClick={onLogout} className={`flex items-center justify-center gap-2 rounded-lg text-sm text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition ${collapsed ? "w-10 h-10 p-0" : "w-full px-3 py-2"}`} title={collapsed ? "Đăng xuất" : undefined}>
             <LogOut size={16} className="shrink-0" /> {!collapsed && "Đăng xuất"}
@@ -1372,6 +1396,14 @@ export default function MesApp() {
               <Route path="/traceability/lot" element={<TraceabilityLot />} />
               <Route path="/master-data/roles" element={<RolesModule />} />
               <Route path="/settings" element={<SettingsScreen />} />
+              <Route path="/hr/config" element={<HrConfig />} />{/* [HR-G1] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/punches" element={<PunchHistory />} />{/* [HR-G2] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/inbox" element={<HrInbox />} />{/* [HR-G3] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/days" element={<WorkdayList />} />{/* [HR-G3] */}
+              <Route path="/hr/shift-plan" element={<ShiftPlanner />} />{/* [HR-G3] */}
+              <Route path="/hr/leave" element={<LeaveRequests />} />{/* [HR-G4] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/leave-balances" element={<LeaveBalances />} />{/* [HR-G4] */}
+              <Route path="/hr/timesheet" element={<Timesheet />} />{/* [HR-G5] CHƯA PHÁT HÀNH */}
               <Route path="/master-data/:entity" element={lookups ? <MasterDataWrapper lookups={lookups} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
               <Route path="/qrlabels" element={<QrLabelsModule />} />

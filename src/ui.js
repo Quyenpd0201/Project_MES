@@ -91,6 +91,32 @@ const STATUS_COLORS = {
   "Đã hủy": BADGE.red,
   "Ngừng": BADGE.red,
   "Không hoạt động": BADGE.red,
+  // [HR-G3] Ngày công + sửa công — 2026-10-23, CHƯA PHÁT HÀNH
+  "Đủ công": BADGE.green,
+  "Đã duyệt": BADGE.green,
+  "Làm ngày nghỉ": BADGE.blue,
+  "Làm ngày lễ": BADGE.blue,
+  "Chưa kết thúc": BADGE.blue,
+  "Đi muộn": BADGE.amber,
+  "Về sớm": BADGE.amber,
+  "Đi muộn, về sớm": BADGE.amber,
+  "Thiếu giờ vào": BADGE.amber,
+  "Thiếu giờ ra": BADGE.amber,
+  "Chờ xác nhận": BADGE.amber,
+  "Vắng không phép": BADGE.red,
+  "Từ chối": BADGE.red,
+  "Nghỉ": BADGE.gray,
+  "Nghỉ lễ": BADGE.gray,
+  // [HR-G4] đơn nghỉ — 2026-10-26, CHƯA PHÁT HÀNH
+  "Nghỉ có phép": BADGE.green,
+  "Nghỉ nửa ngày": BADGE.green,
+  "Nghỉ không lương": BADGE.gray,
+  "Vắng nửa ngày": BADGE.red,
+  "Chờ trưởng đơn vị": BADGE.gray,
+  "Chờ nhân sự": BADGE.amber,
+  // [HR-G5] kỳ công — 2026-10-26, CHƯA PHÁT HÀNH
+  "Đã chốt": BADGE.green,
+  "Mở": BADGE.gray,
 };
 
 export function statusClass(status) {

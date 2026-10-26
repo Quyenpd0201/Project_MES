@@ -5,7 +5,13 @@ import { Toaster } from "react-hot-toast";
 import "./index.css";
 import MesApp from "../MesApp.jsx";
 
-createRoot(document.getElementById("root")).render(
+// [HR-G2] /kiosk = tablet chấm công: app riêng, không qua đăng nhập, tải tách gói — 2026-10-23, CHƯA PHÁT HÀNH
+const KioskApp = React.lazy(() => import("./modules/hr/kiosk/KioskApp.jsx"));
+if (window.location.pathname.startsWith("/kiosk")) {
+  createRoot(document.getElementById("root")).render(
+    <React.Suspense fallback={<div style={{ padding: 32, fontSize: 20 }}>Đang tải…</div>}><KioskApp /></React.Suspense>
+  );
+} else createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
       <Toaster position="top-right" toastOptions={{

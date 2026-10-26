@@ -2704,6 +2704,530 @@ ON CONFLICT (key) DO NOTHING;
 UPDATE public.warehouses SET factory = NULL WHERE factory IN ('Nhà máy 1', 'Nhà máy 2', 'Nhà máy 3');
 -- ---------------------------------------------------------------------
 
+-- 26) [HR-G1] (2026-10-22, CHƯA PHÁT HÀNH): CHẤM CÔNG & NGHỈ PHÉP — DỮ LIỆU NỀN
+--     Toàn bộ mục 26 (a → i) thuộc module Chấm công. Gỡ: migrations/manual/2026-10-22_9_rollback-hr-g1.sql
+--     Spec: docs/ai/specs/2026-10-22-cham-cong-nghi-phep.md. Chỉ THÊM bảng/cột, không đổi dữ liệu cũ.
+--  a) Đơn vị dạng cây: Xưởng/Phòng → Tổ. Nhân viên gắn 1 tổ (hoặc phòng).
+CREATE TABLE IF NOT EXISTS public.org_units (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code       varchar(20)  NOT NULL UNIQUE,
+  name       varchar(150) NOT NULL,
+  kind       varchar(10)  NOT NULL CHECK (kind IN ('XUONG', 'PHONG', 'TO')),
+  parent_id  uuid REFERENCES public.org_units(id),
+  status     varchar(20)  NOT NULL DEFAULT 'Hoạt động' CHECK (status IN ('Hoạt động', 'Không hoạt động')),
+  is_deleted boolean      NOT NULL DEFAULT false,
+  created_at timestamptz  NOT NULL DEFAULT now(),
+  updated_at timestamptz  NOT NULL DEFAULT now(),
+  CONSTRAINT org_units_not_self_parent CHECK (parent_id IS NULL OR parent_id <> id)
+);
+CREATE INDEX IF NOT EXISTS org_units_parent_idx ON public.org_units(parent_id);
+INSERT INTO public.org_units (code, name, kind) VALUES
+  ('THOI', 'Xưởng Thổi', 'XUONG'), ('CAT', 'Xưởng Cắt', 'XUONG'), ('VP', 'Văn phòng', 'PHONG')
+ON CONFLICT (code) DO NOTHING;
+
+--  b) Trưởng đơn vị (1 người quản lý 1–2 tổ/xưởng).
+CREATE TABLE IF NOT EXISTS public.org_unit_managers (
+  user_id     uuid NOT NULL REFERENCES public.users(id),
+  org_unit_id uuid NOT NULL REFERENCES public.org_units(id),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, org_unit_id)
+);
+
+--  c) Nhân viên: đơn vị, PIN kiosk (chỉ hash), đồng ý NĐ 13/2023, tài khoản web (tùy chọn).
+ALTER TABLE public.employees
+  ADD COLUMN IF NOT EXISTS org_unit_id          uuid REFERENCES public.org_units(id),
+  ADD COLUMN IF NOT EXISTS pin_hash             varchar(255),
+  ADD COLUMN IF NOT EXISTS pin_failed_count     integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS pin_locked_until     timestamptz,
+  ADD COLUMN IF NOT EXISTS face_consent_at      timestamptz,
+  ADD COLUMN IF NOT EXISTS face_consent_version varchar(20),
+  ADD COLUMN IF NOT EXISTS user_id              uuid REFERENCES public.users(id);
+CREATE INDEX IF NOT EXISTS employees_org_unit_idx ON public.employees(org_unit_id);
+
+--  d) Ca làm: quy tắc tính công. Khung nghỉ để ở shift_breaks (1 ca có thể nhiều khung).
+--     auto_detect_from/to: chấm VÀO trong khoảng này → tự nhận ca (vd ca đêm 17:30–23:00).
+ALTER TABLE public.shifts
+  ADD COLUMN IF NOT EXISTS overnight            boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS required_minutes     integer NOT NULL DEFAULT 480 CHECK (required_minutes > 0),
+  ADD COLUMN IF NOT EXISTS late_grace_min       integer NOT NULL DEFAULT 0 CHECK (late_grace_min >= 0),
+  ADD COLUMN IF NOT EXISTS early_grace_min      integer NOT NULL DEFAULT 0 CHECK (early_grace_min >= 0),
+  ADD COLUMN IF NOT EXISTS rounding_min         integer NOT NULL DEFAULT 1 CHECK (rounding_min >= 1),
+  ADD COLUMN IF NOT EXISTS ot_enabled           boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS ot_requires_approval boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS auto_detect_from     time,
+  ADD COLUMN IF NOT EXISTS auto_detect_to       time;
+
+CREATE TABLE IF NOT EXISTS public.shift_breaks (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shift_id   uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE,
+  start_time time NOT NULL,
+  end_time   time NOT NULL,
+  CONSTRAINT shift_breaks_not_empty CHECK (start_time <> end_time)
+);
+CREATE INDEX IF NOT EXISTS shift_breaks_shift_idx ON public.shift_breaks(shift_id);
+
+--  e) Loại nghỉ + ngày lễ.
+CREATE TABLE IF NOT EXISTS public.leave_types (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code                 varchar(20)  NOT NULL UNIQUE,
+  name                 varchar(100) NOT NULL,
+  paid                 boolean NOT NULL DEFAULT true,
+  uses_balance         boolean NOT NULL DEFAULT false,
+  annual_days          numeric(5,1) NOT NULL DEFAULT 0 CHECK (annual_days >= 0),
+  requires_attachment  boolean NOT NULL DEFAULT false,
+  requires_hr_approval boolean NOT NULL DEFAULT false,
+  status               varchar(20) NOT NULL DEFAULT 'Hoạt động' CHECK (status IN ('Hoạt động', 'Không hoạt động')),
+  is_deleted           boolean NOT NULL DEFAULT false,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
+);
+--     Phép năm: 12 ngày/năm, không cộng dồn, reset 01/01 (chủ dự án chốt 2026-10-22).
+INSERT INTO public.leave_types (code, name, paid, uses_balance, annual_days, requires_attachment) VALUES
+  ('PHEP_NAM', 'Nghỉ phép năm', true, true, 12, false),
+  ('OM', 'Nghỉ ốm', true, false, 0, true),
+  ('VIEC_RIENG', 'Nghỉ việc riêng', true, false, 0, false),
+  ('KHONG_LUONG', 'Nghỉ không lương', false, false, 0, false)
+ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS public.holidays (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  date       date NOT NULL UNIQUE,
+  name       varchar(150) NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+--  f) Nhật ký thao tác nhạy cảm của HR (sửa công, duyệt đơn, xem ảnh, đổi cấu hình, đặt PIN).
+CREATE TABLE IF NOT EXISTS public.hr_audit_logs (
+  id            bigserial PRIMARY KEY,
+  actor_user_id uuid REFERENCES public.users(id),
+  action        varchar(50) NOT NULL,
+  entity        varchar(50) NOT NULL,
+  entity_id     text,
+  before        jsonb,
+  after         jsonb,
+  ip            varchar(64),
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS hr_audit_logs_entity_idx ON public.hr_audit_logs(entity, entity_id);
+CREATE INDEX IF NOT EXISTS hr_audit_logs_created_idx ON public.hr_audit_logs(created_at);
+
+--  h) Gán đơn vị cho nhân viên hiện có theo cột factory (chỉ dòng chưa có org_unit_id → chạy lại không sao).
+--     Ánh xạ: "Nhà máy thổi" → THOI, "Nhà máy cắt" → CAT, "Quản lý" → VP. Giá trị khác giữ NULL để xếp tay.
+--     Xem trước trên PRD: migrations/manual/2026-10-22_1_xem-truoc-don-vi-nhan-vien.sql
+UPDATE public.employees e SET org_unit_id = u.id
+  FROM public.org_units u
+ WHERE e.org_unit_id IS NULL
+   AND u.code = CASE e.factory WHEN 'Nhà máy thổi' THEN 'THOI' WHEN 'Nhà máy cắt' THEN 'CAT' WHEN 'Quản lý' THEN 'VP' END;
+--  g) Cài đặt mặc định (khai báo + kiểm giá trị ở settings.js DEFS). Không ghi đè nếu đã có.
+INSERT INTO public.app_settings (key, value) VALUES
+  ('hr_scope_by_unit', '0'), ('hr_punch_dedupe_min', '2'), ('hr_photo_retention_days', '180'),
+  ('hr_pin_max_fail', '5'), ('hr_pin_lock_min', '15')
+ON CONFLICT (key) DO NOTHING;
+
+--  i) Sửa theo review G1 (2026-10-22). Idempotent.
+--   - Ca cũ qua đêm (giờ kết thúc < giờ bắt đầu, vd "Ca 3" 22:00–06:00) → bật overnight.
+--     Giờ công còn mặc định 480 → đặt theo độ dài thực của ca (ca cũ chưa có khung nghỉ). Giá trị khác 480 giữ nguyên.
+--     Xem trước trên PRD: migrations/manual/2026-10-22_1_xem-truoc-don-vi-nhan-vien.sql (phần 2).
+UPDATE public.shifts
+   SET overnight = true,
+       required_minutes = CASE WHEN required_minutes = 480
+         THEN (EXTRACT(EPOCH FROM (end_time - start_time + interval '24 hours')) / 60)::int ELSE required_minutes END
+ WHERE overnight = false AND start_time IS NOT NULL AND end_time IS NOT NULL AND end_time < start_time;
+--   - Index / ràng buộc bổ sung.
+CREATE INDEX IF NOT EXISTS org_unit_managers_unit_idx ON public.org_unit_managers(org_unit_id);
+CREATE UNIQUE INDEX IF NOT EXISTS employees_user_id_uq ON public.employees(user_id) WHERE user_id IS NOT NULL AND is_deleted = false;
+CREATE UNIQUE INDEX IF NOT EXISTS shift_breaks_shift_start_uq ON public.shift_breaks(shift_id, start_time);
+ALTER TABLE public.shifts DROP CONSTRAINT IF EXISTS shifts_auto_detect_pair;
+ALTER TABLE public.shifts ADD CONSTRAINT shifts_auto_detect_pair CHECK ((auto_detect_from IS NULL) = (auto_detect_to IS NULL));
+ALTER TABLE public.employees DROP CONSTRAINT IF EXISTS employees_pin_failed_nonneg;
+ALTER TABLE public.employees ADD CONSTRAINT employees_pin_failed_nonneg CHECK (pin_failed_count >= 0);
+
+-- 27) [HR-G2] (2026-10-23, CHƯA PHÁT HÀNH): KIOSK CHẤM CÔNG — thiết bị, lần chấm, ảnh.
+--     Plan: docs/ai/plans/2026-10-23-hr-g2-kiosk-cham-cong.md. Gỡ: migrations/manual/2026-10-23_9_rollback-hr-g2.sql
+--  a) Tablet kiosk: đăng ký bằng mã 6 ký tự → admin duyệt → nhận token (DB chỉ lưu SHA-256).
+CREATE TABLE IF NOT EXISTS public.kiosk_devices (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                varchar(100),
+  org_unit_id         uuid REFERENCES public.org_units(id),
+  token_hash          char(64) UNIQUE,
+  register_code       varchar(10) UNIQUE,
+  register_expires_at timestamptz,
+  status              varchar(20) NOT NULL DEFAULT 'Chờ duyệt' CHECK (status IN ('Chờ duyệt', 'Hoạt động', 'Thu hồi')),
+  approved_by         uuid REFERENCES public.users(id),
+  approved_at         timestamptz,
+  last_seen_at        timestamptz,
+  clock_skew_ms       integer,
+  claim_hash          char(64),            -- bí mật tablet giữ để nhận token sau khi được duyệt (chỉ lưu SHA-256)
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT kiosk_devices_active_has_unit CHECK (status <> 'Hoạt động' OR org_unit_id IS NOT NULL)
+);
+ALTER TABLE public.kiosk_devices ADD COLUMN IF NOT EXISTS claim_hash char(64);
+ALTER TABLE public.kiosk_devices DROP CONSTRAINT IF EXISTS kiosk_devices_active_has_unit;
+ALTER TABLE public.kiosk_devices ADD CONSTRAINT kiosk_devices_active_has_unit CHECK (status <> 'Hoạt động' OR org_unit_id IS NOT NULL);
+
+--  b) Ảnh chấm công: file nằm ở photoStore (Supabase Storage / thư mục local), DB chỉ giữ đường dẫn.
+CREATE TABLE IF NOT EXISTS public.punch_photos (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  storage_key        text NOT NULL UNIQUE,
+  mime               varchar(30) NOT NULL CHECK (mime IN ('image/webp', 'image/jpeg')),
+  bytes              integer NOT NULL CHECK (bytes > 0),
+  width              integer,
+  height             integer,
+  taken_at           timestamptz NOT NULL,
+  device_id          uuid REFERENCES public.kiosk_devices(id),
+  employee_id        uuid NOT NULL REFERENCES public.employees(id),
+  purged_at          timestamptz,
+  face_embedding_ref text,
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS punch_photos_purge_idx ON public.punch_photos(taken_at) WHERE purged_at IS NULL;
+
+--  c) Lần chấm GỐC — chỉ thêm. Sửa công (G3) ghi bảng riêng, không đụng bảng này.
+CREATE TABLE IF NOT EXISTS public.attendance_punches (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id        uuid NOT NULL REFERENCES public.employees(id),
+  device_id          uuid REFERENCES public.kiosk_devices(id),
+  punched_at         timestamptz NOT NULL,
+  direction          varchar(3)  NOT NULL CHECK (direction IN ('IN', 'OUT')),
+  work_date          date NOT NULL,
+  source             varchar(10) NOT NULL CHECK (source IN ('online', 'offline')),
+  client_captured_at timestamptz,
+  idempotency_key    varchar(64) NOT NULL UNIQUE,
+  photo_id           uuid REFERENCES public.punch_photos(id),
+  pin_verified       boolean NOT NULL DEFAULT false,
+  needs_review       boolean NOT NULL DEFAULT false,
+  review_reason      text,
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS attendance_punches_emp_time_idx ON public.attendance_punches(employee_id, punched_at DESC);
+CREATE INDEX IF NOT EXISTS attendance_punches_work_date_idx ON public.attendance_punches(work_date);
+
+--     Bất biến: chỉ cho cập nhật photo_id / needs_review / review_reason; cấm xóa.
+CREATE OR REPLACE FUNCTION public.attendance_punches_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — không được xóa';
+  END IF;
+  IF NEW.employee_id IS DISTINCT FROM OLD.employee_id OR NEW.device_id IS DISTINCT FROM OLD.device_id
+     OR NEW.punched_at IS DISTINCT FROM OLD.punched_at OR NEW.direction IS DISTINCT FROM OLD.direction
+     OR NEW.work_date IS DISTINCT FROM OLD.work_date OR NEW.source IS DISTINCT FROM OLD.source
+     OR NEW.client_captured_at IS DISTINCT FROM OLD.client_captured_at OR NEW.idempotency_key IS DISTINCT FROM OLD.idempotency_key
+     OR NEW.pin_verified IS DISTINCT FROM OLD.pin_verified OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — chỉ được cập nhật ảnh / cờ cần xác nhận';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS attendance_punches_immutable_trg ON public.attendance_punches;
+CREATE TRIGGER attendance_punches_immutable_trg BEFORE UPDATE OR DELETE ON public.attendance_punches
+  FOR EACH ROW EXECUTE FUNCTION public.attendance_punches_immutable();
+
+--  c2) Sửa theo review G2 (2026-10-23): ảnh chỉ gắn 1 lần + cùng nhân viên; chặn TRUNCATE; work_date khớp punched_at.
+CREATE OR REPLACE FUNCTION public.attendance_punches_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — không được xóa';
+  END IF;
+  IF NEW.employee_id IS DISTINCT FROM OLD.employee_id OR NEW.device_id IS DISTINCT FROM OLD.device_id
+     OR NEW.punched_at IS DISTINCT FROM OLD.punched_at OR NEW.direction IS DISTINCT FROM OLD.direction
+     OR NEW.work_date IS DISTINCT FROM OLD.work_date OR NEW.source IS DISTINCT FROM OLD.source
+     OR NEW.client_captured_at IS DISTINCT FROM OLD.client_captured_at OR NEW.idempotency_key IS DISTINCT FROM OLD.idempotency_key
+     OR NEW.pin_verified IS DISTINCT FROM OLD.pin_verified OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — chỉ được cập nhật ảnh / cờ cần xác nhận';
+  END IF;
+  IF NEW.photo_id IS DISTINCT FROM OLD.photo_id THEN
+    IF OLD.photo_id IS NOT NULL THEN
+      RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — ảnh đã gắn thì không đổi / gỡ được';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.punch_photos p WHERE p.id = NEW.photo_id AND p.employee_id = NEW.employee_id) THEN
+      RAISE EXCEPTION 'Ảnh phải thuộc cùng nhân viên với lần chấm';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+
+CREATE OR REPLACE FUNCTION public.attendance_punches_no_truncate() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'attendance_punches là dữ liệu gốc bất biến — không được TRUNCATE';
+END $$;
+DROP TRIGGER IF EXISTS attendance_punches_no_truncate_trg ON public.attendance_punches;
+CREATE TRIGGER attendance_punches_no_truncate_trg BEFORE TRUNCATE ON public.attendance_punches
+  FOR EACH STATEMENT EXECUTE FUNCTION public.attendance_punches_no_truncate();
+
+--      work_date = ngày (giờ VN) của lần chấm, hoặc ngày trước đó (lần RA của ca đêm).
+ALTER TABLE public.attendance_punches DROP CONSTRAINT IF EXISTS attendance_punches_work_date_ck;
+ALTER TABLE public.attendance_punches ADD CONSTRAINT attendance_punches_work_date_ck CHECK (
+  work_date BETWEEN (punched_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 1 AND (punched_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date);
+
+--      Index cho danh sách lần chấm, hàng chờ xác nhận, nhập mã NV, đếm offline / tablet, FK.
+CREATE INDEX IF NOT EXISTS attendance_punches_punched_at_idx ON public.attendance_punches(punched_at DESC);
+CREATE INDEX IF NOT EXISTS attendance_punches_review_idx ON public.attendance_punches(work_date) WHERE needs_review;
+CREATE INDEX IF NOT EXISTS attendance_punches_device_offline_idx ON public.attendance_punches(device_id, created_at) WHERE source = 'offline';
+CREATE INDEX IF NOT EXISTS attendance_punches_photo_idx ON public.attendance_punches(photo_id) WHERE photo_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS punch_photos_employee_idx ON public.punch_photos(employee_id);
+CREATE INDEX IF NOT EXISTS employees_code_upper_idx ON public.employees(upper(employee_code));
+CREATE INDEX IF NOT EXISTS kiosk_devices_pending_idx ON public.kiosk_devices(register_expires_at) WHERE status = 'Chờ duyệt';
+
+--  d) Nhân viên từ chối chụp ảnh (NĐ 13) — vẫn được chấm, bản ghi cần xác nhận.
+ALTER TABLE public.employees ADD COLUMN IF NOT EXISTS face_consent_refused_at timestamptz;
+
+--  e) Cài đặt mặc định.
+INSERT INTO public.app_settings (key, value) VALUES
+  ('hr_consent_version', to_jsonb('2026-10-23'::text)), ('hr_kiosk_result_seconds', '5')
+ON CONFLICT (key) DO NOTHING;
+
+-- 28) [HR-G3] (2026-10-23, CHƯA PHÁT HÀNH): TÍNH CÔNG — phân ca, duyệt lần chấm, sửa công, duyệt tăng ca, ngày công.
+--     Plan: docs/ai/plans/2026-10-23-hr-g3-tinh-cong-sua-cong.md. Gỡ: migrations/manual/2026-10-23_9_rollback-hr-g3.sql
+--  a) Gán ca theo ngày (ca đêm khi có đơn gấp). Không gán → tự nhận theo giờ VÀO → ca mặc định.
+CREATE TABLE IF NOT EXISTS public.shift_assignments (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id uuid NOT NULL REFERENCES public.employees(id),
+  work_date   date NOT NULL,
+  shift_id    uuid NOT NULL REFERENCES public.shifts(id),
+  note        text,
+  assigned_by uuid REFERENCES public.users(id),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (employee_id, work_date)
+);
+CREATE INDEX IF NOT EXISTS shift_assignments_date_idx ON public.shift_assignments(work_date);
+
+--  b) Quyết định duyệt lần chấm cần xác nhận (bảng lần chấm gốc giữ nguyên).
+CREATE TABLE IF NOT EXISTS public.punch_reviews (
+  punch_id    uuid PRIMARY KEY REFERENCES public.attendance_punches(id),
+  decision    varchar(10) NOT NULL CHECK (decision IN ('accept', 'reject')),
+  reason      text,
+  reviewed_by uuid NOT NULL REFERENCES public.users(id),
+  reviewed_at timestamptz NOT NULL DEFAULT now()
+);
+
+--  c) Yêu cầu sửa công: bổ sung giờ vào / ra, hoặc bỏ 1 lần chấm sai. Người duyệt ≠ người tạo.
+CREATE TABLE IF NOT EXISTS public.attendance_corrections (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id       uuid NOT NULL REFERENCES public.employees(id),
+  work_date         date NOT NULL,
+  kind              varchar(15) NOT NULL CHECK (kind IN ('add_in', 'add_out', 'ignore_punch')),
+  new_time          timestamptz,
+  punch_id          uuid REFERENCES public.attendance_punches(id),
+  reason            text NOT NULL CHECK (length(btrim(reason)) > 0),
+  status            varchar(20) NOT NULL DEFAULT 'Chờ duyệt' CHECK (status IN ('Chờ duyệt', 'Đã duyệt', 'Từ chối', 'Đã hủy')),
+  requested_by      uuid NOT NULL REFERENCES public.users(id),
+  created_on_behalf boolean NOT NULL DEFAULT true,
+  decided_by        uuid REFERENCES public.users(id),
+  decided_at        timestamptz,
+  reject_reason     text,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT attendance_corrections_kind_ck CHECK (
+    (kind IN ('add_in', 'add_out') AND new_time IS NOT NULL AND punch_id IS NULL)
+    OR (kind = 'ignore_punch' AND punch_id IS NOT NULL AND new_time IS NULL)),
+  CONSTRAINT attendance_corrections_not_self_approve CHECK (decided_by IS NULL OR decided_by <> requested_by)
+);
+CREATE INDEX IF NOT EXISTS attendance_corrections_emp_date_idx ON public.attendance_corrections(employee_id, work_date);
+CREATE INDEX IF NOT EXISTS attendance_corrections_pending_idx ON public.attendance_corrections(created_at) WHERE status = 'Chờ duyệt';
+
+--  d) Tăng ca được duyệt (số phút, ≤ số tính được — kiểm ở API).
+CREATE TABLE IF NOT EXISTS public.overtime_approvals (
+  employee_id             uuid NOT NULL REFERENCES public.employees(id),
+  work_date               date NOT NULL,
+  approved_ot_min         integer NOT NULL DEFAULT 0 CHECK (approved_ot_min >= 0),
+  approved_ot_night_min   integer NOT NULL DEFAULT 0 CHECK (approved_ot_night_min >= 0),
+  approved_ot_holiday_min integer NOT NULL DEFAULT 0 CHECK (approved_ot_holiday_min >= 0),
+  note                    text,
+  approved_by             uuid NOT NULL REFERENCES public.users(id),
+  approved_at             timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (employee_id, work_date)
+);
+
+--  e) Ngày công = KẾT QUẢ tính (tính lại được bất cứ lúc nào từ dữ liệu gốc, trừ khi đã chốt).
+CREATE TABLE IF NOT EXISTS public.attendance_days (
+  employee_id         uuid NOT NULL REFERENCES public.employees(id),
+  work_date           date NOT NULL,
+  shift_id            uuid REFERENCES public.shifts(id),
+  first_in            timestamptz,
+  last_out            timestamptz,
+  worked_min          integer NOT NULL DEFAULT 0,
+  late_min            integer NOT NULL DEFAULT 0,
+  early_min           integer NOT NULL DEFAULT 0,
+  ot_min              integer NOT NULL DEFAULT 0,
+  ot_night_min        integer NOT NULL DEFAULT 0,
+  ot_holiday_min      integer NOT NULL DEFAULT 0,
+  ot_calc_min         integer NOT NULL DEFAULT 0,
+  ot_calc_night_min   integer NOT NULL DEFAULT 0,
+  ot_calc_holiday_min integer NOT NULL DEFAULT 0,
+  ot_status           varchar(10) NOT NULL DEFAULT 'none' CHECK (ot_status IN ('none', 'pending', 'approved')),
+  status              varchar(30) NOT NULL,
+  flags               jsonb NOT NULL DEFAULT '[]',
+  calc_version        integer NOT NULL DEFAULT 1,
+  calculated_at       timestamptz NOT NULL DEFAULT now(),
+  locked              boolean NOT NULL DEFAULT false,
+  PRIMARY KEY (employee_id, work_date)
+);
+CREATE INDEX IF NOT EXISTS attendance_days_status_idx ON public.attendance_days(work_date, status);
+DROP INDEX IF EXISTS public.attendance_days_date_idx; -- thừa: (work_date, status) đã có work_date làm tiền tố
+
+--  e2) Hàng đợi tính lại (review G3): thao tác ghi vào đây TRONG transaction của nó → tính lại lỗi / server
+--      restart thì không mất; worker nền quét mỗi phút. Tính lại xong thì xóa dòng trong transaction tính lại.
+CREATE TABLE IF NOT EXISTS public.attendance_recalc_queue (
+  employee_id uuid NOT NULL REFERENCES public.employees(id),
+  work_date   date NOT NULL,
+  queued_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (employee_id, work_date)
+);
+CREATE INDEX IF NOT EXISTS attendance_recalc_queue_time_idx ON public.attendance_recalc_queue(queued_at);
+
+--  e3) Ràng buộc bổ sung (review G3).
+CREATE INDEX IF NOT EXISTS attendance_corrections_punch_idx ON public.attendance_corrections(punch_id) WHERE punch_id IS NOT NULL;
+ALTER TABLE public.attendance_corrections DROP CONSTRAINT IF EXISTS attendance_corrections_decided_ck;
+ALTER TABLE public.attendance_corrections ADD CONSTRAINT attendance_corrections_decided_ck
+  CHECK (status NOT IN ('Đã duyệt', 'Từ chối') OR decided_by IS NOT NULL);
+
+--  f) Cài đặt (Q1, Q4, Q6 chốt 2026-10-23). hr_workdays: 1 = thứ 2 … 7 = Chủ nhật.
+INSERT INTO public.app_settings (key, value) VALUES
+  ('hr_default_shift_code', to_jsonb('CA_NGAY'::text)), ('hr_workdays', to_jsonb('1,2,3,4,5,6'::text)),
+  ('hr_ot_night_from', to_jsonb('18:00'::text)), ('hr_ot_min_minutes', '30'), ('hr_ot_block_minutes', '30')
+ON CONFLICT (key) DO NOTHING;
+
+-- 29) [HR-G4] (2026-10-26, CHƯA PHÁT HÀNH): ĐƠN NGHỈ PHÉP — đơn, đính kèm, số dư, thông báo.
+--     Plan: docs/ai/plans/2026-10-26-hr-g4-don-nghi-phep.md. Gỡ: migrations/manual/2026-10-26_9_rollback-hr-g4.sql
+-- btree_gist cho EXCLUDE (employee_id WITH =, slots WITH &&). Supabase: cài vào schema "extensions" (tránh cảnh báo
+-- extension_in_public); Postgres local không có schema đó → cài mặc định. Đã cài ở đâu rồi thì bỏ qua.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'btree_gist') THEN
+    IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'extensions') THEN
+      CREATE EXTENSION btree_gist WITH SCHEMA extensions;
+    ELSE
+      CREATE EXTENSION btree_gist;
+    END IF;
+  END IF;
+END $$;
+
+--  a) Đơn nghỉ. slots = khung nửa ngày [lo, hi) (ngày × 2 + 0 sáng / 1 chiều) → chặn chồng lấn ở DB.
+CREATE TABLE IF NOT EXISTS public.leave_requests (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id       uuid NOT NULL REFERENCES public.employees(id),
+  leave_type_id     uuid NOT NULL REFERENCES public.leave_types(id),
+  from_date         date NOT NULL,
+  to_date           date NOT NULL,
+  from_part         varchar(4) NOT NULL DEFAULT 'FULL' CHECK (from_part IN ('FULL', 'AM', 'PM')),
+  to_part           varchar(4) NOT NULL DEFAULT 'FULL' CHECK (to_part IN ('FULL', 'AM', 'PM')),
+  days              numeric(5,1) NOT NULL CHECK (days > 0),
+  slots             int4range NOT NULL,
+  reason            text NOT NULL CHECK (length(btrim(reason)) > 0),
+  status            varchar(20) NOT NULL DEFAULT 'Chờ trưởng đơn vị'
+                    CHECK (status IN ('Chờ trưởng đơn vị', 'Chờ nhân sự', 'Đã duyệt', 'Từ chối', 'Đã hủy')),
+  created_by        uuid NOT NULL REFERENCES public.users(id),
+  created_on_behalf boolean NOT NULL DEFAULT true,
+  approved_by       uuid REFERENCES public.users(id),
+  approved_at       timestamptz,
+  hr_approved_by    uuid REFERENCES public.users(id),
+  hr_approved_at    timestamptz,
+  rejected_by       uuid REFERENCES public.users(id),
+  reject_reason     text,
+  cancelled_by      uuid REFERENCES public.users(id),
+  cancelled_at      timestamptz,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT leave_requests_dates_ck CHECK (to_date >= from_date),
+  CONSTRAINT leave_requests_not_self_approve CHECK (
+    (approved_by IS NULL OR approved_by <> created_by) AND (hr_approved_by IS NULL OR hr_approved_by <> created_by)),
+  CONSTRAINT leave_requests_rejected_ck CHECK (status <> 'Từ chối' OR (rejected_by IS NOT NULL AND reject_reason IS NOT NULL)),
+  CONSTRAINT leave_requests_no_overlap EXCLUDE USING gist (employee_id WITH =, slots WITH &&)
+    WHERE (status NOT IN ('Từ chối', 'Đã hủy'))
+);
+CREATE INDEX IF NOT EXISTS leave_requests_emp_date_idx ON public.leave_requests(employee_id, from_date);
+CREATE INDEX IF NOT EXISTS leave_requests_pending_idx ON public.leave_requests(created_at) WHERE status IN ('Chờ trưởng đơn vị', 'Chờ nhân sự');
+
+--  b) Đính kèm (giấy khám...). File ở photoStore (Supabase Storage / thư mục local), DB chỉ giữ đường dẫn.
+CREATE TABLE IF NOT EXISTS public.leave_attachments (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id  uuid NOT NULL REFERENCES public.leave_requests(id),
+  storage_key text NOT NULL UNIQUE,
+  mime        varchar(40) NOT NULL CHECK (mime IN ('image/webp', 'image/jpeg', 'image/png', 'application/pdf')),
+  bytes       integer NOT NULL CHECK (bytes > 0),
+  file_name   varchar(200),
+  uploaded_by uuid NOT NULL REFERENCES public.users(id),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS leave_attachments_request_idx ON public.leave_attachments(request_id);
+
+--  c) Số dư: được hưởng + chỉnh tay của nhân sự. "Đã dùng" luôn TÍNH từ đơn đã duyệt (không lưu → không lệch).
+CREATE TABLE IF NOT EXISTS public.leave_balances (
+  employee_id   uuid NOT NULL REFERENCES public.employees(id),
+  year          integer NOT NULL CHECK (year BETWEEN 2000 AND 2100),
+  leave_type_id uuid NOT NULL REFERENCES public.leave_types(id),
+  entitled      numeric(5,1) NOT NULL CHECK (entitled >= 0),
+  adjusted      numeric(5,1) NOT NULL DEFAULT 0,
+  adjust_reason text,
+  updated_by    uuid REFERENCES public.users(id),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (employee_id, year, leave_type_id)
+);
+
+--  d) Thông báo trong app (channel để thêm email / Zalo sau).
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id         bigserial PRIMARY KEY,
+  user_id    uuid NOT NULL REFERENCES public.users(id),
+  type       varchar(40) NOT NULL,
+  title      varchar(200) NOT NULL,
+  body       text,
+  ref_type   varchar(40),
+  ref_id     text,
+  channel    varchar(20) NOT NULL DEFAULT 'in_app',
+  read_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_unread_idx ON public.notifications(user_id, created_at DESC) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON public.notifications(user_id, created_at DESC);
+
+--  e) Ngày công biết ngày đó nghỉ theo đơn nào, buổi nào.
+ALTER TABLE public.attendance_days
+  ADD COLUMN IF NOT EXISTS leave_request_id uuid REFERENCES public.leave_requests(id),
+  ADD COLUMN IF NOT EXISTS leave_part varchar(4) CHECK (leave_part IN ('FULL', 'AM', 'PM'));
+
+--  f) Cài đặt.
+INSERT INTO public.app_settings (key, value) VALUES ('hr_leave_attachment_max_mb', '5') ON CONFLICT (key) DO NOTHING;
+
+--  g) Sửa theo review G4 (2026-10-26).
+--   - Số ngày bị trừ CHỐT theo năm lúc tạo đơn (thêm ngày lễ sau không đổi số dư đơn cũ — chủ dự án chốt).
+ALTER TABLE public.leave_requests ADD COLUMN IF NOT EXISTS days_by_year jsonb;
+--   - slots phải khớp ngày / buổi (EXCLUDE chống chồng lấn dựa vào nó); days là bội số 0,5.
+ALTER TABLE public.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_slots_ck;
+ALTER TABLE public.leave_requests ADD CONSTRAINT leave_requests_slots_ck CHECK (
+  slots = int4range((from_date - DATE '1970-01-01') * 2 + CASE WHEN from_part = 'PM' THEN 1 ELSE 0 END,
+                    (to_date - DATE '1970-01-01') * 2 + CASE WHEN to_part = 'AM' THEN 1 ELSE 2 END));
+ALTER TABLE public.leave_requests DROP CONSTRAINT IF EXISTS leave_requests_days_half_ck;
+ALTER TABLE public.leave_requests ADD CONSTRAINT leave_requests_days_half_ck CHECK (days * 2 = trunc(days * 2));
+--   - Index: danh sách "Tất cả" (ORDER BY created_at), FK từ ngày công.
+CREATE INDEX IF NOT EXISTS leave_requests_created_idx ON public.leave_requests(created_at DESC);
+CREATE INDEX IF NOT EXISTS attendance_days_leave_req_idx ON public.attendance_days(leave_request_id) WHERE leave_request_id IS NOT NULL;
+--   (btree_gist: production Supabase nên cài vào schema extensions — xem ghi chú đầu mục 29.)
+-- ---------------------------------------------------------------------
+
+-- =====================================================================
+-- 30) [HR-G5] (2026-10-26, CHƯA PHÁT HÀNH): CHỐT CÔNG THÁNG — kỳ công, lịch sử mở khóa.
+--     Chốt cả nhà máy theo tháng (Q3). Ngày công dùng cột attendance_days.locked có từ mục 28.
+--     Gỡ: migrations/manual/2026-10-26_9_rollback-hr-g5.sql
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS public.attendance_periods (
+  year_month char(7) PRIMARY KEY CHECK (year_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
+  status     varchar(10) NOT NULL DEFAULT 'Mở' CHECK (status IN ('Mở', 'Đã chốt')),
+  closed_by  uuid REFERENCES public.users(id),
+  closed_at  timestamptz,
+  close_note text,
+  warnings   jsonb NOT NULL DEFAULT '[]',
+  CONSTRAINT attendance_periods_closed_ck CHECK (status <> 'Đã chốt' OR (closed_by IS NOT NULL AND closed_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS public.period_unlocks (
+  id          bigserial PRIMARY KEY,
+  year_month  char(7) NOT NULL REFERENCES public.attendance_periods(year_month),
+  reason      text NOT NULL CHECK (length(btrim(reason)) >= 5),
+  unlocked_by uuid NOT NULL REFERENCES public.users(id),
+  unlocked_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS period_unlocks_ym_idx ON public.period_unlocks(year_month, unlocked_at DESC);
+--   Review G5: precheck đếm lần chấm chờ xác nhận theo tháng
+CREATE INDEX IF NOT EXISTS attendance_punches_review_idx ON public.attendance_punches(work_date) WHERE needs_review;
+-- ---------------------------------------------------------------------
+
 -- 31) NỢ ĐẦU KỲ (2026-10-26): chốt sổ công nợ cũ — mỗi khách 1 dòng (ngày chốt, tổng nợ, đã trả).
 --   Còn nợ đầu kỳ = tổng nợ − đã trả, coi là khoản nợ CŨ NHẤT của khách → Phiếu thanh toán trừ vào đây trước
 --   (phần trừ ghi ở opening_balance_payments). Đã trả > tổng nợ → phần dư là tiền trả trước, trừ vào phiếu giao

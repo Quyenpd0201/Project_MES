@@ -216,3 +216,90 @@ export const appSettingsApi = {
   list: () => http(`/app-settings`).then((r) => r.data),
   save: (values) => http(`/app-settings`, body("PUT", { values })),
 };
+
+// [HR-G1] Chấm công & Nghỉ phép — cấu hình (backend/src/modules/hr/hrConfig.route.js) — 2026-10-22, CHƯA PHÁT HÀNH
+export const hrConfig = {
+  orgUnits: () => http(`/hr/org-units`),
+  createOrgUnit: (d) => http(`/hr/org-units`, body("POST", d)),
+  updateOrgUnit: (id, d) => http(`/hr/org-units/${id}`, body("PUT", d)),
+  setManagers: (id, userIds) => http(`/hr/org-units/${id}/managers`, body("PUT", { user_ids: userIds })),
+  assignableUsers: () => http(`/hr/assignable-users`),
+  shifts: () => http(`/hr/shifts`),
+  createShift: (d) => http(`/hr/shifts`, body("POST", d)),
+  updateShift: (id, d) => http(`/hr/shifts/${id}`, body("PUT", d)),
+  leaveTypes: () => http(`/hr/leave-types`),
+  createLeaveType: (d) => http(`/hr/leave-types`, body("POST", d)),
+  updateLeaveType: (id, d) => http(`/hr/leave-types/${id}`, body("PUT", d)),
+  holidays: (year) => http(`/hr/holidays${year ? `?year=${year}` : ""}`),
+  createHoliday: (d) => http(`/hr/holidays`, body("POST", d)),
+  deleteHoliday: (id) => http(`/hr/holidays/${id}`, { method: "DELETE" }),
+  employees: () => http(`/hr/employees`),
+  resetPin: (id) => http(`/hr/employees/${id}/pin`, { method: "POST" }),
+  unlockPin: (id) => http(`/hr/employees/${id}/pin/unlock`, { method: "POST" }),
+  moveEmployee: (id, orgUnitId) => http(`/hr/employees/${id}/org-unit`, body("PUT", { org_unit_id: orgUnitId })),
+  // [HR-G2] tablet kiosk — 2026-10-23, CHƯA PHÁT HÀNH
+  devices: () => http(`/hr/kiosk-devices`),
+  approveDevice: (d) => http(`/hr/kiosk-devices/approve`, body("POST", d)),
+  updateDevice: (id, d) => http(`/hr/kiosk-devices/${id}`, body("PUT", d)),
+  revokeDevice: (id) => http(`/hr/kiosk-devices/${id}/revoke`, { method: "POST" }),
+};
+
+// [HR-G2] Lần chấm công + ảnh — 2026-10-23, CHƯA PHÁT HÀNH
+export const hrAttendance = {
+  punches: (params = {}) => http(`/hr/punches?${new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null))}`),
+  photoUrl: (id) => http(`/hr/photos/${id}/url`).then((r) => ({ ...r, url: `${API_BASE}${r.url}` })),
+};
+
+// [HR-G3] Ngày công, phân ca, duyệt, sửa công — 2026-10-23, CHƯA PHÁT HÀNH
+const qs = (params = {}) => new URLSearchParams(Object.entries(params).filter(([, v]) => v !== "" && v != null)).toString();
+export const hrWorkday = {
+  days: (params) => http(`/hr/attendance-days?${qs(params)}`),
+  day: (employeeId, date) => http(`/hr/attendance-days/${employeeId}/${date}`),
+  recalculate: (d) => http(`/hr/attendance-days/recalculate`, body("POST", d)),
+  assignments: (params) => http(`/hr/shift-assignments?${qs(params)}`),
+  saveAssignments: (items) => http(`/hr/shift-assignments`, body("PUT", { items })),
+  pendingReviews: (params) => http(`/hr/punch-reviews/pending?${qs(params)}`),
+  reviewPunch: (id, decision, reason) => http(`/hr/punches/${id}/review`, body("POST", { decision, reason })),
+  corrections: (params) => http(`/hr/corrections?${qs(params)}`),
+  createCorrection: (d) => http(`/hr/corrections`, body("POST", d)),
+  decideCorrection: (id, action, d = {}) => http(`/hr/corrections/${id}/${action}`, body("POST", d)),
+  approveOvertime: (employeeId, date, d) => http(`/hr/overtime/${employeeId}/${date}/approve`, body("POST", d)),
+};
+
+// [HR-G4] Đơn nghỉ, số dư phép, thông báo — 2026-10-26, CHƯA PHÁT HÀNH
+export const hrLeave = {
+  list: (params) => http(`/hr/leave-requests?${qs(params)}`),
+  get: (id) => http(`/hr/leave-requests/${id}`),
+  create: (d) => http(`/hr/leave-requests`, body("POST", d)),
+  act: (id, action, d = {}) => http(`/hr/leave-requests/${id}/${action}`, body("POST", d)),
+  upload: async (id, file) => {
+    const f = new FormData(); f.append("file", file);
+    const res = await fetch(`${API_BASE}/api/hr/leave-requests/${id}/attachments`, { method: "POST", headers: authToken ? { Authorization: `Bearer ${authToken}` } : {}, body: f });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.message || `HTTP ${res.status}`);
+    return j;
+  },
+  attachmentUrl: (id) => http(`/hr/leave-attachments/${id}/url`).then((r) => ({ ...r, url: `${API_BASE}${r.url}` })),
+  balances: (params) => http(`/hr/leave-balances?${qs(params)}`),
+  adjust: (employeeId, year, typeId, d) => http(`/hr/leave-balances/${employeeId}/${year}/${typeId}`, body("PUT", d)),
+};
+export const notificationsApi = {
+  list: () => http(`/notifications`),
+  read: (id) => http(`/notifications/${id}/read`, { method: "POST" }),
+  readAll: () => http(`/notifications/read-all`, { method: "POST" }),
+};
+
+// [HR-G5] Bảng công tháng, bất thường, xuất Excel, chốt công — 2026-10-26, CHƯA PHÁT HÀNH
+export const hrReport = {
+  timesheet: (params) => http(`/hr/reports/timesheet?${qs(params)}`),
+  anomalies: (params) => http(`/hr/reports/anomalies?${qs(params)}`),
+  exportXlsx: async (params) => {
+    const res = await fetch(`${API_BASE}/api/hr/reports/timesheet/export.xlsx?${qs(params)}`, { headers: authToken ? { Authorization: `Bearer ${authToken}` } : {} });
+    if (!res.ok) { const j = await res.json().catch(() => null); throw new Error(j?.message || `HTTP ${res.status}`); }
+    return res.blob();
+  },
+  periods: (year) => http(`/hr/periods?${qs({ year })}`),
+  precheck: (ym) => http(`/hr/periods/${ym}/precheck`),
+  close: (ym, d) => http(`/hr/periods/${ym}/close`, body("POST", d)),
+  unlock: (ym, reason) => http(`/hr/periods/${ym}/unlock`, body("POST", { reason })),
+};

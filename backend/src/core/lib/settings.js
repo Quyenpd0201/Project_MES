@@ -16,6 +16,21 @@ const DEFS = {
   company_tax:         { group: 'Công ty (in trên phiếu)', label: 'Mã số thuế', type: 'text', max: 30, def: '0316748578' },
   company_address:     { group: 'Công ty (in trên phiếu)', label: 'Địa chỉ', type: 'text', max: 300, def: '119/1 Đường Đỗ Mười, Tổ 4, Khu phố 1, Phường Thới An, Thành Phố Hồ Chí Minh' },
   company_phone:       { group: 'Công ty (in trên phiếu)', label: 'Điện thoại', type: 'text', max: 50, def: '0938 446 156' },
+  // [HR-G3] Tính công — 2026-10-23, CHƯA PHÁT HÀNH (5 dòng dưới)
+  hr_default_shift_code:   { group: 'Chấm công', label: 'Mã ca mặc định (khi không gán ca / không tự nhận được)', type: 'text', max: 20, def: 'CA_NGAY' },
+  hr_workdays:             { group: 'Chấm công', label: 'Ngày làm việc trong tuần (1 = thứ 2 … 7 = Chủ nhật, cách nhau dấu phẩy)', type: 'text', max: 20, def: '1,2,3,4,5,6' },
+  hr_ot_night_from:        { group: 'Chấm công', label: 'Tăng ca tính là "tăng ca đêm" từ (HH:MM)', type: 'text', max: 5, def: '18:00' },
+  hr_ot_min_minutes:       { group: 'Chấm công', label: 'Ở lại ít hơn (phút) thì không tính tăng ca', type: 'int', min: 0, max: 240, def: 30 },
+  hr_ot_block_minutes:     { group: 'Chấm công', label: 'Tăng ca làm tròn xuống theo block (phút)', type: 'int', min: 1, max: 120, def: 30 },
+  // [HR-G2] Kiosk — 2026-10-23, CHƯA PHÁT HÀNH (2 dòng dưới)
+  hr_consent_version:      { group: 'Chấm công', label: 'Phiên bản thông báo chụp ảnh (NĐ 13) — đổi để hỏi lại mọi người', type: 'text', max: 20, def: '2026-10-23' },
+  hr_kiosk_result_seconds: { group: 'Chấm công', label: 'Kiosk: hiện kết quả chấm trong (giây)', type: 'int', min: 2, max: 30, def: 5 },
+  // [HR-G1] Chấm công — 2026-10-22, CHƯA PHÁT HÀNH (5 dòng dưới)
+  hr_scope_by_unit:        { group: 'Chấm công', label: 'Trưởng tổ chỉ xem tổ mình quản lý (0 = tắt, 1 = bật)', type: 'int', min: 0, max: 1, def: 0 },
+  hr_punch_dedupe_min:     { group: 'Chấm công', label: 'Chặn chấm trùng trong (phút)', type: 'int', min: 0, max: 60, def: 2 },
+  hr_photo_retention_days: { group: 'Chấm công', label: 'Tự xóa ảnh chấm công sau (ngày)', type: 'int', min: 30, max: 3650, def: 180 },
+  hr_pin_max_fail:         { group: 'Chấm công', label: 'Khóa PIN sau số lần nhập sai', type: 'int', min: 3, max: 20, def: 5 },
+  hr_pin_lock_min:         { group: 'Chấm công', label: 'Thời gian khóa PIN (phút)', type: 'int', min: 1, max: 1440, def: 15 },
 };
 
 // Đọc toàn bộ cài đặt đã khai báo (trộn giá trị lưu trong DB với mặc định)

@@ -17,3 +17,6 @@ Thumbs.db
 
 # Test coverage
 coverage/
+
+# [HR-G2] ảnh chấm công lưu local (dev/test) — 2026-10-23, CHƯA PHÁT HÀNH
+storage/
