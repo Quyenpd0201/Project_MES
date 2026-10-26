@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, X, CalendarDays } from "lucide-react";
-import { inputCls, UNITS } from "./ui.js";
+import { inputCls, UNITS, fmt, statusClass } from "./ui.js";
 
 // Bỏ dấu tiếng Việt để tìm không phân biệt dấu/hoa-thường
 const stripVN = (s) => (s || "").toString().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d");
@@ -569,4 +569,27 @@ export function confirmClose(e, close) {
   if (el?.dataset.locked) return;
   if (el?.dataset.dirty && !window.confirm("Bỏ thay đổi chưa lưu?")) return;
   close?.();
+}
+
+/* ---- Chip lệnh SX + tiến độ Thổi / Cắt (dùng ở Đơn hàng, Phiếu giao) ----
+   o: { id, order_code, status, blow_plan, blow_done, cut_plan, cut_done } — từ backend lsxProgressByItems */
+export function LsxProgressChip({ o, onOpen }) {
+  const stage = (label, done, plan) => {
+    if (!(Number(plan) > 0)) return null;
+    const ok = Number(done) >= Number(plan) - 1e-6;
+    return <span className={ok ? "text-emerald-600" : "text-slate-500"}>{label} {fmt(done)}/{fmt(plan)}{ok ? " ✓" : ""}</span>;
+  };
+  const blow = stage("Thổi", o.blow_done, o.blow_plan);
+  const cut = stage("Cắt", o.cut_done, o.cut_plan);
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs whitespace-nowrap">
+      {onOpen
+        ? <a href="#" onClick={(e) => { e.preventDefault(); onOpen(o.id); }} className="font-semibold text-blue-600 hover:underline" title="Mở lệnh sản xuất">{o.order_code}</a>
+        : <span className="font-semibold text-slate-700">{o.order_code}</span>}
+      {blow && <><span className="text-slate-300">·</span>{blow}</>}
+      {cut && <><span className="text-slate-300">·</span>{cut}</>}
+      {!blow && !cut && <span className="text-slate-400">Chưa phân công</span>}
+      <span className={"px-1.5 py-0.5 rounded-full text-[10px] " + statusClass(o.status)}>{o.status}</span>
+    </span>
+  );
 }
