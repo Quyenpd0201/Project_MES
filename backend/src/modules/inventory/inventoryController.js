@@ -4,7 +4,7 @@ const { buildSpecKey, legacyAttrs, specsFromBody, specKeyValues } = require('../
 const { upUnit } = require('../../core/lib/units');
 const { getDataScope } = require('../../core/dataScope');
 const { applyStock, stockErrorResponse } = require('../../core/lib/stock');
-const { nextSlipCode } = require('../../core/lib/codes');
+const { nextCode, nextSlipCode } = require('../../core/lib/codes');
 const { stockAvailabilityRows, lockProducts, assertAvailable } = require('../../core/lib/availability');
 const { slipSources, remaining, postReturn, refreshIssuedFlag } = require('../../core/lib/materialReturns');
 
@@ -68,6 +68,22 @@ async function resolveOutSpec(client, { product_id, location_id, lot_code, spec_
     throw new SpecChoiceError(`${p.product_code || ''} ${p.product_name || ''}: tại vị trí này có nhiều thông số (${list}) — vui lòng chọn đúng thông số cần xuất/chuyển.`);
   }
   return { spec_key: buildSpecKey({}), specs: {} };
+}
+// Xuất tay phải chọn đúng lô: vị trí có từ 2 lô trở lên mà không chọn → báo lỗi (muốn đủ số lượng thì lập nhiều dòng, mỗi dòng 1 lô).
+// Chỉ có 1 lô → tự nhận lô đó. Có hàng "không lô" thì để trống nghĩa là lấy phần đó. Trả về mã lô dùng để trừ.
+async function resolveOutLot(client, { product_id, location_id, spec_key, lot_code }) {
+  if (lot_code) return lot_code;
+  const { rows } = await client.query(
+    `SELECT lot_code, SUM(quantity) AS qty FROM inventory_stock
+      WHERE product_id = $1 AND location_id = $2 AND quantity > 0 AND ($3::text IS NULL OR spec_key = $3)
+      GROUP BY lot_code ORDER BY lot_code`, [product_id, location_id, spec_key || null]);
+  if (rows.some((r) => r.lot_code === '')) return '';
+  if (rows.length === 1) return rows[0].lot_code;
+  if (rows.length > 1) {
+    const p = (await client.query(`SELECT product_code, product_name FROM products WHERE id = $1`, [product_id])).rows[0] || {};
+    throw new SpecChoiceError(`${p.product_code || ''} ${p.product_name || ''}: vị trí này có nhiều lô (${rows.map((r) => `${r.lot_code}: ${Number(r.qty).toLocaleString('vi-VN')}`).join('; ')}) — vui lòng chọn lô. Cần nhiều lô thì thêm dòng cho từng lô.`);
+  }
+  return '';
 }
 const specLabel = (k) => (specKeyValues(k).join(' · ') || 'không thông số');
 function specErrorResponse(res, err) {
@@ -345,6 +361,7 @@ exports.adjust = async (req, res) => {
       }
     }
 
+    if (trxType === 'Xuất') for (const l of lines) l.lot_code = await resolveOutLot(client, { product_id: l.product_id, location_id: locationId, spec_key: l.spec_key, lot_code: l.lot_code });
     if (trxType === 'Xuất') await assertAvailable(client, lines.map((l) => ({ product_id: l.product_id, qty: Math.abs(Number(l.quantity)), location_id: locationId, spec_key: l.spec_key || null, lot_code: l.lot_code || '' })));
     for (const l of lines) {
       const qn = Number(l.quantity);
@@ -392,6 +409,7 @@ exports.createOutboundSlip = async (req, res) => {
 
     await client.query('BEGIN');
 
+    for (const l of validLines) l.lot_code = await resolveOutLot(client, { product_id: l.product_id, location_id, spec_key: l.spec_key, lot_code: l.lot_code });
     await assertAvailable(client, validLines.map((l) => ({ product_id: l.product_id, qty: l.quantity, location_id, spec_key: l.spec_key || null, lot_code: l.lot_code || '' })));
 
     // Sinh mã phiếu PXK00001… (D1: khóa theo bảng — tạo đồng thời không trùng mã)
@@ -411,7 +429,7 @@ exports.createOutboundSlip = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ message: `Đã tạo phiếu chờ xuất kho ${slip.slip_code}.`, slip_code: slip.slip_code, slip_id: slip.id });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
   finally { client.release(); }
 };
 
@@ -635,7 +653,6 @@ exports.transfer = async (req, res) => {
     if (denied) return res.status(403).json({ message: denied });
 
     const qty = Number(b.quantity);
-    const lot = b.lot_code || '';
     const unit = upUnit(b.unit);
 
     // M01: mọi truy vấn đi qua `client` đang giữ — không xin thêm kết nối từ pool (db.query),
@@ -647,16 +664,28 @@ exports.transfer = async (req, res) => {
 
     await client.query('BEGIN');
 
+    // Số phiếu: màn hình tạo sẵn cho mỗi lần lập → mạng gửi lại / bấm đúp cùng số phiếu bị từ chối, hàng không chuyển 2 lần.
+    // Không gửi kèm (client khác) → server tự cấp mã.
+    const refCode = b.ref_code || await nextCode(client, { table: 'inventory_transactions', col: 'ref_code', prefix: 'PCK', width: 5 });
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`invdoc:Chuyển kho:${refCode}`]);
+    const dup = (await client.query(`SELECT 1 FROM inventory_transactions WHERE ref_code = $1 AND trx_type = 'Chuyển kho' LIMIT 1`, [refCode])).rowCount;
+    if (dup) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ message: `Phiếu chuyển ${refCode} đã được ghi trước đó (có thể do mạng gửi lại hoặc bấm 2 lần) — không chuyển lại. Vui lòng tải lại để kiểm tra.` });
+    }
+
     // M13: đọc tồn nguồn TRONG transaction, khoá dòng (FOR UPDATE) → kiểm đủ và trừ trên cùng số liệu.
     // Có chọn lô → chỉ lấy đúng lô đó (trước đây bỏ qua lô, lấy FIFO lô khác).
     // Giữ nguyên spec_key + lô khi chuyển để không tạo dòng '' ảo.
     // K-05: chỉ chuyển đúng 1 thông số (chọn ở màn chuyển kho; không chọn mà nguồn có nhiều thông số → bắt chọn).
     const { spec_key: srcSpec } = await resolveOutSpec(client, {
-      product_id: b.product_id, location_id: b.from_location_id, lot_code: lot, spec_key: b.spec_key });
+      product_id: b.product_id, location_id: b.from_location_id, lot_code: b.lot_code || '', spec_key: b.spec_key });
+    // Bắt buộc chọn lô như Xuất kho: nguồn có từ 2 lô mà không chọn → báo lỗi; chuyển đúng lô đó
+    const lot = await resolveOutLot(client, { product_id: b.product_id, location_id: b.from_location_id, spec_key: srcSpec, lot_code: b.lot_code });
     const { rows: srcRows } = await client.query(
       `SELECT spec_key, specs, lot_code, quantity, unit FROM inventory_stock
-       WHERE product_id = $1 AND location_id = $2 AND quantity > 0 AND ($3 = '' OR lot_code = $3) AND spec_key = $4
-       ORDER BY created_at, lot_code, id FOR UPDATE`, // M50: FIFO — lô vào kho sớm nhất chuyển trước
+       WHERE product_id = $1 AND location_id = $2 AND quantity > 0 AND lot_code = $3 AND spec_key = $4
+       ORDER BY created_at, lot_code, id FOR UPDATE`,
       [b.product_id, b.from_location_id, lot, srcSpec]);
     const onHand = srcRows.reduce((s, r) => s + Number(r.quantity), 0);
     if (qty > onHand + 1e-9) {
@@ -670,7 +699,7 @@ exports.transfer = async (req, res) => {
     for (const sr of srcRows) {
       if (remain <= 1e-9) break;
       const take = Math.min(remain, Number(sr.quantity));
-      const common = { product_id: b.product_id, unit: sr.unit || unit, specs: sr.specs || {}, spec_key: sr.spec_key, lot_code: sr.lot_code || '', clampZero: false, transfer: true };
+      const common = { product_id: b.product_id, unit: sr.unit || unit, specs: sr.specs || {}, spec_key: sr.spec_key, lot_code: sr.lot_code || '', clampZero: false, transfer: true, ref_code: refCode };
       // 1. Xuất khỏi kho nguồn
       await applyStock(client, { ...common, location_id: b.from_location_id, delta: -take, trx_type: 'Chuyển kho', note: `Chuyển kho → ${toLabel}${b.note ? ' | ' + b.note : ''}` });
       // 2. Nhập vào kho đích (cùng spec_key + lô)
@@ -682,7 +711,7 @@ exports.transfer = async (req, res) => {
     // F5: không gửi đơn vị → lấy từ dòng tồn / sản phẩm (trước đây hiện "Đã chuyển 2 null")
     const shownUnit = unit || upUnit(srcRows[0]?.unit)
       || upUnit((await client.query(`SELECT unit FROM products WHERE id = $1`, [b.product_id])).rows[0]?.unit) || '';
-    res.status(201).json({ message: `Đã chuyển ${qty.toLocaleString('vi-VN')}${shownUnit ? ' ' + shownUnit : ''} từ ${fromLabel} → ${toLabel}` });
+    res.status(201).json({ message: `Phiếu ${refCode}: đã chuyển ${qty.toLocaleString('vi-VN')}${shownUnit ? ' ' + shownUnit : ''} từ ${fromLabel} → ${toLabel}`, ref_code: refCode });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err); if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return;

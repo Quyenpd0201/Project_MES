@@ -34,10 +34,13 @@ function lineStock(l, locId) {
   const spec = l.spec_key || (specs.length === 1 ? specs[0] : "");
   const specRows = spec ? locRows.filter(r => r.spec_key === spec) : locRows;
   const lots = [...new Set(specRows.filter(r => r.lot_code).map(r => r.lot_code))];
-  const lot = l.lot_code || (lots.length === 1 ? lots[0] : "");
+  const hasNoLot = specRows.some(r => !r.lot_code);
+  // Trống mà có nhiều lô = chưa chọn; có hàng "không lô" thì trống nghĩa là lấy phần đó
+  const lot = l.lot_code || (lots.length === 1 && !hasNoLot ? lots[0] : "");
+  const needLot = !lot && !hasNoLot && lots.length > 1;
   // Khả dụng = tồn − phần phiếu chờ đang giữ của đúng vị trí, thông số, lô
-  const available = (lot ? specRows.filter(r => r.lot_code === lot) : specRows).reduce((s, r) => s + Number(r.available ?? r.quantity ?? 0), 0);
-  return { available, specs, lots, spec, lot };
+  const available = (lot ? specRows.filter(r => r.lot_code === lot) : hasNoLot ? specRows.filter(r => !r.lot_code) : specRows).reduce((s, r) => s + Number(r.available ?? r.quantity ?? 0), 0);
+  return { available, specs, lots, spec, lot, needLot, specRows };
 }
 
 function OutboundForm({ lookups, onSaved }) {
@@ -73,6 +76,11 @@ function OutboundForm({ lookups, onSaved }) {
   };
 
   const addLine = () => setLines(a => [...a, emptyLine()]);
+  // Lấy thêm từ lô khác: dòng mới cùng sản phẩm, thông số
+  const addLotLine = (l) => setLines(a => {
+    const i = a.findIndex(x => x._k === l._k);
+    return [...a.slice(0, i + 1), { ...emptyLine(), product_id: l.product_id, unit: l.unit, spec_key: l.spec_key, rows: l.rows }, ...a.slice(i + 1)];
+  });
   const rmLine = (k) => setLines(a => a.filter(l => l._k !== k));
 
   const save = async () => {
@@ -84,6 +92,12 @@ function OutboundForm({ lookups, onSaved }) {
     if (noSpec.length) {
       const names = noSpec.map(l => (lookups.products || []).find(x => x.id === l.product_id)?.product_code || "").join(", ");
       return toast.error(`Sản phẩm ${names} có nhiều thông số tại vị trí này — vui lòng chọn thông số cần xuất.`);
+    }
+
+    const noLot = validLines.filter(l => l.needLot);
+    if (noLot.length) {
+      const names = noLot.map(l => (lookups.products || []).find(x => x.id === l.product_id)?.product_code || "").join(", ");
+      return toast.error(`Sản phẩm ${names} có nhiều lô — vui lòng chọn lô. Cần nhiều lô thì bấm "Thêm lô".`);
     }
 
     // Chặn cứng: không cho phép xuất kho khi số lượng vượt tồn hiện có
@@ -250,14 +264,19 @@ function OutboundForm({ lookups, onSaved }) {
                         <UnitSelect value={l.unit} onChange={v => setLine(l._k, "unit", v)} />
                       </td>
                       <td className="px-3 py-2">
-                        <input className={inputCls} placeholder={st.lots.length === 1 ? st.lots[0] : "Số lô"} value={l.lot_code || ""}
-                          list={`lot-${l._k}`}
-                          onChange={e => setLine(l._k, "lot_code", e.target.value)} />
-                        {st.lots.length > 0 && (
-                          <datalist id={`lot-${l._k}`}>
-                            {st.lots.map(lot => <option key={lot} value={lot} />)}
-                          </datalist>
-                        )}
+                        {st.lots.length > 1 ? (
+                          <>
+                            <select className={`${inputCls} ${st.needLot ? "border-amber-400" : ""}`} aria-label="Chọn lô" value={l.lot_code || ""}
+                              onChange={e => setLine(l._k, "lot_code", e.target.value)}>
+                              <option value="">{st.specRows.some(r => !r.lot_code) ? "(không lô)" : "-- Chọn lô --"}</option>
+                              {st.lots.map(lot => {
+                                const free = st.specRows.filter(r => r.lot_code === lot).reduce((s, r) => s + Number(r.available ?? r.quantity ?? 0), 0);
+                                return <option key={lot} value={lot}>{lot} — khả dụng {fmt(free)}</option>;
+                              })}
+                            </select>
+                            <button type="button" onClick={() => addLotLine(l)} className="mt-1 text-xs text-blue-600 hover:underline">+ Thêm lô</button>
+                          </>
+                        ) : <span className="text-xs text-slate-500">{st.lots[0] || "—"}</span>}
                       </td>
                       <td className="px-3 py-2">
                         <input className={inputCls} placeholder="Ghi chú…" value={l.note}
