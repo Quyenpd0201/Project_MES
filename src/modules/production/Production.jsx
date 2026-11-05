@@ -261,7 +261,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
     try {
       const d = await production.materials(editId);
       if (!d.has_bom || !d.lines?.length) return toast.error('Sản phẩm chưa có BOM để gợi ý.');
-      setPlannedMats(d.lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: "", qty: Math.round((l.suggested_qty || 0) * 100) / 100, unit: l.unit || '', note: '', on_hand: l.on_hand })));
+      setPlannedMats(d.lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: "", qty: Math.round((l.suggested_qty || 0) * 100) / 100, unit: l.unit || '', note: '', on_hand: l.on_hand, held: l.held, available: l.available })));
       setPmSeq(d.lines.length + 1);
       toast.success(`Đã đổ ${d.lines.length} NVL gợi ý từ BOM. Hãy chỉnh/xóa theo thực tế rồi Lưu.`);
     } catch (e) { toast.error('Lỗi lấy gợi ý BOM: ' + e.message); }
@@ -365,7 +365,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
           // Đã có NVL cấp → ghép tỷ lệ (%) từ mix_ratio theo material_id
           const ratioBy = {};
           mix.forEach((r) => { ratioBy[r.material_id] = r.ratio; });
-          setPlannedMats(lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: ratioBy[l.material_id] ?? '', qty: Number(l.qty), unit: l.unit || '', note: l.note || '', on_hand: Number(l.on_hand), issued_qty: Number(l.issued_qty) || 0 })));
+          setPlannedMats(lines.map((l, i) => ({ _k: i + 1, material_id: l.material_id, ratio: ratioBy[l.material_id] ?? '', qty: Number(l.qty), unit: l.unit || '', note: l.note || '', on_hand: Number(l.on_hand), pending: Number(l.pending) || 0, blocked: Number(l.blocked) || 0, held: Number(l.held) || 0, available: Number(l.available) || 0, own_pending: Number(l.own_pending) || 0, issued_qty: Number(l.issued_qty) || 0 })));
           setPmSeq(lines.length + 1);
         } else if (mix.length) {
           // THỪA HƯỞNG từ đơn hàng: chưa có NVL cấp nhưng LSX đã định NVL (mix_ratio từ dòng đơn)
@@ -770,17 +770,21 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                 <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Số kg</th>
                 <th className="px-3 py-2.5 w-24 uppercase tracking-wider">ĐVT</th>
                 <th className="px-3 py-2.5 w-24 uppercase tracking-wider">Đã xuất</th>
-                <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Tồn kho</th>
+                <th className="px-3 py-2.5 w-24 uppercase tracking-wider">Tồn kho</th>
+                <th className="px-3 py-2.5 w-32 uppercase tracking-wider">Đang giữ</th>
+                <th className="px-3 py-2.5 w-28 uppercase tracking-wider">Khả dụng</th>
                 <th className="px-3 py-2.5 uppercase tracking-wider">Ghi chú</th>
                 {editing && <th className="px-3 py-2.5 w-10"></th>}
               </tr>
             </thead>
             <tbody>
               {plannedMats.length === 0 && (
-                <tr><td colSpan={editing ? 9 : 8} className="px-3 py-4 text-center text-slate-400 bg-white">Chưa có NVL. {editing ? 'Bấm “Lấy gợi ý từ BOM” hoặc “Thêm NVL”.' : ''}</td></tr>
+                <tr><td colSpan={editing ? 11 : 10} className="px-3 py-4 text-center text-slate-400 bg-white">Chưa có NVL. {editing ? 'Bấm “Lấy gợi ý từ BOM” hoặc “Thêm NVL”.' : ''}</td></tr>
               )}
               {plannedMats.map((r, i) => {
-                const short = r.on_hand != null && Number(r.qty) > Number(r.on_hand);
+                // Thiếu = phần chưa xuất, chưa lên phiếu của lệnh này vượt khả dụng
+                const lack = Number(r.qty) - Number(r.issued_qty || 0) - Number(r.own_pending || 0) - Number(r.available || 0);
+                const short = r.on_hand != null && lack > 1e-6;
                 return (
                 <tr key={r._k} className="border-b border-slate-100 last:border-0 bg-white align-top">
                   <td className="px-3 py-2.5 text-center text-slate-500 font-medium">{i + 1}</td>
@@ -811,7 +815,16 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                   <td className="px-3 py-2.5">
                     {r.on_hand == null
                       ? <span className="text-slate-400 text-xs">— lưu để xem</span>
-                      : <span className={short ? 'text-rose-600 font-semibold' : 'text-slate-700'}>{fmt(r.on_hand)}{short && <span className="block text-[11px] font-normal">thiếu {fmt(Number(r.qty) - Number(r.on_hand))}</span>}</span>}
+                      : <span className="text-slate-700">{fmt(r.on_hand)}</span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {r.on_hand != null && <span className="text-slate-600">{fmt(r.held || 0)}
+                      {Number(r.pending) > 0 && <span className="block text-[11px] text-slate-400">phiếu chờ {fmt(r.pending)}</span>}
+                      {Number(r.blocked) > 0 && <span className="block text-[11px] text-slate-400">kho không xuất được {fmt(r.blocked)}</span>}
+                    </span>}
+                  </td>
+                  <td className="px-3 py-2.5">
+                    {r.on_hand != null && <span className={short ? 'text-rose-600 font-semibold' : 'text-emerald-700 font-medium'}>{fmt(r.available || 0)}{short && <span className="block text-[11px] font-normal">thiếu {fmt(lack)}</span>}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     {editing

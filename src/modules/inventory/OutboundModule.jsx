@@ -35,7 +35,8 @@ function lineStock(l, locId) {
   const specRows = spec ? locRows.filter(r => r.spec_key === spec) : locRows;
   const lots = [...new Set(specRows.filter(r => r.lot_code).map(r => r.lot_code))];
   const lot = l.lot_code || (lots.length === 1 ? lots[0] : "");
-  const available = (lot ? specRows.filter(r => r.lot_code === lot) : specRows).reduce((s, r) => s + Number(r.quantity || 0), 0);
+  // Khả dụng = tồn − phần phiếu chờ đang giữ của đúng vị trí, thông số, lô
+  const available = (lot ? specRows.filter(r => r.lot_code === lot) : specRows).reduce((s, r) => s + Number(r.available ?? r.quantity ?? 0), 0);
   return { available, specs, lots, spec, lot };
 }
 
@@ -90,9 +91,9 @@ function OutboundForm({ lookups, onSaved }) {
     if (overStock.length > 0) {
       const details = overStock.map(l => {
         const p = (lookups.products || []).find(x => x.id === l.product_id);
-        return `• ${p?.product_code || ""} ${p?.product_name || l.product_id}: tồn ${l.available} ${l.unit}, xuất ${l.quantity} ${l.unit}`;
+        return `• ${p?.product_code || ""} ${p?.product_name || l.product_id}: khả dụng ${l.available} ${l.unit}, xuất ${l.quantity} ${l.unit}`;
       }).join("\n");
-      return toast.error(`Không đủ tồn kho — vui lòng kiểm tra lại:\n${details}`);
+      return toast.error(`Không đủ số lượng khả dụng — vui lòng kiểm tra lại:\n${details}`);
     }
 
     if (busy.current) return;

@@ -6,6 +6,7 @@ const { guardDelete } = require('../../core/lib/deleteGuard');
 const { getDataScope } = require('../../core/dataScope');
 const { applyStock, stockErrorResponse, whOutboundOkSql, whInboundOkSql } = require('../../core/lib/stock');
 const { nextSlipCode } = require('../../core/lib/codes');
+const { stockAvailability, assertAvailable } = require('../../core/lib/availability');
 const { orderSources, remaining, netByProduct, postReturn, materialNeeds, syncPendingSlip } = require('../../core/lib/materialReturns');
 
 // Công đoạn cuối của 1 lệnh: 'Cắt' nếu có task Cắt, ngược lại 'Thổi'
@@ -865,14 +866,15 @@ exports.getMaterials = async (req, res) => {
       const bl = (await db.query(
         `SELECT bl.material_id, bl.quantity, bl.unit, p.product_code, p.product_name
          FROM bom_lines bl JOIN products p ON p.id = bl.material_id WHERE bl.bom_id = $1 ORDER BY bl.line_no`, [bom.id])).rows;
+      const avail = await stockAvailability(db, bl.map((l) => l.material_id));
       lines = await Promise.all(bl.map(async (l) => {
-        const oh = (await db.query(`SELECT COALESCE(SUM(quantity),0)::numeric AS q FROM inventory_stock WHERE product_id = $1`, [l.material_id])).rows[0].q;
+        const a = avail.get(String(l.material_id));
         const suggested = Number(l.quantity) * factor;
         const recorded = Object.prototype.hasOwnProperty.call(usage, l.material_id);
         return {
           material_id: l.material_id, material_code: l.product_code, material_name: l.product_name,
           unit: l.unit, suggested_qty: suggested, used_qty: recorded ? usage[l.material_id] : suggested,
-          on_hand: Number(oh), recorded,
+          on_hand: a.on_hand, held: a.held, available: a.available, recorded,
         };
       }));
     }
@@ -920,8 +922,7 @@ exports.getPlannedMaterials = async (req, res) => {
     if (!po) return res.status(404).json({ message: 'Không tìm thấy lệnh sản xuất' });
     const { rows } = await db.query(`
       SELECT pm.material_id, pm.qty, pm.unit, pm.note,
-             p.product_code AS material_code, p.product_name AS material_name,
-             COALESCE((SELECT SUM(quantity) FROM inventory_stock s WHERE s.product_id = pm.material_id), 0) AS on_hand
+             p.product_code AS material_code, p.product_name AS material_name
       FROM production_order_materials pm
       JOIN products p ON p.id = pm.material_id
       WHERE pm.production_order_id = $1
@@ -932,7 +933,12 @@ exports.getPlannedMaterials = async (req, res) => {
        WHERE prod_order_id = $1 AND status IN ('Chờ xuất', 'Đã xuất') ORDER BY created_at DESC LIMIT 1`, [poId])).rows[0] || null;
     const sources = await orderSources(db, poId);
     const net = netByProduct(sources);
-    const lines = rows.map((r) => ({ ...r, issued_qty: net.get(r.material_id) || 0 }));
+    const avail = await stockAvailability(db, rows.map((r) => r.material_id));
+    // Phần phiếu chờ của CHÍNH lệnh này: đã nằm trong "Đang giữ", không tính là thiếu lần nữa
+    const own = new Map((await db.query(
+      `SELECT sl.product_id, SUM(sl.quantity) AS qty FROM outbound_slip_lines sl JOIN outbound_slips os ON os.id = sl.slip_id
+        WHERE os.prod_order_id = $1 AND os.status = 'Chờ xuất' GROUP BY sl.product_id`, [poId])).rows.map((r) => [r.product_id, Number(r.qty)]));
+    const lines = rows.map((r) => ({ ...r, ...avail.get(String(r.material_id)), issued_qty: net.get(r.material_id) || 0, own_pending: own.get(r.material_id) || 0 }));
     res.json({ data: { materials_issued: po.materials_issued, slip, lines, can_return: sources.some((r) => remaining(r) > 1e-6) } });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy NVL cần cung cấp' }); }
 };
@@ -960,7 +966,7 @@ exports.savePlannedMaterials = async (req, res) => {
     await syncPendingSlip(client, poId); // phiếu Chờ xuất của lệnh cập nhật đè theo danh sách mới
     await client.query('COMMIT');
     res.json({ message: 'Đã lưu NVL cần cung cấp', count: lines.length });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi lưu NVL cần cung cấp' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi lưu NVL cần cung cấp' }); }
   finally { client.release(); }
 };
 
@@ -999,6 +1005,7 @@ exports.requestMaterials = async (req, res) => {
        WHERE w.warehouse_type = 'NVL' AND l.is_deleted = FALSE AND w.is_deleted = FALSE
        ORDER BY ${whOutboundOkSql('w', 'l')} DESC, l.created_at LIMIT 1`)).rows[0]?.id || null;
     if (!nvlLoc) { await client.query('ROLLBACK'); return res.status(400).json({ message: 'Hệ thống chưa có Kho Nguyên vật liệu.' }); }
+    await assertAvailable(client, plan.map((l) => ({ product_id: l.material_id, qty: l.need, location_id: nvlLoc })));
 
     // Sinh mã phiếu PXK00001… (D1: khóa theo bảng — tạo đồng thời không trùng mã)
     const slipCode = await nextSlipCode(client);
@@ -1019,7 +1026,7 @@ exports.requestMaterials = async (req, res) => {
     await client.query(`UPDATE production_orders SET materials_issued = TRUE WHERE id = $1`, [poId]);
     await client.query('COMMIT');
     res.json({ message: `Đã tạo phiếu xuất kho ${slip.slip_code} (Chờ xuất). Vào Kho → Xuất kho để xác nhận trừ tồn.`, slip_code: slip.slip_code, slip_id: slip.id, count: plan.length });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi yêu cầu NVL' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi yêu cầu NVL' }); }
   finally { client.release(); }
 };
 

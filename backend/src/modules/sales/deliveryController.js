@@ -1,5 +1,6 @@
 // backend/controllers/deliveryController.js — Phiếu giao hàng & thanh toán
 const db = require('../../core/db');
+const { stockAvailabilityRows, assertAvailable } = require('../../core/lib/availability');
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete } = require('../../core/lib/deleteGuard');
 const { applyStock, stockErrorResponse, whOutboundOkSql } = require('../../core/lib/stock');
@@ -435,6 +436,9 @@ exports.ship = async (req, res) => {
     const left = new Map(); // `${location_id}|${lot_code}|${spec_key}` → lượng còn lại sau các dòng trước
     const rowKey = (r) => `${r.location_id}|${r.lot_code || ''}|${r.spec_key}`;
     const shortages = [], allocations = [];
+    // Chỉ lấy phần KHẢ DỤNG của từng dòng tồn — không lấn phần phiếu chờ đang giữ
+    const freeRows = await stockAvailabilityRows(client, lines.map((l) => l.product_id));
+    const freeOf = new Map(freeRows.map((f) => [`${f.product_id}|${rowKey(f)}`, f.available]));
     for (const l of lines) {
       const need = Number(l.qty);
       const strict = l.spec_key !== EMPTY_SPEC;
@@ -448,7 +452,7 @@ exports.ship = async (req, res) => {
            AND (NOT $3::boolean OR s.spec_key = $2)
          ORDER BY (s.lot_code = ANY($4::text[])) DESC, (s.spec_key = $2) DESC, (w.warehouse_type = 'TP') DESC, s.created_at ASC, s.id ASC`, // FIFO: lô vào kho sớm nhất trước (id là mã ngẫu nhiên, chỉ để thứ tự cố định)
         [l.product_id, l.spec_key, strict, l.own_lots]);
-      const avail = (r) => (left.has(rowKey(r)) ? left.get(rowKey(r)) : Number(r.quantity));
+      const avail = (r) => (left.has(rowKey(r)) ? left.get(rowKey(r)) : (freeOf.get(`${l.product_id}|${rowKey(r)}`) || 0));
       const onHand = stockRows.reduce((s, r) => s + avail(r), 0);
       if (need > onHand + 1e-6) {
         shortages.push({ name: l.product_name + (strict ? ` (đúng thông số ${specKeyValues(l.spec_key).join(', ')})` : ''), unit: l.unit || '', on_hand: onHand, need, lack: need - onHand });
@@ -466,8 +470,8 @@ exports.ship = async (req, res) => {
       }
     }
     if (shortages.length) {
-      const msg = 'Không đủ tồn kho để giao — vui lòng sản xuất/nhập kho trước:\n' +
-        shortages.map((x) => `• ${x.name}: tồn ${x.on_hand} ${x.unit}, cần giao ${x.need} ${x.unit} → thiếu ${x.lack} ${x.unit}`).join('\n');
+      const msg = 'Không đủ số lượng khả dụng để giao (đã trừ phần phiếu chờ đang giữ):\n' +
+        shortages.map((x) => `• ${x.name}: khả dụng ${x.on_hand} ${x.unit}, cần giao ${x.need} ${x.unit} → thiếu ${x.lack} ${x.unit}`).join('\n');
       return res.status(400).json({ message: msg, shortages });
     }
     // Vị trí ĐẠI DIỆN ở đầu phiếu = nơi lấy nhiều nhất; vị trí thật của từng phần nằm ở dòng phiếu (K-11)
@@ -488,6 +492,8 @@ exports.ship = async (req, res) => {
       `UPDATE delivery_notes SET status = 'Giao hàng', delivery_date = ${VN_TODAY_SQL}, updated_at = now()
        WHERE id = $1 AND status = 'Bản nháp' AND is_deleted = FALSE RETURNING id`, [req.params.id]);
     if (!claim.rows.length) { await client.query('ROLLBACK'); return res.status(409).json({ message: 'Phiếu đã được giao hoặc đang được xử lý — vui lòng tải lại.' }); }
+    // Hàng đã lên phiếu Chờ xuất khác là đang giữ — không giao lấn sang
+    await assertAvailable(client, allocations.map((a) => ({ product_id: a.product_id, qty: a.quantity, location_id: a.location_id, spec_key: a.spec_key, lot_code: a.lot_code })));
     // Sinh mã phiếu xuất kho PXK00001… (D1: khóa theo bảng — giao đồng thời không trùng mã)
     const slipCode = await nextSlipCode(client);
     const slip = (await client.query(

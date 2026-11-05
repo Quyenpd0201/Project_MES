@@ -5,6 +5,7 @@ const { upUnit } = require('../../core/lib/units');
 const { getDataScope } = require('../../core/dataScope');
 const { applyStock, stockErrorResponse } = require('../../core/lib/stock');
 const { nextSlipCode } = require('../../core/lib/codes');
+const { stockAvailabilityRows, lockProducts, assertAvailable } = require('../../core/lib/availability');
 const { slipSources, remaining, postReturn, refreshIssuedFlag } = require('../../core/lib/materialReturns');
 
 // A5: tồn của SP / kho / vị trí ĐÃ XÓA không hiển thị, không tính tổng (dữ liệu cũ vẫn giữ trong DB).
@@ -101,7 +102,11 @@ exports.tree = async (req, res) => {
       ${whereSql}
       ORDER BY p.product_code, s.spec_key, s.lot_code`, params);
 
-    res.json({ data: rows });
+    const avail = new Map((await stockAvailabilityRows(db, rows.map((r) => r.product_id))).map((a) => [a.id, a]));
+    res.json({ data: rows.map((r) => {
+      const a = avail.get(r.id);
+      return { ...r, pending: a?.pending || 0, blocked: a?.blocked || 0, available: a?.available || 0 };
+    }) });
   } catch (err) { console.error(err); res.status(500).json({ message: 'Lỗi khi lấy dữ liệu tồn kho' }); }
 };
 
@@ -340,6 +345,7 @@ exports.adjust = async (req, res) => {
       }
     }
 
+    if (trxType === 'Xuất') await assertAvailable(client, lines.map((l) => ({ product_id: l.product_id, qty: Math.abs(Number(l.quantity)), location_id: locationId, spec_key: l.spec_key || null, lot_code: l.lot_code || '' })));
     for (const l of lines) {
       const qn = Number(l.quantity);
       const delta = trxType === 'Xuất' ? -Math.abs(qn) : qn;
@@ -386,6 +392,8 @@ exports.createOutboundSlip = async (req, res) => {
 
     await client.query('BEGIN');
 
+    await assertAvailable(client, validLines.map((l) => ({ product_id: l.product_id, qty: l.quantity, location_id, spec_key: l.spec_key || null, lot_code: l.lot_code || '' })));
+
     // Sinh mã phiếu PXK00001… (D1: khóa theo bảng — tạo đồng thời không trùng mã)
     const slipCode = await nextSlipCode(client);
 
@@ -403,7 +411,7 @@ exports.createOutboundSlip = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ message: `Đã tạo phiếu chờ xuất kho ${slip.slip_code}.`, slip_code: slip.slip_code, slip_id: slip.id });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
   finally { client.release(); }
 };
 
@@ -495,14 +503,17 @@ exports.confirmOutboundSlip = async (req, res) => {
 
     // M50: khoá tồn tại vị trí xuất TRONG transaction (2 phiếu khác nhau cùng xác nhận không trừ quá tồn).
     // Khoá theo id cho thứ tự khoá cố định (tránh deadlock), rồi xếp FIFO: lô vào kho sớm nhất trước.
+    await lockProducts(client, productIds);
     const { rows: locked } = await client.query(
       `SELECT id, product_id, lot_code, quantity, unit, spec_key, specs, created_at
        FROM inventory_stock
        WHERE product_id = ANY($1::uuid[]) AND location_id = $2 AND quantity > 0
        ORDER BY id FOR UPDATE`,
       [productIds, s.location_id]);
+    // Phần phiếu chờ KHÁC đang giữ / kho không xuất được thì không lấy
+    const free = new Map((await stockAvailabilityRows(client, productIds, s.id)).map((a) => [a.id, a.available]));
     const fifo = locked
-      .map((r) => ({ ...r, left: Number(r.quantity) }))
+      .map((r) => ({ ...r, left: free.get(r.id) || 0 }))
       .sort((a, b) => (a.created_at - b.created_at) || String(a.lot_code).localeCompare(String(b.lot_code)) || String(a.id).localeCompare(String(b.id)));
 
     const shortages = [];
@@ -541,8 +552,8 @@ exports.confirmOutboundSlip = async (req, res) => {
 
     if (shortages.length) {
       await client.query('ROLLBACK');
-      const msg = 'Không đủ tồn kho tại vị trí xuất — vui lòng nhập/chuyển kho đến vị trí này trước:\n' +
-        shortages.map((x) => `• ${x.code} ${x.name}${x.lot_code ? ` (lô ${x.lot_code})` : ''}: tồn ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → thiếu ${x.buy} ${x.unit}`).join('\n');
+      const msg = 'Không đủ số lượng khả dụng tại vị trí xuất (đã trừ phần phiếu khác đang giữ):\n' +
+        shortages.map((x) => `• ${x.code} ${x.name}${x.lot_code ? ` (lô ${x.lot_code})` : ''}: khả dụng ${x.on_hand} ${x.unit}, cần ${x.need} ${x.unit} → thiếu ${x.buy} ${x.unit}`).join('\n');
       return res.status(400).json({ message: msg, shortages });
     }
 
