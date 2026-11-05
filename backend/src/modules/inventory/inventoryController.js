@@ -232,7 +232,7 @@ exports.addStockLine = async (req, res) => {
          expiry_date  = CASE WHEN $1 THEN $2::date ELSE expiry_date END,
          counted_qty  = CASE WHEN $3 THEN $4::numeric ELSE counted_qty END,
          counted_date = CASE WHEN $5 THEN $6::date ELSE counted_date END,
-         unit=COALESCE($7,unit), updated_at=now()
+         unit=COALESCE(NULLIF(unit,''),$7), updated_at=now() -- K-15: giữ đơn vị dòng tồn đã có, chỉ điền khi trống
        WHERE product_id=$8 AND location_id IS NOT DISTINCT FROM $9 AND spec_key=$10 AND lot_code=$11`,
       [has('expiry_date'), b.expiry_date || null, has('counted_qty'), numOrNull(b.counted_qty),
        has('counted_date'), b.counted_date || null, upUnit(b.unit), b.product_id, loc, specKey, lot]);

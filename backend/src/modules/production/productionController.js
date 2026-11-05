@@ -224,7 +224,7 @@ async function postTaskStock(client, po, task, finishLots = []) {
     if (!btpLoc) throw new Error('Chưa có kho Bán thành phẩm (BTP) để trừ cuộn — vui lòng tạo kho trước.');
     const rollId = await resolveCutRollProduct(client, po); // cuộn cần trừ = SP đầu ra của dòng Thổi trong lệnh
     const cutOutput = task.output_product_id || po.product_id; // bao bì đầu ra (ô chọn; mặc định = SP lệnh)
-    if (upUnit(po.unit) !== 'Kg') throw new Error(`Đơn vị sản phẩm "${po.product_code}" là "${po.unit}" — công đoạn Cắt chỉ hỗ trợ đơn vị kg.`);
+    if (upUnit(po.unit) !== 'KG') throw new Error(`Đơn vị sản phẩm "${po.product_code}" là "${po.unit}" — công đoạn Cắt chỉ hỗ trợ đơn vị kg.`);
 
     const specKey = buildSpecKey(specs);
     // Các lô cuộn khả dụng ở BTP, khớp 100% thông số; ưu tiên lô của chính lệnh rồi FIFO. Khóa để chống cắt song song.

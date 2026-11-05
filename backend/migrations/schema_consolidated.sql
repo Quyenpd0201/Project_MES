@@ -3280,3 +3280,36 @@ CREATE INDEX IF NOT EXISTS idx_mr_order ON public.material_returns (production_o
 CREATE INDEX IF NOT EXISTS idx_mri_return ON public.material_return_items (return_id);
 CREATE INDEX IF NOT EXISTS idx_mri_source ON public.material_return_items (source_trx_id);
 -- ---------------------------------------------------------------------
+
+-- 33) ĐƠN VỊ VIẾT HOA (2026-11-05): đưa dữ liệu về KG, CÁI… và trigger giữ viết hoa cho mọi đường ghi.
+CREATE OR REPLACE FUNCTION public.trg_unit_upper() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  NEW.unit := NULLIF(UPPER(TRIM(NEW.unit)), '');
+  RETURN NEW;
+END $fn$;
+CREATE OR REPLACE FUNCTION public.trg_output_unit_upper() RETURNS trigger LANGUAGE plpgsql AS $fn$
+BEGIN
+  NEW.output_unit := NULLIF(UPPER(TRIM(NEW.output_unit)), '');
+  RETURN NEW;
+END $fn$;
+DO $do$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['bom_lines','delivery_note_items','delivery_return_items','inventory_stock','outbound_slip_lines',
+    'production_material_usage','production_order_materials','production_orders','products','recycling_rolls','sales_order_items'] LOOP
+    EXECUTE format('UPDATE public.%I SET unit = NULLIF(UPPER(TRIM(unit)), '''') WHERE unit IS DISTINCT FROM NULLIF(UPPER(TRIM(unit)), '''')', t);
+    EXECUTE format('DROP TRIGGER IF EXISTS unit_upper ON public.%I', t);
+    EXECUTE format('CREATE TRIGGER unit_upper BEFORE INSERT OR UPDATE OF unit ON public.%I FOR EACH ROW EXECUTE FUNCTION public.trg_unit_upper()', t);
+  END LOOP;
+  -- CM không phải đơn vị tính (chỉ là kích thước cuộn) — các dòng ghi nhầm đưa về KG
+  FOREACH t IN ARRAY ARRAY['bom_lines','delivery_note_items','delivery_return_items','inventory_stock','outbound_slip_lines',
+    'production_material_usage','production_order_materials','production_orders','products','recycling_rolls','sales_order_items'] LOOP
+    EXECUTE format('UPDATE public.%I SET unit = ''KG'' WHERE unit = ''CM''', t);
+  END LOOP;
+  FOREACH t IN ARRAY ARRAY['boms','process_steps'] LOOP
+    EXECUTE format('UPDATE public.%I SET output_unit = NULLIF(UPPER(TRIM(output_unit)), '''') WHERE output_unit IS DISTINCT FROM NULLIF(UPPER(TRIM(output_unit)), '''')', t);
+    EXECUTE format('DROP TRIGGER IF EXISTS output_unit_upper ON public.%I', t);
+    EXECUTE format('CREATE TRIGGER output_unit_upper BEFORE INSERT OR UPDATE OF output_unit ON public.%I FOR EACH ROW EXECUTE FUNCTION public.trg_output_unit_upper()', t);
+  END LOOP;
+END $do$;
+-- ---------------------------------------------------------------------
