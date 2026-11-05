@@ -424,16 +424,32 @@ function PendingSlips({ canConfirm, onConfirmed }) {
 }
 
 function OutboundHistory() {
+  const { isAdmin } = usePerm();
+  const [reversedCodes, setReversedCodes] = useState(() => new Set());
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useRemembered("outbound:range", defaultRange);
   const load = useCallback(async () => {
     setLoading(true);
-    try { setRows(await inventory.transactions({ trx_type: "Xuất", ...range, limit: 2000 })); }
+    try {
+      const [trx, reversed] = await Promise.all([
+        inventory.transactions({ trx_type: "Xuất", ...range, limit: 2000 }),
+        inventory.outboundSlips({ status: "Đã đảo" }),
+      ]);
+      setRows(trx);
+      setReversedCodes(new Set(reversed.map((s) => s.slip_code)));
+    }
     catch (e) { toast.error("Lỗi: " + e.message); }
     finally { setLoading(false); }
   }, [range]);
   useEffect(() => { load(); }, [load]);
+
+  // Đảo phiếu xác nhận nhầm (Admin) — phiếu giao hàng dùng "Khách trả hàng", server từ chối
+  const reverse = async (code) => {
+    if (!window.confirm(`Đảo phiếu ${code}?\nToàn bộ hàng của phiếu (mọi dòng) sẽ nhập lại kho, đúng lô và thông số. Chỉ dùng khi xác nhận nhầm, hàng chưa rời kho.`)) return;
+    try { const r = await inventory.reverseOutboundSlip(code); toast.success(r.message); await load(); }
+    catch (e) { toast.error(e.message); }
+  };
 
   const columns = [
     { key: "created_at", label: "Thời gian", render: r => fmtDateTime(r.created_at) },
@@ -445,6 +461,9 @@ function OutboundHistory() {
     { key: "ref_code", label: "Số phiếu", filter: "text", render: r => r.ref_code || "—" },
     byColumn,
     { key: "note", label: "Ghi chú / Mục đích", tdClass: "text-slate-400 text-xs" },
+    ...(isAdmin ? [{ key: "_reverse", label: "", render: r => reversedCodes.has(r.ref_code) ? <span className="text-xs text-slate-400">Đã đảo</span>
+      : /^PXK\d+$/.test(r.ref_code || "") && !String(r.note || "").startsWith("Giao hàng")
+      ? <button onClick={() => reverse(r.ref_code)} className="text-xs text-rose-600 hover:underline">Đảo phiếu</button> : null }] : []),
   ];
 
   return (
