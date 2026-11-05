@@ -760,8 +760,8 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
             )}
           </div>
         </div>
-        <div className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
-          <table className="w-full text-left text-sm whitespace-nowrap">
+        <div className="border border-slate-200 rounded-xl overflow-x-auto bg-slate-50/50">
+          <table className="w-full min-w-[1120px] text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-slate-100/50 border-b border-slate-200 text-slate-600 font-semibold text-xs">
                 <th className="px-3 py-2.5 w-12 text-center uppercase tracking-wider">STT</th>
@@ -795,17 +795,17 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                   </td>
                   <td className="px-3 py-2.5">
                     {editing
-                      ? <input type="number" min="0" step="any" className={inputCls} value={r.ratio ?? ''} onChange={(e) => upMat(r._k, 'ratio', e.target.value)} placeholder="%" />
+                      ? <input type="number" min="0" step="any" className={inputCls} value={r.ratio ?? ''} onChange={(e) => upMat(r._k, 'ratio', e.target.value)} placeholder="%" style={{ minWidth: 72 }} />
                       : <span className="font-medium">{r.ratio != null && r.ratio !== '' ? `${r.ratio}%` : '—'}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     {editing
-                      ? <input type="number" min="0" step="any" className={inputCls} value={r.qty} onChange={(e) => upMat(r._k, 'qty', e.target.value)} placeholder="kg" />
+                      ? <input type="number" min="0" step="any" className={inputCls} value={r.qty} onChange={(e) => upMat(r._k, 'qty', e.target.value)} placeholder="kg" style={{ minWidth: 96 }} />
                       : <span className="font-medium">{fmt(r.qty)}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     {editing
-                      ? <input className={inputCls} value={r.unit} onChange={(e) => upMat(r._k, 'unit', e.target.value)} placeholder="kg" />
+                      ? <input className={inputCls} value={r.unit} onChange={(e) => upMat(r._k, 'unit', e.target.value)} placeholder="ĐVT" style={{ minWidth: 72 }} />
                       : <span className="text-slate-600">{r.unit || 'KG'}</span>}
                   </td>
                   <td className="px-3 py-2.5">
@@ -828,7 +828,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                   </td>
                   <td className="px-3 py-2.5">
                     {editing
-                      ? <input className={inputCls} value={r.note} onChange={(e) => upMat(r._k, 'note', e.target.value)} placeholder="ghi chú" />
+                      ? <input className={inputCls} value={r.note} onChange={(e) => upMat(r._k, 'note', e.target.value)} placeholder="ghi chú" style={{ minWidth: 120 }} />
                       : <span className="text-slate-500">{r.note || ''}</span>}
                   </td>
                   {editing && (
