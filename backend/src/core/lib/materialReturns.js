@@ -4,6 +4,7 @@
 // Mọi hàm PHẢI gọi trong transaction (đã BEGIN).
 const { applyStock, whInboundOkSql } = require('./stock');
 const { nextCode } = require('./codes');
+const { assertAvailable } = require('./availability');
 const { currentUser } = require('../requestContext');
 
 // cond dùng alias s = outbound_slips
@@ -75,9 +76,10 @@ async function materialNeeds(client, poId) {
 // Phiếu CHƯA xuất luôn = phần còn thiếu: danh sách NVL đổi → sửa đè đúng phiếu đó (giữ mã); hết thiếu → hủy phiếu.
 async function syncPendingSlip(client, poId) {
   const slip = (await client.query(
-    `SELECT id FROM outbound_slips WHERE prod_order_id = $1 AND status = 'Chờ xuất' ORDER BY created_at DESC LIMIT 1`, [poId])).rows[0];
+    `SELECT id, location_id FROM outbound_slips WHERE prod_order_id = $1 AND status = 'Chờ xuất' ORDER BY created_at DESC LIMIT 1`, [poId])).rows[0];
   if (!slip) return;
   const needs = await materialNeeds(client, poId);
+  await assertAvailable(client, needs.map((n) => ({ product_id: n.material_id, qty: n.need, location_id: slip.location_id })), slip.id); // tăng phiếu chờ phải còn khả dụng
   await client.query(`DELETE FROM outbound_slip_lines WHERE slip_id = $1`, [slip.id]);
   for (const n of needs) await client.query(
     `INSERT INTO outbound_slip_lines (slip_id, product_id, quantity, unit, lot_code, note) VALUES ($1,$2,$3,$4,'',$5)`,

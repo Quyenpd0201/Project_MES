@@ -1,5 +1,6 @@
 // backend/controllers/salesOrderController.js — Đơn hàng + dòng hàng (xuất phiếu)
 const db = require('../../core/db');
+const { stockAvailability } = require('../../core/lib/availability');
 const { buildSpecKey, legacyAttrs, specsFromBody } = require('../../core/lib/specs');
 const { upUnit } = require('../../core/lib/units');
 const { guardDelete, findDependent } = require('../../core/lib/deleteGuard');
@@ -46,10 +47,10 @@ async function lineMaterials(it) {
      WHERE po.sales_order_item_id = $1 AND po.is_deleted = FALSE
      GROUP BY mu.material_id`, [it.id])).rows;
   const usedMap = Object.fromEntries(usedRows.map((r) => [r.material_id, Number(r.used)]));
+  const avail = await stockAvailability(db, lines.map((l) => l.material_id));
   return Promise.all(lines.map(async (l) => {
-    const oh = (await db.query(`SELECT COALESCE(SUM(quantity),0)::numeric AS q FROM inventory_stock WHERE product_id=$1`, [l.material_id])).rows[0].q;
     const required = Number(l.quantity) * factor;
-    const onHand = Number(oh);
+    const onHand = avail.get(String(l.material_id)).available; // khả dụng
     const used = usedMap[l.material_id] || 0;
     return {
       material_id: l.material_id, material_code: l.product_code, material_name: l.product_name, unit: l.unit,
