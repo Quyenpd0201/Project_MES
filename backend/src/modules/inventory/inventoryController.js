@@ -5,6 +5,7 @@ const { upUnit } = require('../../core/lib/units');
 const { getDataScope } = require('../../core/dataScope');
 const { applyStock, stockErrorResponse } = require('../../core/lib/stock');
 const { nextSlipCode } = require('../../core/lib/codes');
+const { slipSources, remaining, postReturn, refreshIssuedFlag } = require('../../core/lib/materialReturns');
 
 // A5: tồn của SP / kho / vị trí ĐÃ XÓA không hiển thị, không tính tổng (dữ liệu cũ vẫn giữ trong DB).
 // Dòng tồn cũ không có vị trí (location_id NULL) của SP còn hoạt động vẫn hiện.
@@ -469,6 +470,14 @@ exports.confirmOutboundSlip = async (req, res) => {
     const claim = await client.query(
       `UPDATE outbound_slips SET status = 'Đã xuất', confirmed_at = now() WHERE id = $1 AND status = 'Chờ xuất' RETURNING id`, [req.params.id]);
     if (!claim.rows.length) { await client.query('ROLLBACK'); return res.status(409).json({ message: 'Phiếu đã được xuất hoặc đang được xử lý — vui lòng tải lại.' }); }
+    // Phiếu NVL của lệnh SX: lệnh đã hủy / đã xóa thì không xuất nữa. FOR SHARE: chờ thao tác đang đổi trạng thái lệnh xong mới xét.
+    if (s.prod_order_id) {
+      const po = (await client.query(`SELECT order_code, status, is_deleted FROM production_orders WHERE id = $1 FOR SHARE`, [s.prod_order_id])).rows[0];
+      if (!po || po.is_deleted || po.status === 'Đã hủy') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: `Lệnh sản xuất ${po?.order_code || ''} đã hủy hoặc đã xóa — không xuất NVL được. Vui lòng hủy phiếu ${s.slip_code}.` });
+      }
+    }
 
     // Gộp SL theo (sản phẩm, lô) TRƯỚC khi kiểm tồn — nhiều dòng cùng 1 SP không được kiểm độc lập
     // (vd 80 + 80 khi tồn 100 PHẢI báo thiếu). M50: dòng có ghi lô chỉ được trừ đúng lô đó.
@@ -562,12 +571,39 @@ exports.cancelOutboundSlip = async (req, res) => {
     const denied = await writeDenied(client, req, s.location_id, ['inv_outbound'], ['confirm']); // K-25
     if (denied) return res.status(403).json({ message: denied });
     await client.query('BEGIN');
-    await client.query(`UPDATE outbound_slips SET status = 'Đã hủy' WHERE id = $1`, [req.params.id]);
-    if (s.prod_order_id) await client.query(`UPDATE production_orders SET materials_issued = FALSE WHERE id = $1`, [s.prod_order_id]);
+    // Chỉ hủy khi vẫn Chờ xuất: xác nhận chạy song song thắng thì không được ghi đè thành Đã hủy (tồn đã trừ)
+    const hit = await client.query(`UPDATE outbound_slips SET status = 'Đã hủy' WHERE id = $1 AND status = 'Chờ xuất' RETURNING id`, [req.params.id]);
+    if (!hit.rows.length) { await client.query('ROLLBACK'); return res.status(409).json({ message: 'Phiếu vừa được xử lý — vui lòng tải lại.' }); }
+    if (s.prod_order_id) await refreshIssuedFlag(client, s.prod_order_id);
     await client.query('COMMIT');
     res.json({ message: `Đã hủy phiếu ${s.slip_code}.` });
   } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi hủy phiếu' }); }
   finally { client.release(); }
+};
+
+// POST /api/outbound-slips/reverse  body { slip_code } — ĐẢO phiếu đã xác nhận nhầm (Admin): nhập lại phần chưa trả
+// đúng lô / thông số, phiếu sang "Đã đảo". Phiếu giao hàng không đảo ở đây — dùng "Khách trả hàng".
+exports.reverseOutboundSlip = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    if (!req.user?.is_admin) return res.status(403).json({ message: 'Chỉ Admin được đảo phiếu xuất.' });
+    await client.query('BEGIN');
+    const bail = async (code, message) => { await client.query('ROLLBACK'); return res.status(code).json({ message }); };
+    const s = (await client.query(`SELECT * FROM outbound_slips WHERE slip_code = $1 FOR UPDATE`, [req.body?.slip_code])).rows[0];
+    if (!s) return await bail(404, 'Không tìm thấy phiếu xuất');
+    if (s.delivery_note_id) return await bail(400, 'Phiếu giao hàng không đảo được — hãy dùng "Khách trả hàng" trên phiếu giao.');
+    if (s.status !== 'Đã xuất') return await bail(400, `Phiếu đang "${s.status}" — chỉ đảo được phiếu Đã xuất.`);
+    const picks = (await slipSources(client, s.id)).filter((r) => remaining(r) > 1e-6).map((source) => ({ source, quantity: remaining(source) }));
+    const code = picks.length ? await postReturn(client, { prefix: 'DPX', orderId: s.prod_order_id, reason: `Đảo phiếu xuất ${s.slip_code}`, picks }) : null;
+    await client.query(`UPDATE outbound_slips SET status = 'Đã đảo' WHERE id = $1`, [s.id]);
+    if (s.prod_order_id) await refreshIssuedFlag(client, s.prod_order_id);
+    await client.query('COMMIT');
+    res.json({ message: code ? `Đã đảo phiếu ${s.slip_code} — hàng nhập lại kho (phiếu ${code}).` : `Đã đảo phiếu ${s.slip_code}.`, return_code: code });
+  } catch (err) {
+    await client.query('ROLLBACK'); console.error(err);
+    if (stockErrorResponse(res, err)) return;
+    res.status(500).json({ message: err.detail || 'Lỗi khi đảo phiếu' });
+  } finally { client.release(); }
 };
 
 // ── CHUYỂN KHO (atomic: Xuất + Nhập trong 1 transaction) ──────────────────────

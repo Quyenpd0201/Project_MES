@@ -2731,3 +2731,28 @@ CREATE INDEX IF NOT EXISTS opening_balance_payments_cust_idx ON public.opening_b
 CREATE INDEX IF NOT EXISTS opening_balance_payments_rcpt_idx ON public.opening_balance_payments(receipt_id);
 ALTER TABLE public.delivery_payments ADD COLUMN IF NOT EXISTS from_opening boolean NOT NULL DEFAULT FALSE;
 -- ---------------------------------------------------------------------
+
+-- 32) PHIẾU TRẢ VỀ KHO (2026-11-05): trả NVL thừa / hủy LSX (TNVL…), đảo phiếu xuất nhầm (DPX…).
+--   Mỗi dòng trỏ về giao dịch "Xuất" gốc để không trả vượt phần đã xuất và truy được phiếu gốc.
+CREATE TABLE IF NOT EXISTS public.material_returns (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  return_code         varchar(30) NOT NULL UNIQUE,
+  production_order_id uuid REFERENCES public.production_orders(id),
+  reason              varchar(100) NOT NULL,
+  note                text,
+  created_by          uuid,
+  created_by_name     varchar(150),
+  created_at          timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.material_return_items (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  return_id     uuid NOT NULL REFERENCES public.material_returns(id) ON DELETE CASCADE,
+  source_trx_id uuid NOT NULL REFERENCES public.inventory_transactions(id),
+  product_id    uuid NOT NULL REFERENCES public.products(id),
+  quantity      numeric(14,2) NOT NULL CHECK (quantity > 0),
+  location_id   uuid REFERENCES public.locations(id)
+);
+CREATE INDEX IF NOT EXISTS idx_mr_order ON public.material_returns (production_order_id);
+CREATE INDEX IF NOT EXISTS idx_mri_return ON public.material_return_items (return_id);
+CREATE INDEX IF NOT EXISTS idx_mri_source ON public.material_return_items (source_trx_id);
+-- ---------------------------------------------------------------------
