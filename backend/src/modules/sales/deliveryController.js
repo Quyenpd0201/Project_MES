@@ -446,7 +446,7 @@ exports.ship = async (req, res) => {
          WHERE s.product_id = $1 AND s.quantity > 0 AND w.warehouse_type IN ('NVL','BTP','TP')
            AND ${whOutboundOkSql('w', 'lo')}
            AND (NOT $3::boolean OR s.spec_key = $2)
-         ORDER BY (s.lot_code = ANY($4::text[])) DESC, (s.spec_key = $2) DESC, (w.warehouse_type = 'TP') DESC, s.id ASC`,
+         ORDER BY (s.lot_code = ANY($4::text[])) DESC, (s.spec_key = $2) DESC, (w.warehouse_type = 'TP') DESC, s.created_at ASC, s.id ASC`, // FIFO: lô vào kho sớm nhất trước (id là mã ngẫu nhiên, chỉ để thứ tự cố định)
         [l.product_id, l.spec_key, strict, l.own_lots]);
       const avail = (r) => (left.has(rowKey(r)) ? left.get(rowKey(r)) : Number(r.quantity));
       const onHand = stockRows.reduce((s, r) => s + avail(r), 0);
