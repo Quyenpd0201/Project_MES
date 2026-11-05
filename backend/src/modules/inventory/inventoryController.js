@@ -250,8 +250,10 @@ exports.addStockLine = async (req, res) => {
 // Muốn bỏ hàng thì xuất / điều chỉnh về 0 (có ghi sổ) rồi mới xóa dòng.
 exports.deleteStockLine = async (req, res) => {
   try {
-    const cur = (await db.query(`SELECT quantity FROM inventory_stock WHERE id = $1`, [req.params.id])).rows[0];
+    const cur = (await db.query(`SELECT quantity, location_id FROM inventory_stock WHERE id = $1`, [req.params.id])).rows[0];
     if (!cur) return res.status(404).json({ message: 'Không tìm thấy dòng tồn' });
+    const denied = await writeDenied(db, req, cur.location_id, ['inv_adjust', 'inventory']); // K-25: đúng phạm vi kho được giao
+    if (denied) return res.status(403).json({ message: denied });
     if (Number(cur.quantity) !== 0) {
       return res.status(400).json({ message: `Dòng tồn còn ${Number(cur.quantity).toLocaleString('vi-VN')} — không xóa thẳng được (sổ cái sẽ lệch). Hãy xuất hoặc điều chỉnh về 0 trước rồi mới xóa.` });
     }
