@@ -3313,3 +3313,14 @@ BEGIN
   END LOOP;
 END $do$;
 -- ---------------------------------------------------------------------
+
+-- 34) SỔ CÁI LƯU ĐƠN VỊ (2026-11-05): mỗi giao dịch ghi ĐVT lúc phát sinh. Dữ liệu cũ lấy theo dòng tồn, không có thì theo sản phẩm.
+ALTER TABLE public.inventory_transactions ADD COLUMN IF NOT EXISTS unit character varying(30);
+UPDATE public.inventory_transactions t SET unit = COALESCE(
+    (SELECT NULLIF(s.unit, '') FROM public.inventory_stock s
+      WHERE s.product_id = t.product_id AND s.location_id IS NOT DISTINCT FROM t.location_id AND s.spec_key = t.spec_key AND s.lot_code = t.lot_code),
+    (SELECT p.unit FROM public.products p WHERE p.id = t.product_id))
+  WHERE t.unit IS NULL;
+DROP TRIGGER IF EXISTS unit_upper ON public.inventory_transactions;
+CREATE TRIGGER unit_upper BEFORE INSERT OR UPDATE OF unit ON public.inventory_transactions FOR EACH ROW EXECUTE FUNCTION public.trg_unit_upper();
+-- ---------------------------------------------------------------------
