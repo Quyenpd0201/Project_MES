@@ -806,7 +806,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                   <td className="px-3 py-2.5">
                     {editing
                       ? <input className={inputCls} value={r.unit} onChange={(e) => upMat(r._k, 'unit', e.target.value)} placeholder="kg" />
-                      : <span className="text-slate-600">{r.unit || 'kg'}</span>}
+                      : <span className="text-slate-600">{r.unit || 'KG'}</span>}
                   </td>
                   <td className="px-3 py-2.5">
                     <span className={Number(r.issued_qty) > Number(r.qty) + 1e-6 ? 'text-amber-700 font-semibold' : 'text-slate-600'}>{fmt(r.issued_qty || 0)}</span>
