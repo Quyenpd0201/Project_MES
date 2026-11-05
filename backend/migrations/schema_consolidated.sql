@@ -2800,3 +2800,13 @@ UPDATE public.inventory_transactions t SET unit = COALESCE(
 DROP TRIGGER IF EXISTS unit_upper ON public.inventory_transactions;
 CREATE TRIGGER unit_upper BEFORE INSERT OR UPDATE OF unit ON public.inventory_transactions FOR EACH ROW EXECUTE FUNCTION public.trg_unit_upper();
 -- ---------------------------------------------------------------------
+
+-- 35) KHÁCH TRẢ HÀNG TRỪ CÔNG NỢ (2026-11-05): tổng tiền phiếu giao giảm theo giá trị hàng trả.
+--   returned_amount giữ phần đã trừ, để sửa dòng phiếu sau đó không làm mất. Phiếu trả lập trước mục này không tự trừ.
+ALTER TABLE public.delivery_notes ADD COLUMN IF NOT EXISTS returned_amount numeric(16,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.delivery_returns ADD COLUMN IF NOT EXISTS amount numeric(16,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.delivery_return_items ADD COLUMN IF NOT EXISTS unit_price numeric(16,2) NOT NULL DEFAULT 0;
+ALTER TABLE public.delivery_return_items ADD COLUMN IF NOT EXISTS amount numeric(16,2) NOT NULL DEFAULT 0;
+--   Số đã giao của đơn = SL giao − returned_qty
+ALTER TABLE public.delivery_note_items ADD COLUMN IF NOT EXISTS returned_qty numeric(14,2) NOT NULL DEFAULT 0;
+-- ---------------------------------------------------------------------

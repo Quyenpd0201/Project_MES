@@ -120,7 +120,7 @@ exports.deliverableOrders = async (req, res) => {
     const { rows } = await db.query(`
       SELECT so.id, so.order_code, so.order_date, so.due_date, so.status,
              (SELECT COALESCE(SUM(it.quantity),0) FROM sales_order_items it WHERE it.sales_order_id = so.id) AS ordered_total,
-             (SELECT COALESCE(SUM(COALESCE(di.actual_quantity, di.quantity)),0) FROM delivery_note_items di
+             (SELECT COALESCE(SUM(COALESCE(di.actual_quantity, di.quantity) - di.returned_qty),0) FROM delivery_note_items di
                 JOIN delivery_notes dn ON dn.id = di.delivery_note_id
                 JOIN sales_order_items it2 ON it2.id = di.sales_order_item_id
                 WHERE it2.sales_order_id = so.id AND ${moneyNoteFilter('dn')}) AS delivered_total
