@@ -47,7 +47,7 @@ self.addEventListener("fetch", (e) => {
     }).catch(async () => (await caches.match("/kiosk")) || Response.error()));
     return;
   }
-  if (url.pathname.startsWith("/assets/") || url.pathname === "/logo.png") {
+  if (url.pathname.startsWith("/assets/") || url.pathname === "/logo.png" || url.pathname === "/logo.svg") {
     e.respondWith(caches.open(CACHE).then(async (c) => {
       const hit = await c.match(req);
       const net = fetch(req).then((res) => { if (res.ok) c.put(req, res.clone()); return res; }).catch(() => hit);
