@@ -705,7 +705,7 @@ function DeliveryVoucher({ id, onBack }) {
       <div className="print-area bg-white rounded-xl border border-slate-200 p-8 max-w-3xl mx-auto text-slate-900">
         {/* Header: logo + tiêu đề */}
         <div className="flex items-center gap-4 border-b-2 border-blue-700 pb-3">
-          <Logo className="h-14 w-auto shrink-0" />
+          <Logo className="h-24 w-auto shrink-0" />
           <div className="flex-1 text-center">
             <h1 className="text-2xl font-extrabold text-blue-800 tracking-wide uppercase">Phiếu xuất kho</h1>
             <div className="text-sm mt-0.5">
