@@ -782,7 +782,10 @@ exports.director = async (req, res) => {
         const live = list.filter((x) => x.status !== 'Đã hủy');
         const kg = live.filter((x) => x.is_kg);
         const cnt = (fn) => list.filter(fn).length;
-        const plan = kg.reduce((a, x) => a + x.plan, 0), actual = kg.reduce((a, x) => a + x.actual, 0);
+        // Phương án A (2026-11-10): actual = làm ra TRONG KỲ (công đoạn cuối, cùng nguồn tỷ lệ phế, gồm lệnh tạo trước kỳ).
+        // Tiến độ (progress / remaining / over) vẫn theo các lệnh tạo trong kỳ.
+        const plan = kg.reduce((a, x) => a + x.plan, 0), progress = kg.reduce((a, x) => a + x.actual, 0);
+        const actual = scrapQ.total_finished;
         const scrapDays = [...scrapQ.by_day].reverse()
           .map((r) => ({ date: r.date, scrap: r1(r.scrap_qty), finished: r1(r.finished_qty) }));
         const scrap = scrapQ.total_scrap, fin = scrapQ.total_finished;
@@ -790,7 +793,8 @@ exports.director = async (req, res) => {
           on_hand: r1(r.on_hand), min_qty: r1(r.min_qty) }));
         return {
           output: { // sản lượng (kg) — LSX tạo trong kỳ
-            plan: r1(plan), actual: r1(actual), remaining: r1(Math.max(0, plan - actual)), over: r1(Math.max(0, actual - plan)),
+            plan: r1(plan), actual: r1(actual), progress: r1(progress),
+            remaining: r1(Math.max(0, plan - progress)), over: r1(Math.max(0, progress - plan)),
             // G1: chưa có thành phẩm (fin = 0) thì tỷ lệ phế không có nghĩa → null (web hiện "—"), không báo 100%
             scrap: r1(scrap), scrap_rate: fin > 0 ? Math.round(scrap / (fin + scrap) * 1000) / 10 : null,
             non_kg_count: live.length - kg.length,

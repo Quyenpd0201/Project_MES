@@ -486,7 +486,16 @@ function OutputReportBody({ lookups }) {
 
   // KPI
   const totalPlanned = filtered.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+  // Tiến độ: đã làm của các lệnh trong kỳ (mọi lúc) — dùng cho % đạt / còn lại
   const totalActual  = filtered.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
+  // Phương án A: SL làm ra TRONG KỲ (công đoạn cuối hoàn thành trong khoảng ngày, kể cả lệnh bắt đầu trước kỳ),
+  // cùng nguồn với tỷ lệ phế; áp các bộ lọc sản phẩm / đội / trạng thái theo từng lệnh.
+  const madeInRange = (scrapSum.by_order || []).filter(o => {
+    const teams = String(o.team || "").split(",").map(s => s.trim()).filter(Boolean);
+    return (!productFilter || o.product_code === productFilter)
+      && (!teamFilter || (teamFilter === NO_TEAM ? teams.length === 0 : teams.includes(teamFilter)))
+      && (!statusFilter || (statusFilter === OVERDUE ? filtered.some(r => r.id === o.order_id) : o.status === statusFilter));
+  }).reduce((s, o) => s + o.finished_qty, 0);
   // Phế lấy từ Quản lý phế (gộp theo ngày trong khoảng lọc), KHÔNG lấy theo lệnh sản xuất.
   const totalScrap    = Number(scrapSum.total_scrap) || 0;
   const scrapFinished = Number(scrapSum.total_finished) || 0;
@@ -761,7 +770,7 @@ function OutputReportBody({ lookups }) {
       {/* 7 thẻ / 1 hàng chỉ từ 2xl (1536px): ở 1280px mỗi thẻ ~122px → 6/7 nhãn bị cắt. Dưới 2xl: 4 thẻ / hàng */}
       <div className="grid grid-cols-2 md:grid-cols-4 2xl:grid-cols-7 gap-4">
         <KpiCard label="SL kế hoạch" value={fmt(totalPlanned)} sub={`${filtered.length} lệnh SX`}        icon={Package}      color="blue"  {...cardProps("all")} />
-        <KpiCard label="SL thực tế"  value={fmt(totalActual)}  sub={`Đạt ${achieveRate}% kế hoạch`}       icon={TrendingUp}   color="green" {...cardProps("actual")} />
+        <KpiCard label="SL thực tế"  value={fmt(madeInRange)}  sub={`Làm ra trong kỳ · tiến độ lệnh ${achieveRate}%`}       icon={TrendingUp}   color="green" {...cardProps("actual")} />
         <KpiCard label="Còn lại"     value={fmt(totalRemaining)}
           sub={totalOver > 0 ? `Vượt mức +${fmt(totalOver)}` : "Còn phải sản xuất"}
           icon={ClipboardList} color={totalRemaining === 0 ? "green" : "amber"} {...cardProps("remain")} />
