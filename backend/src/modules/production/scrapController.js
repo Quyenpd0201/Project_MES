@@ -1,5 +1,6 @@
 const db = require('../../core/db');
 const { vnToday } = require('../../core/lib/dates');
+const { FINAL_STAGE_OF_TASK } = require('../../core/lib/finalStage');
 const { applyStock, stockErrorResponse } = require('../../core/lib/stock');
 
 // GET /api/scrap/workers — lấy toàn bộ nhân viên đang hoạt động
@@ -319,15 +320,29 @@ exports.getSummary = async (req, res) => {
   try {
     const to = req.query.to || req.query.toDate || vnToday(); // G3: nhận cả to/toDate
     const from = req.query.from || req.query.fromDate || to;
+    // Thành phẩm = Σ công đoạn CUỐI đã hoàn thành trong ngày (phiếu phế không nhập TP — finished_qty luôn 0
+    // → trước đây tỷ lệ phế luôn 100%). Ngày của task theo updated_at (người dùng chấp nhận, 2026-11-10).
     const { rows } = await db.query(`
-      SELECT dsr.record_date::text AS date,
-             COALESCE(SUM(dsi.scrap_qty), 0)::numeric    AS scrap_qty,
-             COALESCE(SUM(dsi.finished_qty), 0)::numeric AS finished_qty
-      FROM daily_scrap_records dsr
-      JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
-      WHERE dsr.record_date BETWEEN $1::date AND $2::date
-      GROUP BY dsr.record_date
-      ORDER BY dsr.record_date`, [from, to]);
+      WITH s AS (
+        SELECT dsr.record_date AS d, SUM(dsi.scrap_qty) AS scrap_qty
+        FROM daily_scrap_records dsr
+        JOIN daily_scrap_items dsi ON dsi.record_id = dsr.id
+        WHERE dsr.record_date BETWEEN $1::date AND $2::date
+        GROUP BY dsr.record_date
+      ), f AS (
+        SELECT t.updated_at::date AS d, SUM(COALESCE(t.actual_qty, t.quantity)) AS finished_qty
+        FROM production_tasks t
+        JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+        WHERE t.status = 'Hoàn thành'
+          AND t.updated_at::date BETWEEN $1::date AND $2::date
+          AND t.stage = ${FINAL_STAGE_OF_TASK}
+        GROUP BY t.updated_at::date
+      )
+      SELECT COALESCE(s.d, f.d)::text AS date,
+             COALESCE(s.scrap_qty, 0)::numeric    AS scrap_qty,
+             COALESCE(f.finished_qty, 0)::numeric AS finished_qty
+      FROM s FULL JOIN f ON f.d = s.d
+      ORDER BY 1`, [from, to]);
     const by_day = rows.map((r) => ({
       date: r.date, scrap_qty: Number(r.scrap_qty) || 0, finished_qty: Number(r.finished_qty) || 0,
     }));

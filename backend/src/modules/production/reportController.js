@@ -1,5 +1,6 @@
 const db = require('../../core/db');
 const { upUnit } = require('../../core/lib/units');
+const { FINAL_STAGE_OF_TASK } = require('../../core/lib/finalStage');
 const { hasAppPerm } = require('../../core/requireAuth');
 
 // A5: nguồn tồn kho cho báo cáo — bỏ tồn của SP / kho / vị trí đã xóa (cùng điều kiện màn Tồn kho)
@@ -19,9 +20,7 @@ const DONE_BY_ORDER = `
         SELECT t.production_order_id, SUM(COALESCE(t.actual_qty, t.quantity)) AS done_qty
         FROM production_tasks t
         WHERE t.status = 'Hoàn thành'
-          AND t.stage = (CASE WHEN EXISTS (SELECT 1 FROM production_tasks tf
-                                           WHERE tf.production_order_id = t.production_order_id AND tf.stage = 'Cắt')
-                              THEN 'Cắt' ELSE 'Thổi' END)
+          AND t.stage = ${FINAL_STAGE_OF_TASK}
         GROUP BY t.production_order_id`;
 
 exports.kpi = async (req, res) => {
