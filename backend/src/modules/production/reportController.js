@@ -1,6 +1,7 @@
 const db = require('../../core/db');
 const { upUnit } = require('../../core/lib/units');
 const { FINAL_STAGE_OF_TASK } = require('../../core/lib/finalStage');
+const { scrapByDay } = require('../../core/lib/scrapSummary');
 const { hasAppPerm } = require('../../core/requireAuth');
 
 // A5: nguồn tồn kho cho báo cáo — bỏ tồn của SP / kho / vị trí đã xóa (cùng điều kiện màn Tồn kho)
@@ -623,12 +624,8 @@ exports.director = async (req, res) => {
         WHERE po.is_deleted=FALSE AND po.created_at::date BETWEEN $1 AND $2
         ORDER BY po.created_at DESC`, [f, t]),
       // Kh\u1ed1i 2: ph\u1ebf theo ng\u00e0y \u2014 ngu\u1ed3n Qu\u1ea3n l\u00fd ph\u1ebf (c\u00f9ng /scrap/summary)
-      db.query(`
-        SELECT dsr.record_date::text AS date,
-               COALESCE(SUM(dsi.scrap_qty),0)::numeric AS scrap, COALESCE(SUM(dsi.finished_qty),0)::numeric AS finished
-        FROM daily_scrap_records dsr JOIN daily_scrap_items dsi ON dsi.record_id=dsr.id
-        WHERE dsr.record_date BETWEEN $1 AND $2
-        GROUP BY dsr.record_date ORDER BY dsr.record_date DESC`, [f, t]),
+      // TP = công đoạn cuối hoàn thành trong ngày (trước đây finished_qty phiếu phế luôn 0 → tỷ lệ "—")
+      scrapByDay(db, f, t),
       // Kh\u1ed1i 2: NVL \u0110ANG THI\u1ebeU \u2014 t\u00ecnh tr\u1ea1ng HI\u1ec6N T\u1ea0I (kh\u00f4ng l\u1ecdc k\u1ef3): C\u1ed8NG D\u1ed2N "NVL c\u1ea7n cung c\u1ea5p" c\u1ee7a m\u1ecdi l\u1ec7nh
       // \u0111ang m\u1edf CH\u01afA xu\u1ea5t NVL (\u0111\u00e3 xu\u1ea5t th\u00ec kho \u0111\u00e3 tr\u1eeb r\u1ed3i), so v\u1edbi t\u1ed3n kho NVL.
       db.query(`
@@ -786,8 +783,9 @@ exports.director = async (req, res) => {
         const kg = live.filter((x) => x.is_kg);
         const cnt = (fn) => list.filter(fn).length;
         const plan = kg.reduce((a, x) => a + x.plan, 0), actual = kg.reduce((a, x) => a + x.actual, 0);
-        const scrapDays = scrapQ.rows.map((r) => ({ date: r.date, scrap: r1(r.scrap), finished: r1(r.finished) }));
-        const scrap = scrapDays.reduce((a, x) => a + x.scrap, 0), fin = scrapDays.reduce((a, x) => a + x.finished, 0);
+        const scrapDays = [...scrapQ.by_day].reverse()
+          .map((r) => ({ date: r.date, scrap: r1(r.scrap_qty), finished: r1(r.finished_qty) }));
+        const scrap = scrapQ.total_scrap, fin = scrapQ.total_finished;
         const low = lowQ.rows.map((r) => ({ code: r.code, name: r.name, warehouse: r.warehouse, unit: r.unit,
           on_hand: r1(r.on_hand), min_qty: r1(r.min_qty) }));
         return {
