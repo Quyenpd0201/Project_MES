@@ -485,9 +485,11 @@ function OutputReportBody({ lookups }) {
   const overdueCount = filtered.filter(isOverdue).length;
 
   // KPI
-  const totalPlanned = filtered.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
+  // Lệnh Đã hủy: bỏ hết sản lượng / kế hoạch (chốt 2026-11-10) — vẫn hiện trong danh sách chi tiết
+  const live = filtered.filter(r => r.status !== "Đã hủy");
+  const totalPlanned = live.reduce((s, r) => s + (Number(r.quantity) || 0), 0);
   // Tiến độ: đã làm của các lệnh trong kỳ (mọi lúc) — dùng cho % đạt / còn lại
-  const totalActual  = filtered.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
+  const totalActual  = live.reduce((s, r) => s + (Number(r.produced_qty) || 0), 0);
   // Phương án A: SL làm ra TRONG KỲ (công đoạn cuối hoàn thành trong khoảng ngày, kể cả lệnh bắt đầu trước kỳ),
   // cùng nguồn với tỷ lệ phế; áp các bộ lọc sản phẩm / đội / trạng thái theo từng lệnh.
   const madeInRange = (scrapSum.by_order || []).filter(o => {

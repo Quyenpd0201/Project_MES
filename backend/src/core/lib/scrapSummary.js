@@ -1,7 +1,7 @@
 // Tổng hợp phế theo ngày — MỘT định nghĩa cho Báo cáo sản lượng (/scrap/summary) và Báo cáo giám đốc.
 // Phế: module Quản lý phế, theo ngày cân. Thành phẩm: Σ công đoạn CUỐI đã hoàn thành trong ngày
 // (phiếu phế không nhập TP — finished_qty luôn 0 → trước đây tỷ lệ phế 100% / "—").
-// Ngày của task theo updated_at (người dùng chấp nhận, 2026-11-10).
+// Ngày của task theo updated_at (người dùng chấp nhận, 2026-11-10). Lệnh Đã hủy: bỏ hết sản lượng, phế vẫn tính (chốt 2026-11-10).
 const { FINAL_STAGE_OF_TASK } = require('./finalStage');
 
 async function scrapByDay(db, from, to) {
@@ -15,7 +15,7 @@ async function scrapByDay(db, from, to) {
     ), f AS (
       SELECT t.updated_at::date AS d, SUM(COALESCE(t.actual_qty, t.quantity)) AS finished_qty
       FROM production_tasks t
-      JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+      JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE AND po.status <> 'Đã hủy'
       WHERE t.status = 'Hoàn thành'
         AND t.updated_at::date BETWEEN $1::date AND $2::date
         AND t.stage = ${FINAL_STAGE_OF_TASK}
@@ -38,7 +38,7 @@ async function scrapByDay(db, from, to) {
              po.assigned_team) AS team,
            SUM(COALESCE(t.actual_qty, t.quantity))::numeric AS finished_qty
     FROM production_tasks t
-    JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE
+    JOIN production_orders po ON po.id = t.production_order_id AND po.is_deleted = FALSE AND po.status <> 'Đã hủy'
     LEFT JOIN products p ON p.id = po.product_id
     WHERE t.status = 'Hoàn thành'
       AND t.updated_at::date BETWEEN $1::date AND $2::date
