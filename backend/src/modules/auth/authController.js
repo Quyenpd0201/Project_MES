@@ -179,6 +179,10 @@ exports.isSessionActive = async (payload, client = db) => {
 };
 
 exports.hashPassword = hashPassword;
+// [HR-MOBILE] Dùng chung cho chấm công bằng tài khoản trên tablet của tổ (kioskController.identifyAccount):
+// cùng cách kiểm mật khẩu + cùng bộ đếm sai/khóa với màn đăng nhập.
+exports.verifyPassword = verifyPassword;
+exports.loginGuard = { checkBruteForce, recordFailedLogin, clearFailedLogin };
 
 // Giải mã + kiểm chữ ký/hạn token → payload { userId, tv, jti, exp } hoặc null
 exports.decodeToken = (token) => {

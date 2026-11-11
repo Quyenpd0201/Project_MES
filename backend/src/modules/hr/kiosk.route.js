@@ -30,6 +30,7 @@ router.post('/kiosk/register/claim', perIp(60), k.claim);
 router.get('/kiosk/time', requireKiosk, k.time);
 router.get('/kiosk/roster', requireKiosk, k.roster);
 router.post('/kiosk/identify', requireKiosk, perDevice(Number(process.env.KIOSK_IDENTIFY_PER_MIN) || 30), k.identify);
+router.post('/kiosk/identify-account', requireKiosk, perDevice(Number(process.env.KIOSK_IDENTIFY_PER_MIN) || 30), k.identifyAccount); // [HR-MOBILE] tài khoản + mật khẩu (tablet của tổ)
 router.post('/kiosk/consent', requireKiosk, k.consent);
 router.post('/kiosk/punch', requireKiosk, perDevice(Number(process.env.KIOSK_PUNCH_PER_MIN) || 120), (req, res, next) => {
   upload.single('photo')(req, res, (err) => {

@@ -213,6 +213,54 @@ exports.identify = async (req, res) => {
   } finally { client.release(); }
 };
 
+// ── [HR-MOBILE] Nhận diện bằng TÀI KHOẢN + MẬT KHẨU app (tablet của tổ, app mobile) ──────
+// Chủ dự án chốt 2026-11-11: mỗi tổ 1 tablet; nhân viên đăng nhập bằng tài khoản app rồi chụp ảnh chấm công.
+// Chỉ tablet đã duyệt mới gọi được (requireKiosk) → tự chấm ở nhà / điện thoại riêng không được.
+// Tài khoản ↔ nhân viên qua employees.user_id. Trả về ĐÚNG dạng như identify (PIN) → consent / punch dùng lại nguyên.
+// Chống dò mật khẩu: dùng chung bộ đếm với màn đăng nhập (theo tài khoản + IP / tài khoản / IP) + bộ đếm sai theo tablet.
+exports.identifyAccount = async (req, res) => {
+  const { loginGuard, verifyPassword } = require('../auth/authController');
+  const username = typeof req.body?.username === 'string' ? req.body.username.trim().slice(0, 100) : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!username || !password) return res.status(400).json({ message: 'Vui lòng nhập tài khoản và mật khẩu' });
+  const ip = req.ip || 'unknown';
+  if (deviceFailCount(req.kiosk.id) >= DEVICE_FAIL_MAX || loginGuard.checkBruteForce(ip, username)) {
+    return res.status(429).json({ message: 'Nhập sai quá nhiều lần — tạm khóa 15 phút, báo trưởng tổ' });
+  }
+  const { rows: [u] } = await db.query(
+    `SELECT id, password_hash, status FROM users WHERE username = $1 AND is_deleted = FALSE`, [username]);
+  if (!u || u.status !== 'Hoạt động' || !verifyPassword(password, u.password_hash)) {
+    loginGuard.recordFailedLogin(ip, username); recordDeviceFail(req.kiosk.id);
+    return res.status(401).json({ message: 'Sai tài khoản hoặc mật khẩu' });
+  }
+  loginGuard.clearFailedLogin(ip, username);
+  const s = await getAppSettings(db);
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: [e] } = await client.query(
+      `SELECT * FROM employees WHERE user_id = $1 AND is_deleted = FALSE AND status = 'Hoạt động' FOR UPDATE`, [u.id]);
+    if (!e) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Tài khoản chưa được gắn với nhân viên — gặp trưởng tổ / nhân sự để gắn' });
+    }
+    const last = await lastPunch(client, e.id, new Date());
+    await client.query('COMMIT');
+    const d = decideDirection(last, new Date(), { dedupeMin: s.hr_punch_dedupe_min, maxOpenHours: MAX_OPEN_HOURS });
+    const consent = consentState(e, s.hr_consent_version);
+    res.json({
+      session: issueSession(e.id, req.kiosk.id),
+      employee: { id: e.id, name: e.name, employee_code: e.employee_code },
+      expected_direction: d.duplicate ? last.direction : d.direction,
+      needs_consent: consent === 'needed', photo_required: consent !== 'refused',
+      consent_version: s.hr_consent_version,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally { client.release(); }
+};
+
 // ── Đồng ý / từ chối chụp ảnh (NĐ 13/2023) ───────────────────────────────
 exports.consent = async (req, res) => {
   const p = readSession(req.body?.session, req.kiosk.id);

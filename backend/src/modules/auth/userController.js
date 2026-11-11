@@ -25,6 +25,27 @@ exports.getById = async (req, res) => {
 
 const VALID_STATUSES = ['Hoạt động', 'Không hoạt động'];
 
+// [HR-MOBILE] "Công nhân liên kết" (users.linked_worker = tên hoặc mã NV) là chỗ DUY NHẤT admin gắn tài khoản ↔ nhân viên.
+// Đồng bộ sang employees.user_id (chấm công bằng tài khoản dùng cột này). Chỉ gắn khi khớp ĐÚNG 1 nhân viên;
+// trùng tên nhiều người → không gắn (báo cho admin dùng mã NV). Lỗi đồng bộ không làm hỏng việc lưu tài khoản.
+async function syncEmployeeLink(userId, linkedWorker) {
+  try {
+    await db.query(`UPDATE employees SET user_id = NULL WHERE user_id = $1`, [userId]);
+    const v = String(linkedWorker || '').trim();
+    if (!v) return { linked: false };
+    const { rows } = await db.query(
+      `SELECT id FROM employees WHERE is_deleted = FALSE AND (upper(employee_code) = upper($1) OR name = $1) LIMIT 2`, [v]);
+    if (rows.length !== 1) return { linked: false, reason: rows.length ? 'trùng tên nhiều nhân viên — hãy nhập mã nhân viên' : 'không tìm thấy nhân viên' };
+    await db.query(`UPDATE employees SET user_id = $1 WHERE id = $2`, [userId, rows[0].id]);
+    return { linked: true };
+  } catch (e) {
+    if (e.code === '42703') return { linked: false }; // chưa migrate cột employees.user_id
+    if (e.code === '23505') return { linked: false, reason: 'nhân viên này đã gắn với tài khoản khác' };
+    console.error('[syncEmployeeLink]', e.message);
+    return { linked: false };
+  }
+}
+
 exports.create = async (req, res) => {
   try {
     const { username, password, full_name, role_id, status, team, linked_worker } = req.body;
@@ -39,7 +60,8 @@ exports.create = async (req, res) => {
       `INSERT INTO users (username, password_hash, full_name, role_id, status, team, linked_worker) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
       [username.trim(), hashPassword(password), full_name ? String(full_name).slice(0, 100) : null,
        role_id || null, resolvedStatus, team ? String(team).slice(0, 100) : null, linked_worker ? String(linked_worker).slice(0, 100) : null]);
-    res.status(201).json({ id: rows[0].id });
+    const link = linked_worker ? await syncEmployeeLink(rows[0].id, linked_worker) : null;
+    res.status(201).json({ id: rows[0].id, ...(link && !link.linked && link.reason ? { warning: `Chưa gắn được nhân viên để chấm công: ${link.reason}` } : {}) });
   } catch (e) {
     if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
     console.error('[userController.create]', e);
@@ -83,7 +105,8 @@ exports.update = async (req, res) => {
       ({ rows } = await db.query(sql(''), [...vals, req.params.id]));
     }
     if (!rows.length) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
-    res.json({ message: 'Đã cập nhật tài khoản' });
+    const link = linked_worker !== undefined ? await syncEmployeeLink(req.params.id, linked_worker) : null;
+    res.json({ message: 'Đã cập nhật tài khoản', ...(link && !link.linked && link.reason ? { warning: `Chưa gắn được nhân viên để chấm công: ${link.reason}` } : {}) });
   } catch (e) {
     if (e.code === '23505') return res.status(400).json({ message: 'Tài khoản đã tồn tại' });
     console.error('[userController.update]', e);

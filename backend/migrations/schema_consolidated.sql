@@ -3347,3 +3347,21 @@ UPDATE public.app_settings SET value = to_jsonb('Số 8F3, Đường DD6, Khu Ph
   WHERE key = 'company_address' AND value = to_jsonb('119/1 Đường Đỗ Mười, Tổ 4, Khu phố 1, Phường Thới An, Thành Phố Hồ Chí Minh'::text);
 -- [M3-END]
 -- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- 37) [HR-MOBILE] (2026-11-11, CHƯA PHÁT HÀNH): GẮN TÀI KHOẢN ↔ NHÂN VIÊN cho chấm công trên tablet của tổ.
+--   Nguồn duy nhất: users.linked_worker ("Công nhân liên kết" trên màn Tài khoản) — backend đồng bộ sang employees.user_id
+--   mỗi khi lưu tài khoản. Khối này gắn sẵn cho tài khoản ĐÃ có liên kết, chỉ khi khớp đúng 1 nhân viên và nhân viên
+--   chưa gắn tài khoản nào (chạy lại an toàn, không ghi đè gắn tay).
+--   Gỡ: UPDATE public.employees SET user_id = NULL;  (không xóa cột — cột thuộc mục 26)
+UPDATE public.employees e SET user_id = m.user_id
+FROM (
+  SELECT u.id AS user_id, MIN(e2.id::text)::uuid AS employee_id
+  FROM public.users u
+  JOIN public.employees e2 ON e2.is_deleted = FALSE
+   AND (upper(e2.employee_code) = upper(trim(u.linked_worker)) OR e2.name = trim(u.linked_worker))
+  WHERE u.is_deleted = FALSE AND coalesce(trim(u.linked_worker), '') <> ''
+  GROUP BY u.id HAVING COUNT(*) = 1
+) m
+WHERE e.id = m.employee_id AND e.user_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM public.employees x WHERE x.user_id = m.user_id);
