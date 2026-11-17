@@ -883,7 +883,7 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
             <table className="w-full table-fixed text-sm whitespace-nowrap">
               <thead className="text-slate-400 text-xs uppercase">
                 <tr>
-                  <th className="text-left py-2 pr-2 font-medium w-[116px]" title="Dòng con hiện mã cuộn (Thổi …_1_xxx, Cắt …_2_xxx)">Công đoạn</th>
+                  <th className="text-left py-2 pr-2 font-medium w-[116px]" title="Dòng con hiện mã cuộn (Thổi LSX_1_xxx, Cắt LSX_2_xxx)">Công đoạn</th>
                   <th className="text-left py-2 pr-2 font-medium w-[80px]">Sản lượng</th>
                   <th className="text-left py-2 pr-2 font-medium w-[128px]">Sản phẩm đầu ra</th>
                   <th className="text-left py-2 pr-2 font-medium w-[124px]">Máy</th>
@@ -951,13 +951,17 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                               {/* Mã cuộn của dòng (server cấp khi lưu); dòng cũ / chưa lưu không có mã → để trống */}
                               <span className="flex items-center gap-1 min-w-0">
                                 {rowLocked && <Lock size={13} className="text-emerald-600 shrink-0" aria-hidden="true" />}
-                                {/* Ô hẹp: chỉ hiện phần đuôi phân biệt (…_1_001); mã đầy đủ ở title + cho trình đọc màn hình */}
-                                {t.roll_code && (
-                                  <span className="text-xs tabular-nums text-slate-600 truncate" title={`Mã cuộn ${t.roll_code}`}>
-                                    <span aria-hidden="true">{rollTail(t.roll_code)}</span>
-                                    <span className="sr-only">Mã cuộn {t.roll_code}</span>
-                                  </span>
-                                )}
+                                {/* Hiện ĐỦ mã cuộn (chủ dự án yêu cầu): ô hẹp thì xuống dòng ngay trước phần đuôi _1_001, không cắt "…" */}
+                                {t.roll_code && (() => {
+                                  const tail = rollTail(t.roll_code);
+                                  const head = tail !== t.roll_code ? t.roll_code.slice(0, t.roll_code.length - tail.length + 1) : t.roll_code;
+                                  const rest = tail !== t.roll_code ? tail.slice(1) : "";
+                                  return (
+                                    <span className="text-[11px] leading-tight tabular-nums text-slate-600 whitespace-normal break-words min-w-0" title={`Mã cuộn ${t.roll_code}`}>
+                                      {head}<wbr />{rest}
+                                    </span>
+                                  );
+                                })()}
                               </span>
                             </td>
                             <td className="py-1.5 pr-2"><input disabled={dis} type="number" min="0" className={`${cellCls} no-spin${qtyOver ? " !border-rose-400 !ring-2 !ring-rose-200" : ""}`} value={t.quantity} onChange={(e) => upTask(t._k, "quantity", e.target.value)} title={qtyOver ? `Sản lượng 1 lần vượt 150% SL cần SX (tối đa ${fmt(capStage)})` : undefined} /></td>
