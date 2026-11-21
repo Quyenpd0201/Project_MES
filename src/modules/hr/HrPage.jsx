@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PageHeader } from "../../components.jsx";
+import { PageHeader, Section } from "../../components.jsx";
 
 /* Chuẩn hóa module Chấm công (11/2026): tạo / xem / sửa mở thành TRANG RIÊNG (như Đơn hàng, Sản phẩm…),
    không còn popup. HrPage dùng đúng API của <Modal> (title, onClose, dirty, locked, footer, children)
@@ -27,9 +27,7 @@ export function HrScreen({ children }) {
   );
 }
 
-const WIDTH = { sm: "max-w-2xl", md: "max-w-3xl", lg: "max-w-5xl" };
-
-export function HrPage({ title, onClose, dirty, locked = false, footer, children, size = "md" }) {
+export function HrPage({ title, onClose, dirty, locked = false, footer, children, section = "Thông tin chung" }) {
   const ctx = useContext(Ctx);
   const [id] = useState(() => ++seq);
   useEffect(() => {
@@ -59,9 +57,9 @@ export function HrPage({ title, onClose, dirty, locked = false, footer, children
   return createPortal(
     <div className="space-y-5">
       <PageHeader title={title} onBack={locked ? undefined : requestClose} actions={actions} />
-      <div className={`bg-white rounded-xl border border-slate-200 shadow-sm p-6 ${WIDTH[size] || WIDTH.md}`}>
+      <Section title={section} collapsible={false}>
         {typeof children === "function" ? children(requestClose) : children}
-      </div>
+      </Section>
     </div>,
     ctx.slot,
   );

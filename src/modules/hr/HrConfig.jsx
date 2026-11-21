@@ -70,7 +70,7 @@ function FormModal({ title, initial, onSubmit, onClose, children, submitLabel = 
         <button type="button" className="btn-ghost" onClick={close} disabled={saving}>Hủy</button>
         <button type="button" className="btn-primary disabled:opacity-60" onClick={submit} disabled={saving}>{saving ? "Đang lưu…" : submitLabel}</button>
       </>}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{children(v, set)}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">{children(v, set)}</div>
     </Modal>
   );
 }
@@ -253,14 +253,14 @@ function ShiftsTab({ canEdit }) {
             <Field label="Tên ca" required><input className={inputCls} value={v.name} autoComplete="off" onChange={(e) => set("name")(e.target.value)} /></Field>
             <Field label="Giờ bắt đầu" required><input type="time" className={inputCls} value={v.start_time} onChange={(e) => set("start_time")(e.target.value)} /></Field>
             <Field label="Giờ kết thúc" required><input type="time" className={inputCls} value={v.end_time} onChange={(e) => set("end_time")(e.target.value)} /></Field>
-            <div className="sm:col-span-2"><Check label="Ca qua đêm (kết thúc sáng hôm sau)" checked={v.overnight} onChange={set("overnight")} /></div>
+            <div className="md:col-span-2 lg:col-span-3"><Check label="Ca qua đêm (kết thúc sáng hôm sau)" checked={v.overnight} onChange={set("overnight")} /></div>
             <Field label="Giờ công chuẩn (giờ)" required><input type="number" min={0.5} step={0.5} className={inputCls} value={v.required_hours} onChange={(e) => set("required_hours")(e.target.value)} /></Field>
             <div />
             <Field label="Châm chước đi muộn (phút)"><input type="number" min={0} className={inputCls} value={v.late_grace_min} onChange={(e) => set("late_grace_min")(e.target.value)} /></Field>
             <Field label="Châm chước về sớm (phút)"><input type="number" min={0} className={inputCls} value={v.early_grace_min} onChange={(e) => set("early_grace_min")(e.target.value)} /></Field>
             <Field label="Tự nhận ca nếu chấm vào từ"><input type="time" className={inputCls} value={v.auto_detect_from} onChange={(e) => set("auto_detect_from")(e.target.value)} /></Field>
             <Field label="đến"><input type="time" className={inputCls} value={v.auto_detect_to} onChange={(e) => set("auto_detect_to")(e.target.value)} /></Field>
-            <div className="sm:col-span-2 space-y-2">
+            <div className="md:col-span-2 lg:col-span-3 space-y-2">
               <div className="text-sm font-medium text-slate-600">Khung nghỉ (tự trừ, công nhân không phải chấm)</div>
               {v.breaks.map((b, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -318,7 +318,7 @@ function LeaveTypesTab({ canEdit }) {
             <Check label="Hưởng lương" checked={v.paid} onChange={set("paid")} />
             <Check label="Trừ vào số ngày phép" checked={v.uses_balance} onChange={set("uses_balance")} />
             {v.uses_balance && <Field label="Số ngày mỗi năm (reset 01/01)" required><input type="number" min={0} step={0.5} className={inputCls} value={v.annual_days} onChange={(e) => set("annual_days")(e.target.value)} /></Field>}
-            <div className="sm:col-span-2 space-y-2">
+            <div className="md:col-span-2 lg:col-span-3 space-y-2">
               <Check label="Bắt buộc đính kèm (vd giấy khám)" checked={v.requires_attachment} onChange={set("requires_attachment")} />
               <Check label="Nhân sự duyệt cuối sau trưởng đơn vị" checked={v.requires_hr_approval} onChange={set("requires_hr_approval")} />
             </div>
@@ -416,7 +416,7 @@ function EmployeesTab({ canEdit }) {
       {moving && (
         <FormModal title={`Chuyển tổ — ${moving.name}`} initial={{ org_unit_id: moving.org_unit_id || "" }} submitLabel="Chuyển tổ" onClose={() => setMoving(null)}
           onSubmit={async (v) => { await hrConfig.moveEmployee(moving.id, v.org_unit_id); toast.success(`Đã chuyển ${moving.name}`); load(); }}>
-          {(v, set) => <Field label="Tổ / đơn vị mới" required className="sm:col-span-2"><SearchSelect value={v.org_unit_id} onChange={set("org_unit_id")} options={unitOpts} ariaLabel="Tổ / đơn vị mới" /></Field>}
+          {(v, set) => <Field label="Tổ / đơn vị mới" required className="md:col-span-2 lg:col-span-3"><SearchSelect value={v.org_unit_id} onChange={set("org_unit_id")} options={unitOpts} ariaLabel="Tổ / đơn vị mới" /></Field>}
         </FormModal>
       )}
     </>
@@ -463,7 +463,7 @@ function DevicesTab({ canEdit }) {
           {(v, set) => <>
             <Field label="Mã trên tablet" required><input className={inputCls + " font-mono uppercase tracking-widest"} value={v.code} maxLength={6} spellCheck={false} autoComplete="off" placeholder="VD: K7M2QX…" onChange={(e) => set("code")(e.target.value.toUpperCase())} /></Field>
             <Field label="Xưởng / phòng" required><SearchSelect value={v.org_unit_id} onChange={set("org_unit_id")} options={unitOpts} ariaLabel="Xưởng / phòng của tablet" /></Field>
-            <Field label="Tên tablet" className="sm:col-span-2"><input className={inputCls} value={v.name} maxLength={100} autoComplete="off" placeholder="VD: Tablet cửa xưởng Thổi…" onChange={(e) => set("name")(e.target.value)} /></Field>
+            <Field label="Tên tablet" className="md:col-span-2 lg:col-span-3"><input className={inputCls} value={v.name} maxLength={100} autoComplete="off" placeholder="VD: Tablet cửa xưởng Thổi…" onChange={(e) => set("name")(e.target.value)} /></Field>
           </>}
         </FormModal>
       )}

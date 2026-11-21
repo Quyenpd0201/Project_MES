@@ -66,12 +66,12 @@ function CreateModal({ onClose, onDone }) {
         <button type="button" className="btn-ghost" onClick={close} disabled={saving}>Hủy</button>
         <button type="button" className="btn-primary disabled:opacity-60" disabled={saving || !valid} onClick={submit}>{saving ? "Đang gửi…" : "Gửi đơn"}</button>
       </>}>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-600">Nhân viên <span className="text-rose-600">*</span></span>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+        <label className="block"><span className="text-sm font-medium text-slate-600">Nhân viên <span className="text-rose-600">*</span></span>
           <div className="mt-1"><SearchSelect value={v.employee_id} onChange={set("employee_id")} ariaLabel="Nhân viên"
             options={emps.map((e) => ({ value: e.id, label: `${e.name} · ${e.employee_code}${e.org_unit_name ? ` · ${e.org_unit_name}` : ""}` }))} /></div>
         </label>
-        <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-600">Loại nghỉ <span className="text-rose-600">*</span></span>
+        <label className="block lg:col-span-2"><span className="text-sm font-medium text-slate-600">Loại nghỉ <span className="text-rose-600">*</span></span>
           <select className={inputCls + " mt-1"} value={v.leave_type_id} onChange={(e) => set("leave_type_id")(e.target.value)}>
             <option value="">-- Chọn --</option>
             {types.map((t) => <option key={t.id} value={t.id}>{t.name}{t.paid ? "" : " (không lương)"}</option>)}
@@ -98,10 +98,10 @@ function CreateModal({ onClose, onDone }) {
             </select>
           </label>
         )}
-        <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-600">Lý do <span className="text-rose-600">*</span></span>
+        <label className="block md:col-span-2 lg:col-span-3"><span className="text-sm font-medium text-slate-600">Lý do <span className="text-rose-600">*</span></span>
           <textarea className={inputCls + " mt-1"} rows={2} maxLength={500} value={v.reason} onChange={(e) => set("reason")(e.target.value)} placeholder="VD: Ốm, có giấy khám…" />
         </label>
-        <label className="block sm:col-span-2"><span className="text-sm font-medium text-slate-600">Đính kèm{type?.requires_attachment && <span className="text-amber-700"> (bắt buộc trước khi duyệt — có thể bổ sung sau)</span>}</span>
+        <label className="block md:col-span-2 lg:col-span-3"><span className="text-sm font-medium text-slate-600">Đính kèm{type?.requires_attachment && <span className="text-amber-700"> (bắt buộc trước khi duyệt — có thể bổ sung sau)</span>}</span>
           <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" className="mt-1 block text-sm" onChange={(e) => setFile(e.target.files?.[0] || null)} />
           <span className="block mt-1 text-xs text-slate-500">Ảnh hoặc PDF, tối đa 5 MB. Chủ nhật / ngày lễ trong khoảng nghỉ không bị trừ phép.</span>
         </label>
