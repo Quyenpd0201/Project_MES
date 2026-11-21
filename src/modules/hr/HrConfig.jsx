@@ -83,6 +83,14 @@ function UnitsTab({ canEdit }) {
   const byId = useMemo(() => Object.fromEntries((rows || []).map((u) => [u.id, u])), [rows]);
   const parentOpts = (rows || []).filter((u) => u.kind !== "TO" && u.status === "Hoạt động").map((u) => ({ value: u.id, label: u.name }));
 
+  // Sửa tổ: tải nhân viên của tổ để chọn tổ trưởng + xem thành viên ngay trên trang sửa
+  const [members, setMembers] = useState(null);
+  useEffect(() => {
+    setMembers(null);
+    if (!edit?.id || edit.kind !== "TO") return;
+    hrConfig.employees().then((all) => setMembers(all.filter((e) => e.org_unit_id === edit.id)))
+      .catch((e) => { toast.error(e.message); setMembers([]); });
+  }, [edit?.id, edit?.kind]);
   if (err) return <LoadError message={`Không tải được đơn vị (${err})`} onRetry={load} />;
   const columns = [
     { key: "code", label: "Mã", render: (r) => <span className="font-mono text-xs">{r.code}</span> },
@@ -102,6 +110,9 @@ function UnitsTab({ canEdit }) {
   const save = async (v) => {
     const d = { name: v.name, kind: v.kind, parent_id: v.parent_id || null, status: v.status };
     if (edit.id) await hrConfig.updateOrgUnit(edit.id, d); else await hrConfig.createOrgUnit({ ...d, code: v.code });
+    if (edit.id && edit.kind === "TO" && v.kind === "TO" && v.leader !== (edit.managers?.[0]?.id || "")) {
+      await hrConfig.setManagers(edit.id, v.leader ? [v.leader] : []);
+    }
     toast.success(edit.id ? `Đã lưu ${v.name}` : `Đã tạo ${v.name}`);
     load();
   };
@@ -110,7 +121,7 @@ function UnitsTab({ canEdit }) {
       {canEdit && <div className="flex justify-end"><button type="button" className="btn-primary" onClick={() => setEdit({ kind: "TO", status: "Hoạt động" })}><Plus size={16} /> Thêm đơn vị</button></div>}
       <DataTable columns={columns} rows={rows || []} rowKey={(r) => r.id} loading={!rows} stateKey="hr:units" />
       {edit && (
-        <FormModal title={edit.id ? `Sửa ${edit.name}` : "Thêm đơn vị / tổ"} initial={{ code: edit.code || "", name: edit.name || "", kind: edit.kind, parent_id: edit.parent_id || "", status: edit.status }}
+        <FormModal title={edit.id ? `Sửa ${edit.name}` : "Thêm đơn vị / tổ"} initial={{ code: edit.code || "", name: edit.name || "", kind: edit.kind, parent_id: edit.parent_id || "", status: edit.status, leader: edit.managers?.[0]?.id || "" }}
           onSubmit={save} onClose={() => setEdit(null)}>
           {(v, set) => <>
             <Field label="Mã" required><input className={inputCls} value={v.code} disabled={!!edit.id} spellCheck={false} autoComplete="off" placeholder="VD: THOI-T1…" onChange={(e) => set("code")(e.target.value)} /></Field>
@@ -128,6 +139,40 @@ function UnitsTab({ canEdit }) {
                 <option>Hoạt động</option><option>Không hoạt động</option>
               </select>
             </Field>}
+            {edit.id && edit.kind === "TO" && <>
+              <Field label="Tổ trưởng">
+                <select className={inputCls} value={v.leader} disabled={!members} onChange={(e) => set("leader")(e.target.value)}>
+                  <option value="">{members ? "— Chưa có tổ trưởng —" : "Đang tải…"}</option>
+                  {(members || []).map((m) => (
+                    <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>
+                      {m.name} ({m.employee_code}){m.user_id ? "" : " — chưa có tài khoản"}
+                    </option>
+                  ))}
+                </select>
+                <span className="block text-xs text-slate-500 mt-1">Chọn 1 người trong nhân viên của tổ, phải có tài khoản đăng nhập.</span>
+              </Field>
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="text-sm font-medium text-slate-600 mb-1">Nhân viên của tổ ({members ? members.length : "…"})</div>
+                {!members ? <div className="text-sm text-slate-400">Đang tải…</div> : members.length === 0 ? (
+                  <div className="text-sm text-amber-700">Tổ chưa có nhân viên — vào tab "Nhân viên & PIN" để xếp người vào tổ.</div>
+                ) : (
+                  <table className="w-full text-sm border border-slate-200 rounded-lg overflow-hidden">
+                    <thead className="bg-slate-50 text-slate-500 text-xs uppercase"><tr>
+                      <th className="text-left px-3 py-2">Mã NV</th><th className="text-left px-3 py-2">Họ tên</th>
+                      <th className="text-left px-3 py-2">Tài khoản</th><th className="text-left px-3 py-2">Vai trò</th>
+                    </tr></thead>
+                    <tbody>{members.map((m) => (
+                      <tr key={m.id} className="border-t border-slate-100">
+                        <td className="px-3 py-2 font-mono text-xs">{m.employee_code}</td>
+                        <td className="px-3 py-2">{m.name}</td>
+                        <td className="px-3 py-2">{m.user_id ? "Có" : <span className="text-amber-700">Chưa có</span>}</td>
+                        <td className="px-3 py-2">{m.user_id && m.user_id === v.leader ? <span className="text-blue-700 font-medium">Tổ trưởng</span> : "Nhân viên"}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                )}
+              </div>
+            </>}
           </>}
         </FormModal>
       )}
