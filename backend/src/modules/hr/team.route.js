@@ -47,8 +47,15 @@ router.get('/hr/team/roster', requireTeamLeader, async (req, res) => {
       FROM employees e
      WHERE e.is_deleted = FALSE AND e.status = 'Hoạt động' AND e.org_unit_id = $1
      ORDER BY e.name`, [req.teamLeader.unit_id]);
+  // Ca làm việc + ngày làm của tổ (app Đơn vị sản xuất) — cho trang chủ tổ trưởng
+  const { rows: [u] } = await db.query(`
+    SELECT s.name AS shift_name, to_char(s.start_time, 'HH24:MI') AS shift_start, to_char(s.end_time, 'HH24:MI') AS shift_end,
+           o.work_days, EXTRACT(ISODOW FROM now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::int AS today_dow
+      FROM org_units o LEFT JOIN shifts s ON s.id = o.default_shift_id WHERE o.id = $1`, [req.teamLeader.unit_id]);
   res.json({ unit_id: req.teamLeader.unit_id, unit_name: req.teamLeader.unit_name, now: new Date().toISOString(),
-    consent_version: s.hr_consent_version, employees: rows });
+    consent_version: s.hr_consent_version, employees: rows,
+    shift: u?.shift_name ? { name: u.shift_name, start: u.shift_start, end: u.shift_end } : null,
+    work_today: !u?.work_days || u.work_days.includes(u.today_dow) });
 });
 
 // Chọn tên + PIN 6 số → phiên chấm ngắn hạn (chỉ nhận chọn theo tên trong tổ, không nhận nhập mã NV tự do)
