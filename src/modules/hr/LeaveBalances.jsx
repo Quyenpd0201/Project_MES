@@ -1,7 +1,8 @@
 // [HR-G4] Số dư phép — 2026-10-26, CHƯA PHÁT HÀNH (file mới)
 // Được hưởng (12 / năm, reset 01/01) + chỉnh tay của nhân sự − đã dùng (đơn đã duyệt) = còn lại; đang chờ tách riêng.
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { ListHeader, DataTable, LoadError, Modal, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, useSaving } from "../../components.jsx";
+import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrLeave } from "../../mesApi.js";
 import { inputCls, fmtDec, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";

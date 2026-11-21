@@ -2,7 +2,8 @@
 // Lưới nhân viên × ngày (ký hiệu theo Q2), bấm ô → chi tiết ngày (G3). Chốt / mở khóa qua hộp thoại.
 import React, { useState, useEffect, useCallback } from "react";
 import { Download, Lock, Unlock } from "lucide-react";
-import { ListHeader, DataTable, LoadError, SearchSelect, Modal, useSaving, usePager } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, SearchSelect, useSaving, usePager } from "../../components.jsx";
+import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrReport, hrConfig } from "../../mesApi.js";
 import { inputCls, fmt, fmtDate, fmtDateTime, statusClass, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";

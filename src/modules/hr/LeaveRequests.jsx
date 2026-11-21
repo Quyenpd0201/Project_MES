@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Paperclip, FileText } from "lucide-react";
-import { ListHeader, DataTable, LoadError, Modal, SearchSelect, DateInput, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, SearchSelect, DateInput, useSaving } from "../../components.jsx";
+import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrLeave, hrConfig } from "../../mesApi.js";
 import { inputCls, fmtDate, fmtDateTime, fmtDec, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";

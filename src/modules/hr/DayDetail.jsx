@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import { Link } from "react-router-dom"; // [HR-G4]
-import { Modal, LoadError, useSaving } from "../../components.jsx";
+import { Modal as PhotoModal, LoadError, useSaving } from "../../components.jsx";
+import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrWorkday, hrAttendance } from "../../mesApi.js";
 import { inputCls, fmtDate, fmtDateTime, statusClass, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -157,12 +158,12 @@ export function DayDetailModal({ employeeId, date, onClose, onChanged }) {
         </div>
       )}
       {photo && (
-        <Modal title="Ảnh chấm công" onClose={() => setPhoto(null)} size="md" closeOnBackdrop z="z-[60]">
+        <PhotoModal title="Ảnh chấm công" onClose={() => setPhoto(null)} size="md" closeOnBackdrop z="z-[60]">
           <div className="text-center space-y-2">
             <img src={photo.url} alt="Ảnh chấm công" width={480} height={360} className="mx-auto rounded-lg max-h-[60vh] w-auto" />
             <p className="text-sm text-slate-500 tabular-nums">{fmtDateTime(photo.at)} · lượt xem đã được ghi lại</p>
           </div>
-        </Modal>
+        </PhotoModal>
       )}
       {correcting && <CorrectionForm employeeId={employeeId} date={date} punches={data?.punches || []}
         onClose={() => setCorrecting(false)} onDone={() => { load(); onChanged?.(); }} />}

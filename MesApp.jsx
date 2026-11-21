@@ -10,6 +10,7 @@ import {
 import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nextCode, productFiles } from "./src/mesApi.js";
 import { setAppSettings } from "./src/appSettings.js";
 import SettingsScreen from "./src/modules/masterData/SettingsScreen.jsx";
+import { HrScreen } from "./src/modules/hr/HrPage.jsx"; // chuẩn hóa: form chấm công mở trang riêng
 import HrConfig from "./src/modules/hr/HrConfig.jsx"; // [HR-G1] Chấm công — 2026-10-22, CHƯA PHÁT HÀNH
 import PunchHistory from "./src/modules/hr/PunchHistory.jsx"; // [HR-G2] 2026-10-23, CHƯA PHÁT HÀNH
 import HrInbox from "./src/modules/hr/HrInbox.jsx"; // [HR-G3] 2026-10-23, CHƯA PHÁT HÀNH
@@ -1396,14 +1397,14 @@ export default function MesApp() {
               <Route path="/traceability/lot" element={<TraceabilityLot />} />
               <Route path="/master-data/roles" element={<RolesModule />} />
               <Route path="/settings" element={<SettingsScreen />} />
-              <Route path="/hr/config" element={<HrConfig />} />{/* [HR-G1] CHƯA PHÁT HÀNH */}
-              <Route path="/hr/punches" element={<PunchHistory />} />{/* [HR-G2] CHƯA PHÁT HÀNH */}
-              <Route path="/hr/inbox" element={<HrInbox />} />{/* [HR-G3] CHƯA PHÁT HÀNH */}
-              <Route path="/hr/days" element={<WorkdayList />} />{/* [HR-G3] */}
-              <Route path="/hr/shift-plan" element={<ShiftPlanner />} />{/* [HR-G3] */}
-              <Route path="/hr/leave" element={<LeaveRequests />} />{/* [HR-G4] CHƯA PHÁT HÀNH */}
-              <Route path="/hr/leave-balances" element={<LeaveBalances />} />{/* [HR-G4] */}
-              <Route path="/hr/timesheet" element={<Timesheet />} />{/* [HR-G5] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/config" element={<HrScreen><HrConfig /></HrScreen>} />{/* [HR-G1] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/punches" element={<HrScreen><PunchHistory /></HrScreen>} />{/* [HR-G2] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/inbox" element={<HrScreen><HrInbox /></HrScreen>} />{/* [HR-G3] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/days" element={<HrScreen><WorkdayList /></HrScreen>} />{/* [HR-G3] */}
+              <Route path="/hr/shift-plan" element={<HrScreen><ShiftPlanner /></HrScreen>} />{/* [HR-G3] */}
+              <Route path="/hr/leave" element={<HrScreen><LeaveRequests /></HrScreen>} />{/* [HR-G4] CHƯA PHÁT HÀNH */}
+              <Route path="/hr/leave-balances" element={<HrScreen><LeaveBalances /></HrScreen>} />{/* [HR-G4] */}
+              <Route path="/hr/timesheet" element={<HrScreen><Timesheet /></HrScreen>} />{/* [HR-G5] CHƯA PHÁT HÀNH */}
               <Route path="/master-data/:entity" element={lookups ? <MasterDataWrapper lookups={lookups} onOpenOrder={goSalesOrder} onOpenProductionOrder={goProductionOrder} /> : loadingEl} />
               <Route path="/workschedule" element={needLookups(WorkScheduleModule)} />
               <Route path="/qrlabels" element={<QrLabelsModule />} />

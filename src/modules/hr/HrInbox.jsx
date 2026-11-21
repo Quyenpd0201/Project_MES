@@ -2,7 +2,8 @@
 // Việc của trưởng tổ / nhân sự: lần chấm cần xác nhận, yêu cầu sửa công, tăng ca chờ duyệt.
 import React, { useState, useEffect, useCallback } from "react";
 import { Image as ImageIcon, Check, X } from "lucide-react";
-import { ListHeader, DataTable, LoadError, Modal, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, Modal as PhotoModal, useSaving } from "../../components.jsx";
+import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrWorkday, hrAttendance } from "../../mesApi.js";
 import { inputCls, fmtDate, fmtDateTime, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -76,12 +77,12 @@ function PunchesTab({ canApprove, onOpen }) {
       {rejecting && <ReasonModal title={`Từ chối lần chấm — ${rejecting.employee_name}`} label="Lý do từ chối" onClose={() => setRejecting(null)}
         onSubmit={async (reason) => { await hrWorkday.reviewPunch(rejecting.id, "reject", reason); toast.success("Đã từ chối lần chấm"); load(); }} />}
       {photo && (
-        <Modal title={`Ảnh chấm công — ${photo.who}`} onClose={() => setPhoto(null)} size="md" closeOnBackdrop>
+        <PhotoModal title={`Ảnh chấm công — ${photo.who}`} onClose={() => setPhoto(null)} size="md" closeOnBackdrop>
           <div className="text-center space-y-2">
             <img src={photo.url} alt={`Ảnh chấm công của ${photo.who}`} width={480} height={360} className="mx-auto rounded-lg max-h-[60vh] w-auto" />
             <p className="text-sm text-slate-500 tabular-nums">{fmtDateTime(photo.at)} · lượt xem đã được ghi lại</p>
           </div>
-        </Modal>
+        </PhotoModal>
       )}
     </>
   );
