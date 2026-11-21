@@ -3372,3 +3372,13 @@ WHERE e.id = m.employee_id AND e.user_id IS NULL
 ALTER TABLE public.org_units
   ADD COLUMN IF NOT EXISTS default_shift_id uuid REFERENCES public.shifts(id),
   ADD COLUMN IF NOT EXISTS work_days smallint[] NOT NULL DEFAULT '{1,2,3,4,5,6}';
+
+--  [HR-TEAM 11/2026] Chấm công trên tablet do TỔ TRƯỞNG đăng nhập (không cần duyệt máy):
+--     ghi vị trí GPS + người đăng nhập tablet. Chỉ THÊM cột (trigger bất biến không chặn cột mới).
+--     Gỡ: ALTER TABLE public.attendance_punches DROP COLUMN IF EXISTS lat, DROP COLUMN IF EXISTS lng,
+--         DROP COLUMN IF EXISTS gps_accuracy_m, DROP COLUMN IF EXISTS leader_user_id;
+ALTER TABLE public.attendance_punches
+  ADD COLUMN IF NOT EXISTS lat            double precision,
+  ADD COLUMN IF NOT EXISTS lng            double precision,
+  ADD COLUMN IF NOT EXISTS gps_accuracy_m real,
+  ADD COLUMN IF NOT EXISTS leader_user_id uuid REFERENCES public.users(id);

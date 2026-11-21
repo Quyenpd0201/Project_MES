@@ -34,7 +34,9 @@ const KEY_RE = /^[A-Za-z0-9_-]{8,64}$/;
 
 const isUuid = (v) => UUID_RE.test(String(v || ''));
 const randomCode = () => Array.from(crypto.randomBytes(6), (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
-const kioskReq = (req) => ({ ...req, user: null }); // audit từ kiosk: không có user, ghi IP + thiết bị trong after
+const kioskReq = (req) => (req.teamLeader ? req : { ...req, user: null }); // audit: kiosk không có user; tablet tổ trưởng ghi đúng người đăng nhập
+// Khóa đếm sai PIN: theo tablet (kiosk) hoặc theo tổ (tablet tổ trưởng đăng nhập, không có mã máy)
+const failKey = (req) => req.kiosk.id || `team:${req.kiosk.org_unit_id}`;
 
 // So khớp PIN theo đúng định dạng salt:hash (scrypt) mà authController.hashPassword tạo ra
 function verifyPin(pin, stored) {
@@ -141,7 +143,7 @@ async function lastPunch(conn, employeeId, before) {
 exports.identify = async (req, res) => {
   const { employee_id: empId, employee_code: empCode, pin } = req.body || {};
   if (!pin || !/^\d{4,8}$/.test(String(pin))) return res.status(400).json({ message: 'Vui lòng nhập PIN (4–8 chữ số)' });
-  if (deviceFailCount(req.kiosk.id) >= DEVICE_FAIL_MAX) {
+  if (deviceFailCount(failKey(req)) >= DEVICE_FAIL_MAX) {
     return res.status(429).json({ message: 'Tablet nhập sai PIN quá nhiều lần — tạm khóa 10 phút, báo trưởng tổ' });
   }
   const byCode = !empId && !!empCode; // "Người xưởng khác": mọi lỗi trả cùng 1 thông báo → không dò được mã NV
@@ -165,18 +167,18 @@ exports.identify = async (req, res) => {
     }
     if (!e || !e.pin_hash) {
       await client.query('ROLLBACK');
-      if (byCode) { recordDeviceFail(req.kiosk.id); return res.status(401).json({ message: GENERIC_CODE_ERROR }); }
+      if (byCode) { recordDeviceFail(failKey(req)); return res.status(401).json({ message: GENERIC_CODE_ERROR }); }
       if (!e) return res.status(404).json({ message: 'Không tìm thấy nhân viên' });
       return res.status(400).json({ message: 'Bạn chưa có PIN chấm công — vui lòng gặp trưởng tổ để được cấp PIN' });
     }
     if (e.pin_locked_until && new Date(e.pin_locked_until) > new Date()) {
       await client.query('ROLLBACK');
-      if (byCode) { recordDeviceFail(req.kiosk.id); return res.status(401).json({ message: GENERIC_CODE_ERROR }); }
+      if (byCode) { recordDeviceFail(failKey(req)); return res.status(401).json({ message: GENERIC_CODE_ERROR }); }
       const t = new Date(e.pin_locked_until).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
       return res.status(423).json({ message: `PIN đang bị khóa đến ${t} do nhập sai nhiều lần — gặp trưởng tổ để mở khóa` });
     }
     if (!verifyPin(pin, e.pin_hash)) {
-      recordDeviceFail(req.kiosk.id);
+      recordDeviceFail(failKey(req));
       // #6 Khóa tăng dần: bộ đếm KHÔNG reset sau mỗi lần khóa (chỉ reset khi nhập đúng / trưởng tổ mở khóa).
       // Lần khóa thứ k (mỗi max_fail lần sai) kéo dài lock_min × 2^(k−1) phút, tối đa 24 giờ.
       const { rows: [u] } = await client.query(
@@ -224,13 +226,13 @@ exports.identifyAccount = async (req, res) => {
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!username || !password) return res.status(400).json({ message: 'Vui lòng nhập tài khoản và mật khẩu' });
   const ip = req.ip || 'unknown';
-  if (deviceFailCount(req.kiosk.id) >= DEVICE_FAIL_MAX || loginGuard.checkBruteForce(ip, username)) {
+  if (deviceFailCount(failKey(req)) >= DEVICE_FAIL_MAX || loginGuard.checkBruteForce(ip, username)) {
     return res.status(429).json({ message: 'Nhập sai quá nhiều lần — tạm khóa 15 phút, báo trưởng tổ' });
   }
   const { rows: [u] } = await db.query(
     `SELECT id, password_hash, status FROM users WHERE username = $1 AND is_deleted = FALSE`, [username]);
   if (!u || u.status !== 'Hoạt động' || !verifyPassword(password, u.password_hash)) {
-    loginGuard.recordFailedLogin(ip, username); recordDeviceFail(req.kiosk.id);
+    loginGuard.recordFailedLogin(ip, username); recordDeviceFail(failKey(req));
     return res.status(401).json({ message: 'Sai tài khoản hoặc mật khẩu' });
   }
   loginGuard.clearFailedLogin(ip, username);
@@ -325,6 +327,10 @@ exports.punch = async (req, res) => {
 
   // 2) Ai chấm, lúc nào
   const offline = b.offline === '1' || b.offline === 'true';
+  // [HR-TEAM] Tablet tổ trưởng: chỉ chấm trực tuyến, giờ = giờ máy chủ → chỉ chấm được cho HÔM NAY
+  if (offline && req.teamLeader) return res.status(400).json({ message: 'Chấm công cần kết nối mạng — không chấm bù cho ngày khác' });
+  const num = (x, lo, hi) => { const n = Number(x); return x !== undefined && x !== '' && Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
+  const gps = { lat: num(b.lat, -90, 90), lng: num(b.lng, -180, 180), acc: num(b.gps_accuracy, 0, 100000) };
   const now = new Date();
   let employeeId; let time = now; let pinVerified = true; const reasons = []; let session = null;
   if (offline) {
@@ -355,6 +361,7 @@ exports.punch = async (req, res) => {
     employeeId = session.e;
   }
 
+  if (req.teamLeader && (gps.lat === null || gps.lng === null)) reasons.push('Không lấy được vị trí GPS');
   const s = await getAppSettings(db);
   const { rows: [emp] } = await db.query(
     `SELECT id, name, face_consent_at, face_consent_version, face_consent_refused_at FROM employees
@@ -426,12 +433,14 @@ exports.punch = async (req, res) => {
     }
     const { rows: [p] } = await client.query(
       `INSERT INTO attendance_punches (employee_id, device_id, punched_at, direction, work_date, source, client_captured_at,
-                                       idempotency_key, photo_id, pin_verified, needs_review, review_reason)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                       idempotency_key, photo_id, pin_verified, needs_review, review_reason,
+                                       lat, lng, gps_accuracy_m, leader_user_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING id, direction, punched_at, to_char(work_date, 'YYYY-MM-DD') AS work_date, needs_review`,
       [employeeId, req.kiosk.id, time, d.direction, d.work_date, offline ? 'offline' : 'online',
         Number.isFinite(Date.parse(b.client_captured_at)) ? new Date(b.client_captured_at) : null,
-        key, photoId, pinVerified, reasons.length > 0, reasons.join('; ') || null]);
+        key, photoId, pinVerified, reasons.length > 0, reasons.join('; ') || null,
+        gps.lat, gps.lng, gps.acc, req.teamLeader?.user_id || null]);
     await enqueue(client, around(employeeId, p.work_date)); // [HR-G3] xếp hàng tính lại trong cùng transaction
     await client.query('COMMIT');
     client.release(); client = null; // trả kết nối TRƯỚC khi tính lại (không giữ 2 kết nối / lần chấm)
