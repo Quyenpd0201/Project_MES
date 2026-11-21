@@ -83,11 +83,12 @@ exports.listOrgUnits = async (req, res) => {
     return res.json(rows);
   }
   const { rows } = await db.query(`
-    SELECT u.id, u.code, u.name, u.kind, u.parent_id, u.status,
+    SELECT u.id, u.code, u.name, u.kind, u.parent_id, u.status, u.default_shift_id, u.work_days,
+           s.name AS shift_name, to_char(s.start_time, 'HH24:MI') AS shift_start, to_char(s.end_time, 'HH24:MI') AS shift_end,
            (SELECT count(*)::int FROM employees e WHERE e.org_unit_id = u.id AND e.is_deleted = FALSE) AS employee_count,
            COALESCE((SELECT json_agg(json_build_object('id', us.id, 'name', COALESCE(us.full_name, us.username)) ORDER BY us.username)
                        FROM org_unit_managers m JOIN users us ON us.id = m.user_id WHERE m.org_unit_id = u.id), '[]') AS managers
-      FROM org_units u
+      FROM org_units u LEFT JOIN shifts s ON s.id = u.default_shift_id
      WHERE u.is_deleted = FALSE
      ORDER BY u.parent_id NULLS FIRST, u.code`);
   res.json(rows);
@@ -145,13 +146,25 @@ exports.updateOrgUnit = async (req, res) => {
       kind: b.kind !== undefined ? str(b.kind).toUpperCase() : cur.kind,
       parent_id: b.parent_id !== undefined ? (b.parent_id || null) : cur.parent_id,
       status: b.status !== undefined ? str(b.status) : cur.status,
+      default_shift_id: b.default_shift_id !== undefined ? (b.default_shift_id || null) : cur.default_shift_id,
+      work_days: b.work_days !== undefined ? b.work_days : cur.work_days,
     };
     if (!next.name) bad('Vui lòng nhập tên đơn vị.');
     if (!UNIT_KINDS.includes(next.kind)) bad('Loại đơn vị phải là Xưởng, Phòng hoặc Tổ.');
     await checkParent(client, id, next.parent_id, next.kind);
+    // Thời gian làm việc của tổ (app Đơn vị sản xuất)
+    if (next.default_shift_id && b.default_shift_id !== undefined) {
+      if (!isUuid(next.default_shift_id)) bad('Ca làm không hợp lệ.');
+      const { rows: [s] } = await client.query(
+        `SELECT 1 FROM shifts WHERE id = $1 AND is_deleted = FALSE AND status = 'Hoạt động'`, [next.default_shift_id]);
+      if (!s) bad('Ca làm không tồn tại hoặc đang ngừng hoạt động.');
+    }
+    if (!Array.isArray(next.work_days) || next.work_days.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) bad('Ngày làm việc không hợp lệ.');
+    next.work_days = [...new Set(next.work_days)].sort((a, b) => a - b);
     const { rows: [u] } = await client.query(
-      `UPDATE org_units SET name = $1, kind = $2, parent_id = $3, status = $4, updated_at = now() WHERE id = $5 RETURNING *`,
-      [next.name, next.kind, next.parent_id, next.status, id]);
+      `UPDATE org_units SET name = $1, kind = $2, parent_id = $3, status = $4, default_shift_id = $5, work_days = $6, updated_at = now()
+        WHERE id = $7 RETURNING *`,
+      [next.name, next.kind, next.parent_id, next.status, next.default_shift_id, next.work_days, id]);
     await logHr(client, req, { action: 'update', entity: 'org_unit', entityId: id, before: cur, after: u });
     return u;
   });
@@ -187,6 +200,46 @@ exports.setOrgUnitManagers = async (req, res) => {
     }
     await logHr(client, req, { action: 'set_managers', entity: 'org_unit', entityId: id, before: { user_ids: before }, after: { user_ids: userIds } });
     return { org_unit_id: id, user_ids: userIds };
+  });
+  send(res, 200, out);
+};
+
+/** App Đơn vị sản xuất: đặt TOÀN BỘ danh sách nhân viên của tổ.
+ *  Có trong danh sách → chuyển vào tổ này (rời tổ cũ, mất chức tổ trưởng tổ cũ nếu có);
+ *  đang ở tổ mà bỏ tick → thành "chưa xếp tổ" (và mất chức tổ trưởng tổ này nếu có). Chỉ admin. */
+exports.setOrgUnitMembers = async (req, res) => {
+  if (!canManageTree(req)) return forbidTree(res);
+  const { id } = req.params;
+  const ids = Array.isArray(req.body?.employee_ids) ? [...new Set(req.body.employee_ids)] : null;
+  if (!isUuid(id)) return res.status(404).json({ message: 'Không tìm thấy đơn vị' });
+  const out = await inTx(res, async (client) => {
+    if (!ids || ids.some((x) => !isUuid(x))) bad('Danh sách nhân viên không hợp lệ.');
+    const { rows: [unit] } = await client.query('SELECT id, kind FROM org_units WHERE id = $1 AND is_deleted = FALSE FOR UPDATE', [id]);
+    if (!unit) { res.status(404).json({ message: 'Không tìm thấy đơn vị' }); return undefined; }
+    if (unit.kind !== 'TO') bad('Chỉ xếp nhân viên vào tổ.');
+    const { rows: emps } = await client.query(
+      `SELECT id, org_unit_id, user_id FROM employees WHERE is_deleted = FALSE AND (id = ANY($1) OR org_unit_id = $2) FOR UPDATE`, [ids, id]);
+    if (emps.filter((e) => ids.includes(e.id)).length !== ids.length) bad('Có nhân viên không tồn tại hoặc đã bị xóa.');
+    const before = emps.filter((e) => e.org_unit_id === id).map((e) => e.id);
+    const leaving = emps.filter((e) => e.org_unit_id === id && !ids.includes(e.id));
+    const joining = emps.filter((e) => ids.includes(e.id) && e.org_unit_id !== id);
+    if (leaving.length) {
+      await client.query('UPDATE employees SET org_unit_id = NULL, updated_at = now() WHERE id = ANY($1)', [leaving.map((e) => e.id)]);
+      const users = leaving.map((e) => e.user_id).filter(Boolean);
+      if (users.length) await client.query('DELETE FROM org_unit_managers WHERE org_unit_id = $1 AND user_id = ANY($2)', [id, users]);
+    }
+    for (const e of joining) {
+      if (e.org_unit_id && e.user_id) {
+        await client.query(
+          `DELETE FROM org_unit_managers m USING org_units u
+            WHERE m.org_unit_id = u.id AND u.kind = 'TO' AND m.org_unit_id = $1 AND m.user_id = $2`, [e.org_unit_id, e.user_id]);
+      }
+    }
+    if (joining.length) {
+      await client.query('UPDATE employees SET org_unit_id = $1, updated_at = now() WHERE id = ANY($2)', [id, joining.map((e) => e.id)]);
+    }
+    await logHr(client, req, { action: 'set_members', entity: 'org_unit', entityId: id, before: { employee_ids: before }, after: { employee_ids: ids } });
+    return { org_unit_id: id, employee_ids: ids };
   });
   send(res, 200, out);
 };

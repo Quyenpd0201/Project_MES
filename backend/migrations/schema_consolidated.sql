@@ -3365,3 +3365,10 @@ FROM (
 ) m
 WHERE e.id = m.employee_id AND e.user_id IS NULL
   AND NOT EXISTS (SELECT 1 FROM public.employees x WHERE x.user_id = m.user_id);
+
+--  [HR-UNITS 11/2026] App "Đơn vị sản xuất": thời gian làm việc của tổ.
+--     default_shift_id = ca làm mặc định của tổ; work_days = ngày làm trong tuần (1 = Thứ 2 … 7 = Chủ nhật).
+--     Chỉ THÊM cột. Gỡ: ALTER TABLE public.org_units DROP COLUMN IF EXISTS default_shift_id, DROP COLUMN IF EXISTS work_days;
+ALTER TABLE public.org_units
+  ADD COLUMN IF NOT EXISTS default_shift_id uuid REFERENCES public.shifts(id),
+  ADD COLUMN IF NOT EXISTS work_days smallint[] NOT NULL DEFAULT '{1,2,3,4,5,6}';

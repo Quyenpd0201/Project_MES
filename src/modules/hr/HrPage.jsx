@@ -57,9 +57,11 @@ export function HrPage({ title, onClose, dirty, locked = false, footer, children
   return createPortal(
     <div className="space-y-5">
       <PageHeader title={title} onBack={locked ? undefined : requestClose} actions={actions} />
-      <Section title={section} collapsible={false}>
-        {typeof children === "function" ? children(requestClose) : children}
-      </Section>
+      {section === null
+        ? (typeof children === "function" ? children(requestClose) : children) /* trang tự chia nhiều <Section> */
+        : <Section title={section} collapsible={false}>
+            {typeof children === "function" ? children(requestClose) : children}
+          </Section>}
     </div>,
     ctx.slot,
   );

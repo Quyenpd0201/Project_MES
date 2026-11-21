@@ -14,6 +14,7 @@ router.get('/hr/org-units', viewCatalog, c.listOrgUnits);
 router.post('/hr/org-units', edit, c.createOrgUnit);
 router.put('/hr/org-units/:id', edit, c.updateOrgUnit);
 router.put('/hr/org-units/:id/managers', edit, c.setOrgUnitManagers);
+router.put('/hr/org-units/:id/members', edit, c.setOrgUnitMembers); // app Đơn vị sản xuất
 router.get('/hr/assignable-users', edit, c.listAssignableUsers);
 
 router.get('/hr/shifts', viewCatalog, c.listShifts);

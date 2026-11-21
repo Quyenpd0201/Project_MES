@@ -229,6 +229,7 @@ export const hrConfig = {
   createOrgUnit: (d) => http(`/hr/org-units`, body("POST", d)),
   updateOrgUnit: (id, d) => http(`/hr/org-units/${id}`, body("PUT", d)),
   setManagers: (id, userIds) => http(`/hr/org-units/${id}/managers`, body("PUT", { user_ids: userIds })),
+  setMembers: (id, employeeIds) => http(`/hr/org-units/${id}/members`, body("PUT", { employee_ids: employeeIds })),
   assignableUsers: () => http(`/hr/assignable-users`),
   shifts: () => http(`/hr/shifts`),
   createShift: (d) => http(`/hr/shifts`, body("POST", d)),

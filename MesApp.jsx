@@ -11,6 +11,7 @@ import { getLookups, getDashboard, auth, setToken, getToken, productRelated, nex
 import { setAppSettings } from "./src/appSettings.js";
 import SettingsScreen from "./src/modules/masterData/SettingsScreen.jsx";
 import { HrScreen } from "./src/modules/hr/HrPage.jsx"; // chuẩn hóa: form chấm công mở trang riêng
+import ProductionUnits from "./src/modules/hr/ProductionUnits.jsx"; // app Đơn vị sản xuất
 import HrConfig from "./src/modules/hr/HrConfig.jsx"; // [HR-G1] Chấm công — 2026-10-22, CHƯA PHÁT HÀNH
 import PunchHistory from "./src/modules/hr/PunchHistory.jsx"; // [HR-G2] 2026-10-23, CHƯA PHÁT HÀNH
 import HrInbox from "./src/modules/hr/HrInbox.jsx"; // [HR-G3] 2026-10-23, CHƯA PHÁT HÀNH
@@ -220,6 +221,7 @@ function Sidebar({ user, onLogout, collapsed, onToggle, mobileMenuOpen, onCloseM
         { key: "hr_days", label: "Ngày công", icon: CalendarDays, path: "/hr/days", perm: "hr_attendance" }, // [HR-G3]
         { key: "hr_shifts_plan", label: "Phân ca", icon: Clock, path: "/hr/shift-plan", perm: "hr_attendance" }, // [HR-G3]
         { key: "hr_punches", label: "Lịch sử chấm công", icon: ClipboardList, path: "/hr/punches", perm: "hr_attendance" }, // [HR-G2]
+        { key: "hr_units", label: "Đơn vị sản xuất", icon: Users, path: "/hr/units", perm: "hr_config" }, // tổ · tổ trưởng · nhân viên · ca
         { key: "hr_config", label: "Cấu hình chấm công", icon: Settings, path: "/hr/config", perm: "hr_config" },
       ]
     },
@@ -1397,6 +1399,7 @@ export default function MesApp() {
               <Route path="/traceability/lot" element={<TraceabilityLot />} />
               <Route path="/master-data/roles" element={<RolesModule />} />
               <Route path="/settings" element={<SettingsScreen />} />
+              <Route path="/hr/units" element={<HrScreen><ProductionUnits /></HrScreen>} />
               <Route path="/hr/config" element={<HrScreen><HrConfig /></HrScreen>} />{/* [HR-G1] CHƯA PHÁT HÀNH */}
               <Route path="/hr/punches" element={<HrScreen><PunchHistory /></HrScreen>} />{/* [HR-G2] CHƯA PHÁT HÀNH */}
               <Route path="/hr/inbox" element={<HrScreen><HrInbox /></HrScreen>} />{/* [HR-G3] CHƯA PHÁT HÀNH */}
