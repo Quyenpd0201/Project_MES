@@ -24,7 +24,7 @@ function Field({ label, required, hint, className = "", children }) {
   );
 }
 
-export function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved }) {
+export function UnitPage({ unit, units, employees, shifts, users = [], canEdit, onClose, onSaved }) {
   const isNew = !unit.id;
   const initial = useMemo(() => ({
     code: unit.code || "", name: unit.name || "", parent_id: unit.parent_id || "", status: unit.status || "Hoạt động",
@@ -42,12 +42,21 @@ export function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onS
   const unitName = Object.fromEntries(units.map((u) => [u.id, u.name]));
   const memberSet = new Set(v.members);
   const members = employees.filter((e) => memberSet.has(e.id));
-  // Tổ trưởng chọn trong TOÀN BỘ nhân viên → tự tick vào tổ; bỏ tick tổ trưởng ở mục 3 thì tự bỏ chọn tổ trưởng
+  // Tổ trưởng chọn từ danh sách TÀI KHOẢN. Tài khoản đã gắn hồ sơ nhân viên → tự đưa vào tổ;
+  // bỏ người đó khỏi tổ ở mục 3 thì tự bỏ chọn tổ trưởng. Chưa gắn hồ sơ → vẫn chọn được, có ghi chú.
+  const empByUser = Object.fromEntries(employees.filter((e) => e.user_id).map((e) => [e.user_id, e]));
   const pickLeader = (userId) => {
-    const emp = employees.find((e) => e.user_id === userId);
+    const emp = empByUser[userId];
     setV((s) => ({ ...s, leader: userId, members: emp && !s.members.includes(emp.id) ? [...s.members, emp.id] : s.members }));
   };
-  useEffect(() => { if (v.leader && !members.some((m) => m.user_id === v.leader)) set("leader")(""); }, [v.members]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const emp = empByUser[v.leader];
+    if (v.leader && emp && !memberSet.has(emp.id)) set("leader")("");
+  }, [v.members]); // eslint-disable-line react-hooks/exhaustive-deps
+  const leaderLinked = !v.leader || !!empByUser[v.leader];
+  const leaderHint = leaderLinked
+    ? "Chọn 1 tài khoản (Quản trị hệ thống → Tài khoản). Tài khoản đã gắn hồ sơ nhân viên sẽ tự được đưa vào tổ và chấm công trên tablet của tổ."
+    : <span className="text-amber-700">Tài khoản này chưa gắn hồ sơ nhân viên nên chưa chấm công được trên tablet. Gắn ở Quản trị hệ thống → Tài khoản → ô "Liên kết với công nhân".</span>;
 
   const addMember = (id) => id && set("members")([...v.members, id]);
   const removeMember = (id) => set("members")(v.members.filter((x) => x !== id));
@@ -90,12 +99,13 @@ export function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onS
 
         <Section title="2. Tổ trưởng" collapsible={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-            <Field label="Tổ trưởng" className="lg:col-span-2" hint="Chọn 1 người trong danh sách nhân viên (phải có tài khoản đăng nhập). Người được chọn tự được đưa vào tổ này và chấm công trên tablet của tổ.">
+            <Field label="Tổ trưởng" className="lg:col-span-2" hint={leaderHint}>
               <SearchSelect value={v.leader} onChange={pickLeader} disabled={ro} placeholder="— Chưa có tổ trưởng —" ariaLabel="Tổ trưởng"
-                options={[{ value: "", label: "— Chưa có tổ trưởng —" }, ...employees.map((m) => ({
-                  value: m.user_id || `nouser-${m.id}`, disabled: !m.user_id,
-                  label: `${m.name} (${m.employee_code})${!m.user_id ? " — chưa có tài khoản" : m.org_unit_id && m.org_unit_id !== unit.id && !memberSet.has(m.id) ? ` — đang ở ${unitName[m.org_unit_id] || "tổ khác"}` : ""}`,
-                }))]} />
+                options={[{ value: "", label: "— Chưa có tổ trưởng —" }, ...users.map((u) => {
+                  const emp = empByUser[u.id];
+                  const where = emp && emp.org_unit_id && emp.org_unit_id !== unit.id && !memberSet.has(emp.id) ? ` — đang ở ${unitName[emp.org_unit_id] || "tổ khác"}` : "";
+                  return { value: u.id, label: `${u.name} (${u.username})${where}` };
+                })]} />
             </Field>
           </div>
         </Section>
@@ -171,8 +181,8 @@ export default function ProductionUnits() {
   const [open, setOpen] = useState(null);
   const load = () => {
     setErr(null);
-    Promise.all([hrConfig.orgUnits(), hrConfig.employees(), hrConfig.shifts()])
-      .then(([units, employees, shifts]) => setData({ units, employees, shifts }))
+    Promise.all([hrConfig.orgUnits(), hrConfig.employees(), hrConfig.shifts(), hrConfig.assignableUsers().catch(() => [])])
+      .then(([units, employees, shifts, users]) => setData({ units, employees, shifts, users }))
       .catch((e) => setErr(e.message));
   };
   useEffect(load, []);
@@ -206,7 +216,7 @@ export default function ProductionUnits() {
         </div>
       )}
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} loading={!data} stateKey="hr:prod-units" emptyText="Chưa có tổ nào" />
-      {open && data && <UnitPage unit={open} units={units} employees={data.employees} shifts={data.shifts} canEdit={canEdit}
+      {open && data && <UnitPage unit={open} units={units} employees={data.employees} shifts={data.shifts} users={data.users} canEdit={canEdit}
         onClose={() => setOpen(null)} onSaved={load} />}
     </div>
   );

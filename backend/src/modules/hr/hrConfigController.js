@@ -189,10 +189,11 @@ exports.setOrgUnitManagers = async (req, res) => {
       if (userIds.length === 1) {
         // Admin chọn tổ trưởng trong TOÀN BỘ nhân viên; người được chọn tự chuyển vào tổ này
         // (tổ trưởng chấm công trên tablet của tổ) và mất chức tổ trưởng ở tổ cũ nếu có.
+        // Tổ trưởng chọn từ danh sách TÀI KHOẢN. Tài khoản đã gắn hồ sơ nhân viên → đưa nhân viên đó vào tổ;
+        // chưa gắn → vẫn nhận (quản lý tổ qua tài khoản), chỉ là chưa chấm công trên tablet được.
         const { rows: [emp] } = await client.query(
           'SELECT id, org_unit_id FROM employees WHERE user_id = $1 AND is_deleted = FALSE FOR UPDATE', [userIds[0]]);
-        if (!emp) bad('Tổ trưởng phải là nhân viên đã được gắn tài khoản đăng nhập.');
-        if (emp.org_unit_id !== id) {
+        if (emp && emp.org_unit_id !== id) {
           if (emp.org_unit_id) {
             await client.query(
               `DELETE FROM org_unit_managers m USING org_units u
