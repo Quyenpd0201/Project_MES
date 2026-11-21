@@ -44,7 +44,11 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
   const unitName = Object.fromEntries(units.map((u) => [u.id, u.name]));
   const memberSet = new Set(v.members);
   const members = employees.filter((e) => memberSet.has(e.id));
-  // Tổ trưởng chọn trong nhân viên ĐANG tick của tổ; bỏ tick tổ trưởng thì tự bỏ chọn
+  // Tổ trưởng chọn trong TOÀN BỘ nhân viên → tự tick vào tổ; bỏ tick tổ trưởng ở mục 3 thì tự bỏ chọn tổ trưởng
+  const pickLeader = (userId) => {
+    const emp = employees.find((e) => e.user_id === userId);
+    setV((s) => ({ ...s, leader: userId, members: emp && !s.members.includes(emp.id) ? [...s.members, emp.id] : s.members }));
+  };
   useEffect(() => { if (v.leader && !members.some((m) => m.user_id === v.leader)) set("leader")(""); }, [v.members]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const shown = employees.filter((e) => {
@@ -93,10 +97,14 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
 
         <Section title="2. Tổ trưởng" collapsible={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
-            <Field label="Tổ trưởng" className="lg:col-span-2" hint="Chọn 1 người trong nhân viên của tổ (mục 3), phải có tài khoản đăng nhập. Tổ trưởng cũng chấm công trên tablet của tổ.">
-              <select className={inputCls} value={v.leader} disabled={ro} onChange={(e) => set("leader")(e.target.value)}>
-                <option value="">{members.length ? "— Chưa có tổ trưởng —" : "— Chọn nhân viên cho tổ ở mục 3 trước —"}</option>
-                {members.map((m) => <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>{m.name} ({m.employee_code}){m.user_id ? "" : " — chưa có tài khoản"}</option>)}
+            <Field label="Tổ trưởng" className="lg:col-span-2" hint="Chọn 1 người trong danh sách nhân viên (phải có tài khoản đăng nhập). Người được chọn tự được đưa vào tổ này và chấm công trên tablet của tổ.">
+              <select className={inputCls} value={v.leader} disabled={ro} onChange={(e) => pickLeader(e.target.value)}>
+                <option value="">— Chưa có tổ trưởng —</option>
+                {employees.map((m) => (
+                  <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>
+                    {m.name} ({m.employee_code}){!m.user_id ? " — chưa có tài khoản" : m.org_unit_id && m.org_unit_id !== unit.id && !memberSet.has(m.id) ? ` — đang ở ${unitName[m.org_unit_id] || "tổ khác"}` : ""}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>

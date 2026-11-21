@@ -84,13 +84,13 @@ function UnitsTab({ canEdit }) {
   const parentOpts = (rows || []).filter((u) => u.kind !== "TO" && u.status === "Hoạt động").map((u) => ({ value: u.id, label: u.name }));
 
   // Sửa tổ: tải nhân viên của tổ để chọn tổ trưởng + xem thành viên ngay trên trang sửa
-  const [members, setMembers] = useState(null);
+  const [allEmps, setAllEmps] = useState(null); // tổ trưởng chọn trong TOÀN BỘ nhân viên
   useEffect(() => {
-    setMembers(null);
+    setAllEmps(null);
     if (!edit?.id || edit.kind !== "TO") return;
-    hrConfig.employees().then((all) => setMembers(all.filter((e) => e.org_unit_id === edit.id)))
-      .catch((e) => { toast.error(e.message); setMembers([]); });
+    hrConfig.employees().then(setAllEmps).catch((e) => { toast.error(e.message); setAllEmps([]); });
   }, [edit?.id, edit?.kind]);
+  const members = allEmps && allEmps.filter((e) => e.org_unit_id === edit?.id);
   if (err) return <LoadError message={`Không tải được đơn vị (${err})`} onRetry={load} />;
   const columns = [
     { key: "code", label: "Mã", render: (r) => <span className="font-mono text-xs">{r.code}</span> },
@@ -141,15 +141,15 @@ function UnitsTab({ canEdit }) {
             </Field>}
             {edit.id && edit.kind === "TO" && <>
               <Field label="Tổ trưởng">
-                <select className={inputCls} value={v.leader} disabled={!members} onChange={(e) => set("leader")(e.target.value)}>
+                <select className={inputCls} value={v.leader} disabled={!allEmps} onChange={(e) => set("leader")(e.target.value)}>
                   <option value="">{members ? "— Chưa có tổ trưởng —" : "Đang tải…"}</option>
-                  {(members || []).map((m) => (
+                  {(allEmps || []).map((m) => (
                     <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>
                       {m.name} ({m.employee_code}){m.user_id ? "" : " — chưa có tài khoản"}
                     </option>
                   ))}
                 </select>
-                <span className="block text-xs text-slate-500 mt-1">Chọn 1 người trong nhân viên của tổ, phải có tài khoản đăng nhập.</span>
+                <span className="block text-xs text-slate-500 mt-1">Chọn 1 người trong danh sách nhân viên (phải có tài khoản đăng nhập). Người được chọn sẽ tự được đưa vào tổ này.</span>
               </Field>
               <div className="md:col-span-2 lg:col-span-3">
                 <div className="text-sm font-medium text-slate-600 mb-1">Nhân viên của tổ ({members ? members.length : "…"})</div>
@@ -190,7 +190,7 @@ function LeaderModal({ unit, onClose, onSaved }) {
   const [sel, setSel] = useState(initial);
   const [saving, guard] = useSaving();
   useEffect(() => {
-    hrConfig.employees().then((rows) => setEmps(rows.filter((e) => e.org_unit_id === unit.id)))
+    hrConfig.employees().then((rows) => setEmps(rows))
       .catch((e) => { toast.error(e.message); setEmps([]); });
   }, [unit.id]);
   const save = () => guard(async () => {
@@ -211,14 +211,14 @@ function LeaderModal({ unit, onClose, onSaved }) {
         <button type="button" className="btn-primary disabled:opacity-60" onClick={save} disabled={saving || !emps}>{saving ? "Đang lưu…" : "Lưu tổ trưởng"}</button>
       </>}>
       {!emps ? <div className="text-sm text-slate-400">Đang tải…</div> : emps.length === 0 ? (
-        <div className="text-sm text-amber-700">Tổ chưa có nhân viên. Vào tab "Nhân viên & PIN" xếp người vào tổ trước.</div>
+        <div className="text-sm text-amber-700">Chưa có nhân viên nào — tạo nhân viên trước.</div>
       ) : (
         <div className="space-y-0.5 max-h-80 overflow-y-auto">
           {radio("", "— Chưa có tổ trưởng —", false)}
-          {emps.map((e) => radio(e.user_id || `nouser-${e.id}`, `${e.name} (${e.employee_code})`, !e.user_id, !e.user_id && "Chưa có tài khoản"))}
+          {emps.map((e) => radio(e.user_id || `nouser-${e.id}`, `${e.name} (${e.employee_code})`, !e.user_id, !e.user_id ? "Chưa có tài khoản" : e.org_unit_name && e.org_unit_id !== unit.id ? `Đang ở ${e.org_unit_name}` : ""))}
         </div>
       )}
-      <p className="text-xs text-slate-500 mt-3">Mỗi tổ 1 tổ trưởng, chọn trong nhân viên của tổ. Người chưa có tài khoản đăng nhập thì phải tạo tài khoản và gắn với nhân viên trước.</p>
+      <p className="text-xs text-slate-500 mt-3">Mỗi tổ 1 tổ trưởng, chọn trong danh sách nhân viên; người được chọn sẽ tự được đưa vào tổ này. Người chưa có tài khoản đăng nhập thì phải tạo tài khoản và gắn với nhân viên trước.</p>
     </Modal>
   );
 }

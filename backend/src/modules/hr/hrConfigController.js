@@ -187,9 +187,19 @@ exports.setOrgUnitManagers = async (req, res) => {
     if (unit.kind === 'TO') {
       if (userIds.length > 1) bad('Mỗi tổ chỉ có 1 tổ trưởng.');
       if (userIds.length === 1) {
+        // Admin chọn tổ trưởng trong TOÀN BỘ nhân viên; người được chọn tự chuyển vào tổ này
+        // (tổ trưởng chấm công trên tablet của tổ) và mất chức tổ trưởng ở tổ cũ nếu có.
         const { rows: [emp] } = await client.query(
-          'SELECT 1 FROM employees WHERE user_id = $1 AND org_unit_id = $2 AND is_deleted = FALSE', [userIds[0], id]);
-        if (!emp) bad('Tổ trưởng phải là nhân viên thuộc tổ này và đã được gắn tài khoản đăng nhập.');
+          'SELECT id, org_unit_id FROM employees WHERE user_id = $1 AND is_deleted = FALSE FOR UPDATE', [userIds[0]]);
+        if (!emp) bad('Tổ trưởng phải là nhân viên đã được gắn tài khoản đăng nhập.');
+        if (emp.org_unit_id !== id) {
+          if (emp.org_unit_id) {
+            await client.query(
+              `DELETE FROM org_unit_managers m USING org_units u
+                WHERE m.org_unit_id = u.id AND u.kind = 'TO' AND m.org_unit_id = $1 AND m.user_id = $2`, [emp.org_unit_id, userIds[0]]);
+          }
+          await client.query('UPDATE employees SET org_unit_id = $1, updated_at = now() WHERE id = $2', [id, emp.id]);
+        }
       }
     }
     const before = (await client.query('SELECT user_id FROM org_unit_managers WHERE org_unit_id = $1', [id])).rows.map((r) => r.user_id);
