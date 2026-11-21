@@ -400,6 +400,7 @@ async function employeeRows({ fromDate, toDate, stage, shift, team, orderCode } 
         WHERE ${empWhere.join(' AND ')}
       )
       SELECT
+        e.id                                                                          AS employee_id, -- lọc theo tổ (tablet tổ trưởng)
         e.name                                                                        AS worker,
         e.factory                                                                     AS team,
         COUNT(t.id)::int                                                              AS tasks_count,
