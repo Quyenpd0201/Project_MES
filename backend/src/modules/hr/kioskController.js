@@ -244,6 +244,15 @@ exports.identifyAccount = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(404).json({ message: 'Tài khoản chưa được gắn với nhân viên — gặp trưởng tổ / nhân sự để gắn' });
     }
+    // Quy trình 11/2026: thuộc tổ nào thì chấm ở tablet của tổ đó (kể cả tổ trưởng)
+    const { rows: [inUnit] } = await client.query(
+      `SELECT 1 WHERE $1::uuid IN ${subtreeSql(2)}`, [e.org_unit_id, req.kiosk.org_unit_id]);
+    if (!inUnit) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ message: e.org_unit_id
+        ? 'Bạn không thuộc tổ của máy này — hãy chấm công ở tablet của tổ mình'
+        : 'Bạn chưa được xếp vào tổ nào — báo admin xếp tổ trước khi chấm công' });
+    }
     const last = await lastPunch(client, e.id, new Date());
     await client.query('COMMIT');
     const d = decideDirection(last, new Date(), { dedupeMin: s.hr_punch_dedupe_min, maxOpenHours: MAX_OPEN_HOURS });

@@ -88,12 +88,13 @@ function UnitsTab({ canEdit }) {
     { key: "name", label: "Tên", filter: "text" },
     { key: "kind", label: "Loại", filter: "select", filterValue: (r) => KIND_LABEL[r.kind], render: (r) => KIND_LABEL[r.kind] },
     { key: "parent", label: "Thuộc", render: (r) => byId[r.parent_id]?.name || <span className="text-slate-400">—</span> },
-    { key: "managers", label: "Người quản lý", render: (r) => r.managers.length ? r.managers.map((m) => m.name).join(", ") : <span className="text-slate-400">—</span> },
+    { key: "managers", label: "Tổ trưởng / Quản lý", render: (r) => r.managers.length ? r.managers.map((m) => m.name).join(", ")
+      : r.kind === "TO" ? <span className="text-amber-700">Chưa có tổ trưởng</span> : <span className="text-slate-400">—</span> },
     { key: "employee_count", label: "Nhân viên", align: "right", render: (r) => <span className="tabular-nums">{r.employee_count}</span> },
     { key: "status", label: "Trạng thái" },
     ...(canEdit ? [{ key: "_act", label: "", align: "right", render: (r) => (
       <div className="flex justify-end gap-1">
-        <button type="button" className={iconBtn} title="Gán người quản lý" aria-label={`Gán người quản lý ${r.name}`} onClick={() => setMgr(r)}><Users size={15} /></button>
+        <button type="button" className={iconBtn} title={r.kind === "TO" ? "Chọn tổ trưởng" : "Gán người quản lý"} aria-label={`${r.kind === "TO" ? "Chọn tổ trưởng" : "Gán người quản lý"} ${r.name}`} onClick={() => setMgr(r)}><Users size={15} /></button>
         <button type="button" className={iconBtn} title="Sửa" aria-label={`Sửa ${r.name}`} onClick={() => setEdit(r)}><Edit size={15} /></button>
       </div>) }] : []),
   ];
@@ -129,8 +130,50 @@ function UnitsTab({ canEdit }) {
           </>}
         </FormModal>
       )}
-      {mgr && <ManagersModal unit={mgr} onClose={() => setMgr(null)} onSaved={load} />}
+      {mgr && (mgr.kind === "TO"
+        ? <LeaderModal unit={mgr} onClose={() => setMgr(null)} onSaved={load} />
+        : <ManagersModal unit={mgr} onClose={() => setMgr(null)} onSaved={load} />)}
     </>
+  );
+}
+
+/* Tổ: đúng 1 tổ trưởng, chọn trong nhân viên của chính tổ đó, phải có tài khoản đăng nhập (quy trình 11/2026). */
+function LeaderModal({ unit, onClose, onSaved }) {
+  const [emps, setEmps] = useState(null);
+  const initial = unit.managers[0]?.id || "";
+  const [sel, setSel] = useState(initial);
+  const [saving, guard] = useSaving();
+  useEffect(() => {
+    hrConfig.employees().then((rows) => setEmps(rows.filter((e) => e.org_unit_id === unit.id)))
+      .catch((e) => { toast.error(e.message); setEmps([]); });
+  }, [unit.id]);
+  const save = () => guard(async () => {
+    try { await hrConfig.setManagers(unit.id, sel ? [sel] : []); toast.success(`Đã lưu tổ trưởng ${unit.name}`); onSaved(); onClose(); }
+    catch (e) { toast.error(e.message); }
+  });
+  const radio = (value, label, disabled, note) => (
+    <label key={value || "none"} className={`flex items-center gap-2 px-2 py-1.5 rounded ${disabled ? "opacity-50" : "hover:bg-slate-50 cursor-pointer"}`}>
+      <input type="radio" name="leader" checked={sel === value} disabled={disabled} onChange={() => setSel(value)} />
+      <span className="text-sm">{label}</span>
+      {note && <span className="text-xs text-amber-700 ml-auto">{note}</span>}
+    </label>
+  );
+  return (
+    <Modal title={`Tổ trưởng — ${unit.name}`} onClose={onClose} size="md" locked={saving} dirty={sel !== initial}
+      footer={(close) => <>
+        <button type="button" className="btn-ghost" onClick={close} disabled={saving}>Hủy</button>
+        <button type="button" className="btn-primary disabled:opacity-60" onClick={save} disabled={saving || !emps}>{saving ? "Đang lưu…" : "Lưu tổ trưởng"}</button>
+      </>}>
+      {!emps ? <div className="text-sm text-slate-400">Đang tải…</div> : emps.length === 0 ? (
+        <div className="text-sm text-amber-700">Tổ chưa có nhân viên. Vào tab "Nhân viên & PIN" xếp người vào tổ trước.</div>
+      ) : (
+        <div className="space-y-0.5 max-h-80 overflow-y-auto">
+          {radio("", "— Chưa có tổ trưởng —", false)}
+          {emps.map((e) => radio(e.user_id || `nouser-${e.id}`, `${e.name} (${e.employee_code})`, !e.user_id, !e.user_id && "Chưa có tài khoản"))}
+        </div>
+      )}
+      <p className="text-xs text-slate-500 mt-3">Mỗi tổ 1 tổ trưởng, chọn trong nhân viên của tổ. Người chưa có tài khoản đăng nhập thì phải tạo tài khoản và gắn với nhân viên trước.</p>
+    </Modal>
   );
 }
 

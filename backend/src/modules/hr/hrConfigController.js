@@ -165,10 +165,20 @@ exports.setOrgUnitManagers = async (req, res) => {
   if (!isUuid(id)) return res.status(404).json({ message: 'Không tìm thấy đơn vị' });
   const out = await inTx(res, async (client) => {
     if (!userIds || userIds.some((u) => !isUuid(u))) bad('Danh sách người quản lý không hợp lệ.');
-    const { rows: [unit] } = await client.query('SELECT id FROM org_units WHERE id = $1 AND is_deleted = FALSE FOR UPDATE', [id]);
+    const { rows: [unit] } = await client.query('SELECT id, kind FROM org_units WHERE id = $1 AND is_deleted = FALSE FOR UPDATE', [id]);
     if (!unit) { res.status(404).json({ message: 'Không tìm thấy đơn vị' }); return undefined; }
     const { rows: found } = await client.query('SELECT id FROM users WHERE id = ANY($1) AND is_deleted = FALSE', [userIds]);
     if (found.length !== userIds.length) bad('Có tài khoản không tồn tại hoặc đã bị xóa.');
+    // Quy trình 11/2026: 1 tổ = 1 tablet = 1 tổ trưởng; tổ trưởng phải là nhân viên của chính tổ đó, có tài khoản.
+    // Xưởng / phòng vẫn cho nhiều người quản lý như cũ.
+    if (unit.kind === 'TO') {
+      if (userIds.length > 1) bad('Mỗi tổ chỉ có 1 tổ trưởng.');
+      if (userIds.length === 1) {
+        const { rows: [emp] } = await client.query(
+          'SELECT 1 FROM employees WHERE user_id = $1 AND org_unit_id = $2 AND is_deleted = FALSE', [userIds[0], id]);
+        if (!emp) bad('Tổ trưởng phải là nhân viên thuộc tổ này và đã được gắn tài khoản đăng nhập.');
+      }
+    }
     const before = (await client.query('SELECT user_id FROM org_unit_managers WHERE org_unit_id = $1', [id])).rows.map((r) => r.user_id);
     await client.query('DELETE FROM org_unit_managers WHERE org_unit_id = $1', [id]);
     if (userIds.length) {
@@ -410,7 +420,7 @@ exports.deleteHoliday = async (req, res) => {
 exports.listEmployees = async (req, res) => {
   const sc = await hrScope(req, { col: 'e.org_unit_id', startIndex: 1 });
   const { rows } = await db.query(`
-    SELECT e.id, e.employee_code, e.name, e.status, e.org_unit_id, u.name AS org_unit_name,
+    SELECT e.id, e.employee_code, e.name, e.status, e.org_unit_id, u.name AS org_unit_name, e.user_id,
            (e.pin_hash IS NOT NULL) AS has_pin,
            (e.pin_locked_until IS NOT NULL AND e.pin_locked_until > now()) AS pin_locked,
            e.face_consent_at
@@ -453,6 +463,8 @@ exports.unlockPin = async (req, res) => {
 };
 
 exports.moveEmployeeUnit = async (req, res) => {
+  // Quy trình 11/2026: chỉ admin / nhân sự xếp người vào tổ — tổ trưởng không tự thêm bớt người.
+  if (!canManageTree(req)) return res.status(403).json({ message: 'Chỉ admin mới được xếp nhân viên vào tổ.' });
   const { id } = req.params; const unitId = req.body?.org_unit_id;
   const out = await inTx(res, async (client) => {
     if (!(await requireEmployeeInScope(client, req, res, id))) return undefined;
@@ -463,8 +475,14 @@ exports.moveEmployeeUnit = async (req, res) => {
       `SELECT u.status FROM org_units u WHERE u.id = $1 AND u.is_deleted = FALSE AND ${sc.sql}`, [unitId, ...sc.params]);
     if (!u) bad('Tổ/đơn vị không tồn tại hoặc nằm ngoài phạm vi bạn quản lý.');
     if (u.status !== 'Hoạt động') bad('Tổ/đơn vị đang ngừng hoạt động.');
-    const { rows: [cur] } = await client.query('SELECT org_unit_id FROM employees WHERE id = $1 FOR UPDATE', [id]);
+    const { rows: [cur] } = await client.query('SELECT org_unit_id, user_id FROM employees WHERE id = $1 FOR UPDATE', [id]);
     await client.query('UPDATE employees SET org_unit_id = $1, updated_at = now() WHERE id = $2', [unitId, id]);
+    // Đang là tổ trưởng tổ cũ mà chuyển sang tổ khác → bỏ chức tổ trưởng tổ cũ (tổ trưởng phải thuộc tổ)
+    if (cur.user_id && cur.org_unit_id && cur.org_unit_id !== unitId) {
+      await client.query(
+        `DELETE FROM org_unit_managers m USING org_units u
+          WHERE m.org_unit_id = u.id AND u.kind = 'TO' AND m.org_unit_id = $1 AND m.user_id = $2`, [cur.org_unit_id, cur.user_id]);
+    }
     await logHr(client, req, { action: 'move_unit', entity: 'employee', entityId: id, before: cur, after: { org_unit_id: unitId } });
     return { id, org_unit_id: unitId };
   });
