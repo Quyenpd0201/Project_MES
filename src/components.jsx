@@ -20,19 +20,18 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
   const selected = options.find((o) => o.value === value);
   const filtered = q ? options.filter((o) => stripVN(o.label).includes(stripVN(q))) : options;
 
+  // Quy tắc chung (11/2026): danh sách LUÔN sổ xuống dưới ô. Thiếu chỗ phía dưới thì cuộn trang
+  // để ô lên giữa màn hình trước khi mở, không lật ngược danh sách lên trên.
   const place = () => {
     const r = triggerRef.current?.getBoundingClientRect();
     if (!r) return;
     const spaceBelow = window.innerHeight - r.bottom;
-    const spaceAbove = r.top;
-    if (spaceBelow < 250 && spaceAbove > spaceBelow) {
-      setPos({ left: r.left, bottom: window.innerHeight - r.top + 4, width: r.width, maxHeight: Math.min(300, spaceAbove - 16) });
-    } else {
-      setPos({ left: r.left, top: r.bottom + 4, width: r.width, maxHeight: Math.min(300, spaceBelow - 16) });
-    }
+    setPos({ left: r.left, top: r.bottom + 4, width: r.width, maxHeight: Math.max(160, Math.min(300, spaceBelow - 16)) });
   };
   const openMenu = () => {
     if (disabled) return;
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r && window.innerHeight - r.bottom < 250) triggerRef.current.scrollIntoView({ block: "center" });
     place(); setOpen(true);
     setActiveIdx(Math.max(0, options.findIndex((o) => o.value === value)));
   };
@@ -47,7 +46,7 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
       menuRef.current?.querySelector(`[data-idx="${n}"]`)?.scrollIntoView({ block: "nearest" });
     } else if (e.key === "Enter") {
       e.preventDefault();
-      const o = filtered[activeIdx]; if (o) { onChange(o.value); close(true); }
+      const o = filtered[activeIdx]; if (o && !o.disabled) { onChange(o.value); close(true); }
     } else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); close(true); }
     else if (e.key === "Tab") close(false);
   };
@@ -89,9 +88,9 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
           <div className="py-1" role="listbox" aria-label={ariaLabel}>
             {!filtered.length && <div className="px-3 py-2 text-sm text-slate-400">Không tìm thấy</div>}
             {filtered.map((o, i) => (
-              <button type="button" key={o.value} onClick={() => pick(o.value)} tabIndex={-1}
-                role="option" aria-selected={o.value === value} data-idx={i} onMouseEnter={() => setActiveIdx(i)}
-                className={"w-full text-left truncate px-3 py-1.5 text-xs hover:bg-blue-50 " + (o.value === value ? "bg-blue-50 text-blue-700 font-medium " : "text-slate-700 ") + (i === activeIdx ? "ring-1 ring-inset ring-blue-300" : "")}
+              <button type="button" key={o.value} onClick={() => !o.disabled && pick(o.value)} tabIndex={-1} disabled={o.disabled}
+                role="option" aria-selected={o.value === value} aria-disabled={o.disabled || undefined} data-idx={i} onMouseEnter={() => setActiveIdx(i)}
+                className={"w-full text-left truncate px-3 py-1.5 text-xs " + (o.disabled ? "text-slate-400 cursor-not-allowed " : "hover:bg-blue-50 ") + (o.value === value ? "bg-blue-50 text-blue-700 font-medium " : o.disabled ? "" : "text-slate-700 ") + (i === activeIdx && !o.disabled ? "ring-1 ring-inset ring-blue-300" : "")}
                 title={o.label}>
                 {o.label}
               </button>

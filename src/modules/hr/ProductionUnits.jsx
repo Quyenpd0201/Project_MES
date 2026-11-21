@@ -88,9 +88,8 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
             <Field label="Tên tổ" required><input className={inputCls} value={v.name} disabled={ro} onChange={(e) => set("name")(e.target.value)} /></Field>
             <Field label="Thuộc xưởng" required><SearchSelect value={v.parent_id} onChange={set("parent_id")} options={parentOpts} disabled={ro} ariaLabel="Thuộc xưởng" /></Field>
             <Field label="Trạng thái">
-              <select className={inputCls} value={v.status} disabled={isNew || ro} onChange={(e) => set("status")(e.target.value)}>
-                <option>Hoạt động</option><option>Không hoạt động</option>
-              </select>
+              <SearchSelect value={v.status} onChange={set("status")} disabled={isNew || ro} ariaLabel="Trạng thái"
+                options={[{ value: "Hoạt động", label: "Hoạt động" }, { value: "Không hoạt động", label: "Không hoạt động" }]} />
             </Field>
           </div>
         </Section>
@@ -98,14 +97,11 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
         <Section title="2. Tổ trưởng" collapsible={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
             <Field label="Tổ trưởng" className="lg:col-span-2" hint="Chọn 1 người trong danh sách nhân viên (phải có tài khoản đăng nhập). Người được chọn tự được đưa vào tổ này và chấm công trên tablet của tổ.">
-              <select className={inputCls} value={v.leader} disabled={ro} onChange={(e) => pickLeader(e.target.value)}>
-                <option value="">— Chưa có tổ trưởng —</option>
-                {employees.map((m) => (
-                  <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>
-                    {m.name} ({m.employee_code}){!m.user_id ? " — chưa có tài khoản" : m.org_unit_id && m.org_unit_id !== unit.id && !memberSet.has(m.id) ? ` — đang ở ${unitName[m.org_unit_id] || "tổ khác"}` : ""}
-                  </option>
-                ))}
-              </select>
+              <SearchSelect value={v.leader} onChange={pickLeader} disabled={ro} placeholder="— Chưa có tổ trưởng —" ariaLabel="Tổ trưởng"
+                options={[{ value: "", label: "— Chưa có tổ trưởng —" }, ...employees.map((m) => ({
+                  value: m.user_id || `nouser-${m.id}`, disabled: !m.user_id,
+                  label: `${m.name} (${m.employee_code})${!m.user_id ? " — chưa có tài khoản" : m.org_unit_id && m.org_unit_id !== unit.id && !memberSet.has(m.id) ? ` — đang ở ${unitName[m.org_unit_id] || "tổ khác"}` : ""}`,
+                }))]} />
             </Field>
           </div>
         </Section>
@@ -152,10 +148,8 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
         <Section title="4. Thời gian làm việc" collapsible={false}>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
             <Field label="Ca làm việc của tổ" className="lg:col-span-2" hint={shift ? `Giờ làm ${String(shift.start_time).slice(0, 5)}–${String(shift.end_time).slice(0, 5)}${shift.overnight ? " (qua đêm)" : ""}. Muốn thêm ca: Cấu hình chấm công → Ca làm.` : "Chọn trong các ca đã khai báo ở Cấu hình chấm công → Ca làm."}>
-              <select className={inputCls} value={v.default_shift_id} disabled={ro} onChange={(e) => set("default_shift_id")(e.target.value)}>
-                <option value="">— Chưa chọn ca —</option>
-                {shifts.filter((s) => s.status === "Hoạt động" || s.id === v.default_shift_id).map((s) => <option key={s.id} value={s.id}>{shiftLabel(s)}</option>)}
-              </select>
+              <SearchSelect value={v.default_shift_id} onChange={set("default_shift_id")} disabled={ro} placeholder="— Chưa chọn ca —" ariaLabel="Ca làm việc của tổ"
+                options={[{ value: "", label: "— Chưa chọn ca —" }, ...shifts.filter((s) => s.status === "Hoạt động" || s.id === v.default_shift_id).map((s) => ({ value: s.id, label: shiftLabel(s) }))]} />
             </Field>
             <Field label="Ngày làm trong tuần" className="lg:col-span-2">
               <div className="flex flex-wrap gap-2">

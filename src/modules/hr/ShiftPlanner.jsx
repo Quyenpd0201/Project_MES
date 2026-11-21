@@ -49,6 +49,8 @@ export default function ShiftPlanner() {
     return ids;
   }, [unit, units]);
   const rows = (emps || []).filter((e) => !unitIds || unitIds.has(e.org_unit_id));
+  const cellOpts = [{ value: "", label: "Tự nhận" }, ...shifts.map((s) => ({ value: s.id, label: s.name }))];
+  const colOpts = [{ value: "_auto", label: "Tự nhận" }, ...shifts.map((s) => ({ value: s.id, label: s.name }))];
   const changes = Object.keys({ ...saved, ...draft }).filter((k) => (saved[k] || "") !== (draft[k] || ""));
 
   if (!can("hr_attendance", "view")) return <div className="flex items-center justify-center h-64 text-slate-400 text-sm">Bạn không có quyền xem phân ca.</div>;
@@ -92,12 +94,8 @@ export default function ShiftPlanner() {
                 <th key={d} className="px-2 py-2 text-xs font-semibold text-slate-500 min-w-32">
                   <div className="uppercase tracking-wide">{WD[i]} {d.slice(8)}/{d.slice(5, 7)}</div>
                   {canEditDay(d) && rows.length > 0 && (
-                    <select aria-label={`Gán cả cột ${WD[i]}`} className="mt-1 w-full text-xs rounded-md border border-slate-200 bg-white py-0.5" value=""
-                      onChange={(e) => fillDay(d, e.target.value === "_auto" ? "" : e.target.value)}>
-                      <option value="">Gán cả cột…</option>
-                      <option value="_auto">Tự nhận</option>
-                      {shifts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
+                    <div className="mt-1 normal-case tracking-normal font-normal"><SearchSelect ariaLabel={`Gán cả cột ${WD[i]}`} value="" placeholder="Gán cả cột…" options={colOpts}
+                      onChange={(val) => fillDay(d, val === "_auto" ? "" : val)} className="w-full text-xs rounded-md border border-slate-200 bg-white py-0.5 px-2" /></div>
                   )}
                 </th>
               ))}
@@ -113,11 +111,10 @@ export default function ShiftPlanner() {
                     const k = `${e.id}|${d}`; const changed = (saved[k] || "") !== (draft[k] || "");
                     return (
                       <td key={d} className="px-2 py-1.5">
-                        <select aria-label={`Ca của ${e.name} ngày ${d}`} disabled={!canEditDay(d)} title={canEditDay(d) ? undefined : "Ngày đã qua — chỉ nhân sự đổi ca"} value={draft[k] || ""} onChange={(ev) => setCell(k, ev.target.value)}
-                          className={`${inputCls} py-1 text-xs ${changed ? "border-blue-400 bg-blue-50" : draft[k] ? "bg-amber-50 border-amber-200" : ""}`}>
-                          <option value="">Tự nhận</option>
-                          {shifts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
+                        <div title={canEditDay(d) ? undefined : "Ngày đã qua — chỉ nhân sự đổi ca"}>
+                          <SearchSelect ariaLabel={`Ca của ${e.name} ngày ${d}`} disabled={!canEditDay(d)} value={draft[k] || ""} onChange={(val) => setCell(k, val)} options={cellOpts}
+                            className={`${inputCls} py-1 text-xs ${changed ? "border-blue-400 bg-blue-50" : draft[k] ? "bg-amber-50 border-amber-200" : ""}`} />
+                        </div>
                       </td>
                     );
                   })}

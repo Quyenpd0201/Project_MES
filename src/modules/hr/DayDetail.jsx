@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Image as ImageIcon, Plus } from "lucide-react";
 import { Link } from "react-router-dom"; // [HR-G4]
-import { Modal as PhotoModal, LoadError, useSaving } from "../../components.jsx";
+import { Modal as PhotoModal, LoadError, useSaving, SearchSelect } from "../../components.jsx";
 import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riêng thay popup
 import { hrWorkday, hrAttendance } from "../../mesApi.js";
 import { inputCls, fmtDate, fmtDateTime, statusClass, toast } from "../../ui.js";
@@ -44,16 +44,11 @@ function CorrectionForm({ employeeId, date, punches, onDone, onClose }) {
       </>}>
       <div className="space-y-3">
         <label className="block"><span className="text-sm font-medium text-slate-600">Loại sửa <span className="text-rose-600">*</span></span>
-          <select className={inputCls + " mt-1"} value={v.kind} onChange={(e) => set("kind")(e.target.value)}>
-            {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-          </select>
+          <div className="mt-1"><SearchSelect value={v.kind} onChange={set("kind")} ariaLabel="Loại yêu cầu" options={Object.entries(KIND_LABEL).map(([k, l]) => ({ value: k, label: l }))} /></div>
         </label>
         {v.kind === "ignore_punch" ? (
           <label className="block"><span className="text-sm font-medium text-slate-600">Lần chấm cần bỏ <span className="text-rose-600">*</span></span>
-            <select className={inputCls + " mt-1"} value={v.punch_id} onChange={(e) => set("punch_id")(e.target.value)}>
-              <option value="">-- Chọn --</option>
-              {punches.map((p) => <option key={p.id} value={p.id}>{fmtDateTime(p.punched_at)}</option>)}
-            </select>
+            <div className="mt-1"><SearchSelect value={v.punch_id} onChange={set("punch_id")} ariaLabel="Lần chấm cần bỏ" options={punches.map((p) => ({ value: p.id, label: fmtDateTime(p.punched_at) }))} /></div>
           </label>
         ) : (
           <div className="flex items-end gap-3">

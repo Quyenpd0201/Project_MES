@@ -18,6 +18,8 @@ const TABS = [
   { key: "devices", label: "Tablet chấm công" }, // [HR-G2]
 ];
 const KIND_LABEL = { XUONG: "Xưởng", PHONG: "Phòng", TO: "Tổ" };
+const KIND_OPTS = Object.entries(KIND_LABEL).map(([value, label]) => ({ value, label }));
+const STATUS_OPTS = [{ value: "Hoạt động", label: "Hoạt động" }, { value: "Không hoạt động", label: "Không hoạt động" }];
 const hhmm = (t) => (t ? String(t).slice(0, 5) : "—");
 
 /** Tải danh sách + trạng thái lỗi/đang tải dùng chung cho mọi tab */
@@ -127,28 +129,18 @@ function UnitsTab({ canEdit }) {
             <Field label="Mã" required><input className={inputCls} value={v.code} disabled={!!edit.id} spellCheck={false} autoComplete="off" placeholder="VD: THOI-T1…" onChange={(e) => set("code")(e.target.value)} /></Field>
             <Field label="Tên" required><input className={inputCls} value={v.name} autoComplete="off" onChange={(e) => set("name")(e.target.value)} /></Field>
             <Field label="Loại" required>
-              <select className={inputCls} value={v.kind} onChange={(e) => set("kind")(e.target.value)}>
-                {Object.entries(KIND_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
-              </select>
+              <SearchSelect value={v.kind} onChange={set("kind")} options={KIND_OPTS} ariaLabel="Loại" />
             </Field>
             <Field label="Thuộc xưởng / phòng" required={v.kind === "TO"}>
               <SearchSelect value={v.parent_id} onChange={set("parent_id")} options={parentOpts.filter((o) => o.value !== edit.id)} placeholder="-- Không --" ariaLabel="Thuộc xưởng / phòng" />
             </Field>
             {edit.id && <Field label="Trạng thái">
-              <select className={inputCls} value={v.status} onChange={(e) => set("status")(e.target.value)}>
-                <option>Hoạt động</option><option>Không hoạt động</option>
-              </select>
+              <SearchSelect value={v.status} onChange={set("status")} options={STATUS_OPTS} ariaLabel="Trạng thái" />
             </Field>}
             {edit.id && edit.kind === "TO" && <>
               <Field label="Tổ trưởng">
-                <select className={inputCls} value={v.leader} disabled={!allEmps} onChange={(e) => set("leader")(e.target.value)}>
-                  <option value="">{members ? "— Chưa có tổ trưởng —" : "Đang tải…"}</option>
-                  {(allEmps || []).map((m) => (
-                    <option key={m.id} value={m.user_id || ""} disabled={!m.user_id}>
-                      {m.name} ({m.employee_code}){m.user_id ? "" : " — chưa có tài khoản"}
-                    </option>
-                  ))}
-                </select>
+                <SearchSelect value={v.leader} onChange={set("leader")} disabled={!allEmps} placeholder={allEmps ? "— Chưa có tổ trưởng —" : "Đang tải…"} ariaLabel="Tổ trưởng"
+                  options={[{ value: "", label: "— Chưa có tổ trưởng —" }, ...(allEmps || []).map((m) => ({ value: m.user_id || `nouser-${m.id}`, disabled: !m.user_id, label: `${m.name} (${m.employee_code})${m.user_id ? "" : " — chưa có tài khoản"}` }))]} />
                 <span className="block text-xs text-slate-500 mt-1">Chọn 1 người trong danh sách nhân viên (phải có tài khoản đăng nhập). Người được chọn sẽ tự được đưa vào tổ này.</span>
               </Field>
               <div className="md:col-span-2 lg:col-span-3">
@@ -367,7 +359,7 @@ function LeaveTypesTab({ canEdit }) {
               <Check label="Bắt buộc đính kèm (vd giấy khám)" checked={v.requires_attachment} onChange={set("requires_attachment")} />
               <Check label="Nhân sự duyệt cuối sau trưởng đơn vị" checked={v.requires_hr_approval} onChange={set("requires_hr_approval")} />
             </div>
-            {edit.id && <Field label="Trạng thái"><select className={inputCls} value={v.status} onChange={(e) => set("status")(e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></select></Field>}
+            {edit.id && <Field label="Trạng thái"><SearchSelect value={v.status} onChange={set("status")} options={STATUS_OPTS} ariaLabel="Trạng thái" /></Field>}
           </>}
         </FormModal>
       )}

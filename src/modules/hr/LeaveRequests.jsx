@@ -72,10 +72,7 @@ function CreateModal({ onClose, onDone }) {
             options={emps.map((e) => ({ value: e.id, label: `${e.name} · ${e.employee_code}${e.org_unit_name ? ` · ${e.org_unit_name}` : ""}` }))} /></div>
         </label>
         <label className="block lg:col-span-2"><span className="text-sm font-medium text-slate-600">Loại nghỉ <span className="text-rose-600">*</span></span>
-          <select className={inputCls + " mt-1"} value={v.leave_type_id} onChange={(e) => set("leave_type_id")(e.target.value)}>
-            <option value="">-- Chọn --</option>
-            {types.map((t) => <option key={t.id} value={t.id}>{t.name}{t.paid ? "" : " (không lương)"}</option>)}
-          </select>
+          <div className="mt-1"><SearchSelect value={v.leave_type_id} onChange={set("leave_type_id")} ariaLabel="Loại nghỉ" options={types.map((t) => ({ value: t.id, label: t.name + (t.paid ? "" : " (không lương)") }))} /></div>
           {balance && <span className="block mt-1 text-xs text-slate-500">Còn lại {fmtDec(balance.remaining, 1)} ngày{balance.pending ? ` · đang chờ duyệt ${fmtDec(balance.pending, 1)} ngày` : ""}</span>}
         </label>
         <label className="block"><span className="text-sm font-medium text-slate-600">Từ ngày <span className="text-rose-600">*</span></span>
@@ -85,17 +82,11 @@ function CreateModal({ onClose, onDone }) {
           <div className="mt-1"><DateInput value={v.to_date} min={v.from_date} onChange={(e) => set("to_date")(e.target.value)} /></div>
         </label>
         <label className="block"><span className="text-sm font-medium text-slate-600">{oneDay || !v.to_date ? "Buổi" : "Ngày đầu nghỉ"}</span>
-          <select className={inputCls + " mt-1"} value={v.from_part} onChange={(e) => set("from_part")(e.target.value)}>
-            <option value="FULL">Cả ngày</option>
-            {(oneDay || !v.to_date) && <option value="AM">Buổi sáng</option>}
-            <option value="PM">{oneDay || !v.to_date ? "Buổi chiều" : "Từ buổi chiều"}</option>
-          </select>
+          <div className="mt-1"><SearchSelect value={v.from_part} onChange={set("from_part")} ariaLabel="Buổi" options={[{ value: "FULL", label: "Cả ngày" }, ...(oneDay || !v.to_date ? [{ value: "AM", label: "Buổi sáng" }] : []), { value: "PM", label: oneDay || !v.to_date ? "Buổi chiều" : "Từ buổi chiều" }]} /></div>
         </label>
         {!oneDay && v.to_date && (
           <label className="block"><span className="text-sm font-medium text-slate-600">Ngày cuối nghỉ</span>
-            <select className={inputCls + " mt-1"} value={v.to_part} onChange={(e) => set("to_part")(e.target.value)}>
-              <option value="FULL">Cả ngày</option><option value="AM">Đến hết buổi sáng</option>
-            </select>
+            <div className="mt-1"><SearchSelect value={v.to_part} onChange={set("to_part")} ariaLabel="Ngày cuối nghỉ" options={[{ value: "FULL", label: "Cả ngày" }, { value: "AM", label: "Đến hết buổi sáng" }]} /></div>
           </label>
         )}
         <label className="block md:col-span-2 lg:col-span-3"><span className="text-sm font-medium text-slate-600">Lý do <span className="text-rose-600">*</span></span>
