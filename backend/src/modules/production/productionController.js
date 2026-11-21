@@ -800,7 +800,7 @@ exports.executionTasks = async (req, res) => {
     if (q)      { where.push(`(po.order_code ILIKE $${i} OR p.product_name ILIKE $${i} OR p.product_code ILIKE $${i})`); params.push(`%${q}%`); i++; }
     const { rows } = await db.query(`
       SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty, t.status, t.shift,
-             t.planned_date, t.planned_end_date, t.assigned_team, t.assigned_worker,
+             t.planned_date, t.planned_end_date, t.assigned_team, t.assigned_worker, t.assigned_worker_id,
              m.name AS machine_name,
              po.id AS production_order_id, po.order_code, po.due_date, po.unit,
              po.attr_color, po.attr_size, po.attr_thickness, po.specs, po.priority,
