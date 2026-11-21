@@ -6,6 +6,7 @@ import { HrPage as Modal } from "./HrPage.jsx"; // chuẩn hóa: mở trang riê
 import { hrConfig } from "../../mesApi.js";
 import { inputCls, fmtDate, fmtDateTime, fmtDec, toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
+import { UnitPage } from "./ProductionUnits.jsx"; // sửa tổ = cùng trang với app Đơn vị sản xuất
 
 /* Cấu hình Chấm công & Nghỉ phép: Đơn vị/Tổ · Ca làm · Loại nghỉ · Ngày lễ · Nhân viên & PIN.
    Quyền: hr_config.view (xem) / hr_config.edit (sửa). Lọc nhân viên theo phạm vi do backend làm. */
@@ -87,10 +88,11 @@ function UnitsTab({ canEdit }) {
 
   // Sửa tổ: tải nhân viên của tổ để chọn tổ trưởng + xem thành viên ngay trên trang sửa
   const [allEmps, setAllEmps] = useState(null); // tổ trưởng chọn trong TOÀN BỘ nhân viên
+  const [allShifts, setAllShifts] = useState([]);
   useEffect(() => {
     setAllEmps(null);
     if (!edit?.id || edit.kind !== "TO") return;
-    hrConfig.employees().then(setAllEmps).catch((e) => { toast.error(e.message); setAllEmps([]); });
+    Promise.all([hrConfig.employees(), hrConfig.shifts()]).then(([e, s]) => { setAllShifts(s); setAllEmps(e); }).catch((e) => { toast.error(e.message); setAllEmps([]); });
   }, [edit?.id, edit?.kind]);
   const members = allEmps && allEmps.filter((e) => e.org_unit_id === edit?.id);
   if (err) return <LoadError message={`Không tải được đơn vị (${err})`} onRetry={load} />;
@@ -122,7 +124,10 @@ function UnitsTab({ canEdit }) {
     <>
       {canEdit && <div className="flex justify-end"><button type="button" className="btn-primary" onClick={() => setEdit({ kind: "TO", status: "Hoạt động" })}><Plus size={16} /> Thêm đơn vị</button></div>}
       <DataTable columns={columns} rows={rows || []} rowKey={(r) => r.id} loading={!rows} stateKey="hr:units" />
-      {edit && (
+      {edit?.id && edit.kind === "TO" && allEmps && (
+        <UnitPage unit={edit} units={rows || []} employees={allEmps} shifts={allShifts} canEdit={canEdit} onClose={() => setEdit(null)} onSaved={load} />
+      )}
+      {edit && !(edit.id && edit.kind === "TO") && (
         <FormModal title={edit.id ? `Sửa ${edit.name}` : "Thêm đơn vị / tổ"} initial={{ code: edit.code || "", name: edit.name || "", kind: edit.kind, parent_id: edit.parent_id || "", status: edit.status, leader: edit.managers?.[0]?.id || "" }}
           onSubmit={save} onClose={() => setEdit(null)}>
           {(v, set) => <>

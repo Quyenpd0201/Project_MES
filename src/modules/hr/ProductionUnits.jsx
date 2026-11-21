@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Edit, Search } from "lucide-react";
+import { Plus, Edit, X } from "lucide-react";
 import { ListHeader, DataTable, LoadError, SearchSelect, Section, useSaving } from "../../components.jsx";
 import { HrPage } from "./HrPage.jsx";
 import { hrConfig } from "../../mesApi.js";
@@ -24,7 +24,7 @@ function Field({ label, required, hint, className = "", children }) {
   );
 }
 
-function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved }) {
+export function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved }) {
   const isNew = !unit.id;
   const initial = useMemo(() => ({
     code: unit.code || "", name: unit.name || "", parent_id: unit.parent_id || "", status: unit.status || "Hoạt động",
@@ -33,8 +33,6 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
     default_shift_id: unit.default_shift_id || "", work_days: unit.work_days || [1, 2, 3, 4, 5, 6],
   }), [unit, employees]);
   const [v, setV] = useState(initial);
-  const [q, setQ] = useState("");
-  const [onlyFree, setOnlyFree] = useState(false);
   const [saving, guard] = useSaving();
   const set = (k) => (val) => setV((s) => ({ ...s, [k]: val }));
   const dirty = JSON.stringify(v) !== JSON.stringify(initial);
@@ -51,12 +49,8 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
   };
   useEffect(() => { if (v.leader && !members.some((m) => m.user_id === v.leader)) set("leader")(""); }, [v.members]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const shown = employees.filter((e) => {
-    if (onlyFree && e.org_unit_id && !memberSet.has(e.id)) return false;
-    const s = q.trim().toLowerCase();
-    return !s || e.name.toLowerCase().includes(s) || String(e.employee_code).toLowerCase().includes(s);
-  });
-  const toggle = (id, on) => set("members")(on ? [...v.members, id] : v.members.filter((x) => x !== id));
+  const addMember = (id) => id && set("members")([...v.members, id]);
+  const removeMember = (id) => set("members")(v.members.filter((x) => x !== id));
   const shift = shifts.find((s) => s.id === v.default_shift_id);
 
   const save = () => guard(async () => {
@@ -107,42 +101,42 @@ function UnitPage({ unit, units, employees, shifts, canEdit, onClose, onSaved })
         </Section>
 
         <Section title={`3. Nhân viên của tổ (${members.length})`} collapsible={false}>
-          <div className="flex flex-wrap items-center gap-3 mb-3">
-            <div className="relative flex-1 min-w-[220px] max-w-md">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input className={`${inputCls} pl-9`} value={q} placeholder="Tìm theo tên hoặc mã nhân viên…" onChange={(e) => setQ(e.target.value)} />
+          {!ro && (
+            <div className="max-w-xl mb-3">
+              <SearchSelect value="" placeholder="+ Thêm công nhân…" ariaLabel="Thêm công nhân vào tổ" onChange={addMember}
+                options={employees.filter((e) => !memberSet.has(e.id)).map((e) => ({
+                  value: e.id,
+                  label: `${e.name} (${e.employee_code})${e.org_unit_id && e.org_unit_id !== unit.id ? ` — đang ở ${unitName[e.org_unit_id] || "tổ khác"}` : ""}`,
+                }))} />
+              <span className="block text-xs text-slate-500 mt-1">Chọn từ danh sách nhân viên. Người đang ở tổ khác sẽ được chuyển sang tổ này khi bấm Lưu.</span>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input type="checkbox" checked={onlyFree} onChange={(e) => setOnlyFree(e.target.checked)} /> Chỉ hiện người chưa có tổ
-            </label>
-          </div>
-          <div className="border border-slate-200 rounded-lg overflow-hidden max-h-[420px] overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0"><tr>
-                <th className="w-10 px-3 py-2"></th><th className="text-left px-3 py-2">Mã NV</th><th className="text-left px-3 py-2">Họ tên</th>
-                <th className="text-left px-3 py-2">Tổ hiện tại</th><th className="text-left px-3 py-2">Tài khoản</th><th className="text-left px-3 py-2">Vai trò</th>
-              </tr></thead>
-              <tbody>
-                {shown.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-slate-400">Không có nhân viên phù hợp</td></tr>}
-                {shown.map((e) => {
-                  const on = memberSet.has(e.id);
-                  const other = e.org_unit_id && e.org_unit_id !== unit.id;
-                  return (
-                    <tr key={e.id} className={`border-t border-slate-100 ${on ? "bg-blue-50/40" : ""}`}>
-                      <td className="px-3 py-2"><input type="checkbox" checked={on} disabled={ro} aria-label={`Chọn ${e.name}`} onChange={(ev) => toggle(e.id, ev.target.checked)} /></td>
+          )}
+          {members.length === 0 ? (
+            <div className="text-sm text-slate-400 py-4">Tổ chưa có công nhân nào.</div>
+          ) : (
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase"><tr>
+                  <th className="text-left px-3 py-2">Mã NV</th><th className="text-left px-3 py-2">Họ tên</th>
+                  <th className="text-left px-3 py-2">Tài khoản</th><th className="text-left px-3 py-2">Vai trò</th>
+                  {!ro && <th className="w-24 px-3 py-2"></th>}
+                </tr></thead>
+                <tbody>
+                  {members.map((e) => (
+                    <tr key={e.id} className="border-t border-slate-100">
                       <td className="px-3 py-2 font-mono text-xs">{e.employee_code}</td>
-                      <td className="px-3 py-2">{e.name}</td>
-                      <td className="px-3 py-2">{on ? (other ? <span className="text-amber-700">{unitName[e.org_unit_id]} → chuyển sang tổ này</span> : "Tổ này")
-                        : e.org_unit_id ? unitName[e.org_unit_id] || "—" : <span className="text-slate-400">Chưa có tổ</span>}</td>
+                      <td className="px-3 py-2">{e.name}{e.org_unit_id && e.org_unit_id !== unit.id && <span className="text-xs text-amber-700"> (chuyển từ {unitName[e.org_unit_id] || "tổ khác"})</span>}</td>
                       <td className="px-3 py-2">{e.user_id ? "Có" : <span className="text-amber-700">Chưa có</span>}</td>
-                      <td className="px-3 py-2">{on && e.user_id && e.user_id === v.leader ? <span className="text-blue-700 font-medium">Tổ trưởng</span> : on ? "Nhân viên" : ""}</td>
+                      <td className="px-3 py-2">{e.user_id && e.user_id === v.leader ? <span className="text-blue-700 font-medium">Tổ trưởng</span> : "Công nhân"}</td>
+                      {!ro && <td className="px-3 py-2 text-right">
+                        <button type="button" onClick={() => removeMember(e.id)} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-rose-600" aria-label={`Bỏ ${e.name} khỏi tổ`}><X size={14} /> Bỏ khỏi tổ</button>
+                      </td>}
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="text-xs text-slate-500 mt-2">Tick để đưa vào tổ; người đang ở tổ khác sẽ được chuyển sang tổ này khi bấm Lưu. Bỏ tick thì người đó thành "chưa có tổ".</p>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </Section>
 
         <Section title="4. Thời gian làm việc" collapsible={false}>
