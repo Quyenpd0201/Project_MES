@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Upload, Save, Plus, Trash2, RefreshCcw, History, AlertTriangle, PackageCheck, Check, Ban, ChevronRight, ChevronDown, ClipboardList } from "lucide-react";
-import { DataTable, PageHeader, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
+import { DataTable, PageHeader, UnitSelect, SearchSelect, useRemembered, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, toast, todayYmd, fmtDateTime } from "../../ui.js";
@@ -188,18 +188,18 @@ function OutboundForm({ lookups, onSaved }) {
             <div className={`${inputCls} bg-slate-50 text-slate-500`}>Hôm nay ({fmtDate(todayYmd())})</div>
           </Field>
           <Field label="Mục đích xuất" required>
-            <select className={inputCls} value={header.purpose} onChange={e => setH("purpose", e.target.value)}>
+            <Select className={inputCls} value={header.purpose} onChange={e => setH("purpose", e.target.value)}>
               {OUTBOUND_PURPOSES.map(s => <option key={s}>{s}</option>)}
-            </select>
+            </Select>
             <p className="text-[11px] text-slate-400 mt-1">Chuyển kho → màn Chuyển kho</p>
           </Field>
           <Field label="Kho / Vị trí xuất" required>
-            <select className={inputCls} value={header.location_id} onChange={e => onLocationChange(e.target.value)}>
+            <Select className={inputCls} value={header.location_id} onChange={e => onLocationChange(e.target.value)}>
               <option value="">-- Chọn kho/vị trí --</option>
               {locationsToShow.map(l => (
                 <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
 
@@ -240,11 +240,11 @@ function OutboundForm({ lookups, onSaved }) {
                       </td>
                       <td className="px-3 py-2">
                         {st.specs.length > 1 ? (
-                          <select className={`${inputCls} ${!st.spec ? "border-amber-400" : ""}`} value={l.spec_key}
+                          <Select className={`${inputCls} ${!st.spec ? "border-amber-400" : ""}`} value={l.spec_key}
                             onChange={e => setLines(a => a.map(x => x._k === l._k ? { ...x, spec_key: e.target.value, lot_code: "" } : x))}>
                             <option value="">-- Chọn thông số --</option>
                             {st.specs.map(k => <option key={k} value={k}>{specLabel(k)}</option>)}
-                          </select>
+                          </Select>
                         ) : <span className="text-xs text-slate-500">{st.specs.length === 1 ? specLabel(st.specs[0]) : "—"}</span>}
                       </td>
                       <td className="px-3 py-2 text-right">
@@ -266,14 +266,14 @@ function OutboundForm({ lookups, onSaved }) {
                       <td className="px-3 py-2">
                         {st.lots.length > 1 ? (
                           <>
-                            <select className={`${inputCls} ${st.needLot ? "border-amber-400" : ""}`} aria-label="Chọn lô" value={l.lot_code || ""}
+                            <Select className={`${inputCls} ${st.needLot ? "border-amber-400" : ""}`} aria-label="Chọn lô" value={l.lot_code || ""}
                               onChange={e => setLine(l._k, "lot_code", e.target.value)}>
                               <option value="">{st.specRows.some(r => !r.lot_code) ? "(không lô)" : "-- Chọn lô --"}</option>
                               {st.lots.map(lot => {
                                 const free = st.specRows.filter(r => r.lot_code === lot).reduce((s, r) => s + Number(r.available ?? r.quantity ?? 0), 0);
                                 return <option key={lot} value={lot}>{lot} — khả dụng {fmt(free)}</option>;
                               })}
-                            </select>
+                            </Select>
                             <button type="button" onClick={() => addLotLine(l)} className="mt-1 text-xs text-blue-600 hover:underline">+ Thêm lô</button>
                           </>
                         ) : <span className="text-xs text-slate-500">{st.lots[0] || "—"}</span>}

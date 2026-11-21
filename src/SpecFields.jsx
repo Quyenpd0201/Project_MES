@@ -3,6 +3,7 @@
 import React from "react";
 import { inputCls } from "./ui.js";
 import { PRODUCT_SPECS, splitNU } from "./specs.js";
+import { Select } from "./components.jsx"; // ô chọn chuẩn: luôn sổ xuống
 
 export function SpecFields({ specs, onChange, disabled }) {
   const get = (n) => specs?.[n] || "";
@@ -20,9 +21,9 @@ export function SpecFields({ specs, onChange, disabled }) {
         );
         if (spec.kind === "select") return (
           <label key={spec.name}>{lbl}
-            <select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
+            <Select className={cls} disabled={disabled} value={get(spec.name)} onChange={(e) => setV(spec.name, e.target.value)}>
               <option value="">-- Chọn --</option>{spec.options.map((o) => <option key={o}>{o}</option>)}
-            </select>
+            </Select>
           </label>
         );
         if (spec.kind === "num") { const { num } = splitNU(get(spec.name)); return (
@@ -42,10 +43,10 @@ export function SpecFields({ specs, onChange, disabled }) {
             <div className="flex gap-1.5">
               <input type="number" step="any" className={clsFlex + " flex-1 min-w-0 no-spin"} disabled={disabled} value={num} placeholder="0"
                 onChange={(e) => setV(spec.name, e.target.value ? `${e.target.value} ${cu}` : "")} />
-              <select className={clsFlex + " w-[4.5rem] shrink-0 px-2"} disabled={disabled} value={cu}
+              <Select className={clsFlex + " w-[4.5rem] shrink-0 px-2"} disabled={disabled} value={cu}
                 onChange={(e) => setV(spec.name, num ? `${num} ${e.target.value}` : "")}>
                 {spec.units.map((u) => <option key={u}>{u}</option>)}
-              </select>
+              </Select>
             </div>
           </label>
         );

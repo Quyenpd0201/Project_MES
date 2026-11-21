@@ -3,7 +3,7 @@ import {
   Recycle, Plus, Trash2, Save, FileText, Scale, CheckCircle2, 
   ArrowRight, Box, Package, Calendar, User, X
 } from "lucide-react";
-import { ListHeader, DataTable, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
+import { ListHeader, DataTable, DialogBehavior, confirmClose, DateInput, Select } from "../../components.jsx";
 import { recycling, resource } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd, fmtDate, statusClass } from "../../ui.js";
 
@@ -241,10 +241,10 @@ Hoàn thành phiếu?`)) return;
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Kho phế phẩm</label>
-              <select className={inputCls} value={s1.scrap_warehouse_id} onChange={e => setS1({...s1, scrap_warehouse_id: e.target.value})} disabled={isCompleted || ticket}>
+              <Select className={inputCls} value={s1.scrap_warehouse_id} onChange={e => setS1({...s1, scrap_warehouse_id: e.target.value})} disabled={isCompleted || ticket}>
                 <option value="">-- Chọn kho --</option>
                 {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Bên thứ 3 (Đơn vị tái chế)</label>
@@ -367,12 +367,12 @@ Hoàn thành phiếu?`)) return;
 
               <div>
                 <label className="block text-sm font-medium text-slate-600 mb-1">Kho nhập (Kho BTP / NVL)</label>
-                <select className={inputCls} value={s4.import_warehouse_id} onChange={e => setS4({...s4, import_warehouse_id: e.target.value})} disabled={isCompleted || ticket.status !== 'Đang tái chế'}>
+                <Select className={inputCls} value={s4.import_warehouse_id} onChange={e => setS4({...s4, import_warehouse_id: e.target.value})} disabled={isCompleted || ticket.status !== 'Đang tái chế'}>
                   <option value="">-- Chọn kho nhập --</option>
                   {/* Cuộn PE chỉ nhập kho BTP hoặc NVL (backend cũng chặn); phiếu cũ đã chọn kho khác vẫn hiển thị */}
                   {warehouses.filter(w => ['BTP', 'NVL'].includes(w.warehouse_type) || w.id === s4.import_warehouse_id)
                     .map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
           </div>

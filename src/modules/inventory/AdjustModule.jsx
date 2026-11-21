@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Wrench, Save, RefreshCcw, History, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { DataTable, PageHeader, UnitSelect, useRemembered } from "../../components.jsx";
+import { DataTable, PageHeader, UnitSelect, useRemembered, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, toast, fmtDateTime } from "../../ui.js";
@@ -106,24 +106,24 @@ function AdjustForm({ lookups, onSaved }) {
       <div className="p-5 space-y-5">
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Field label="Sản phẩm" required>
-            <select className={inputCls} value={form.product_id} onChange={e => onProductChange(e.target.value)}>
+            <Select className={inputCls} value={form.product_id} onChange={e => onProductChange(e.target.value)}>
               <option value="">-- Chọn sản phẩm --</option>
               {(lookups.products || []).map(p => (
                 <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Field label="Kho / Vị trí" required>
-            <select className={inputCls} value={form.location_id}
+            <Select className={inputCls} value={form.location_id}
               onChange={e => setForm(s => ({ ...s, location_id: e.target.value, line: "", actual_qty: "" }))}>
               <option value="">-- Chọn kho/vị trí --</option>
               {(lookups.locations || []).map(l => (
                 <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Field label="Dòng tồn (thông số · lô)" required>
-            <select className={inputCls} value={form.line} disabled={!form.product_id || !form.location_id || !rows}
+            <Select className={inputCls} value={form.line} disabled={!form.product_id || !form.location_id || !rows}
               onChange={e => setForm(s => ({ ...s, line: e.target.value, actual_qty: "" }))}>
               <option value="">{!form.product_id || !form.location_id ? "-- Chọn SP và vị trí trước --" : !rows ? "Đang tải…" : "-- Chọn dòng tồn --"}</option>
               {locLines.map(r => (
@@ -132,7 +132,7 @@ function AdjustForm({ lookups, onSaved }) {
                 </option>
               ))}
               <option value={NEW_LINE}>+ Dòng mới (vị trí này chưa có tồn)</option>
-            </select>
+            </Select>
             {form.line === NEW_LINE && (
               <input className={inputCls + " mt-2"} placeholder="Mã lô (nếu có)" value={form.new_lot}
                 onChange={e => set("new_lot", e.target.value)} />
@@ -188,9 +188,9 @@ function AdjustForm({ lookups, onSaved }) {
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Lý do điều chỉnh" required>
-            <select className={inputCls} value={form.reason} onChange={e => set("reason", e.target.value)}>
+            <Select className={inputCls} value={form.reason} onChange={e => set("reason", e.target.value)}>
               {ADJUST_REASONS.map(r => <option key={r}>{r}</option>)}
-            </select>
+            </Select>
           </Field>
           <div className="flex items-end gap-3">
             <Field label="Đơn vị">

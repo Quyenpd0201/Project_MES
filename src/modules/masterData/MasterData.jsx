@@ -4,7 +4,7 @@ import { RotateCcw, Plus, Trash2, Pencil, Save, Upload, Download, FileDown } fro
 import * as XLSX from "xlsx";
 import { resource, customerOrders, machineOrders, nextCode } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, DataTable, PageHeader, Section, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, useSaving, Select } from "../../components.jsx";
 import {  inputCls, statusClass, fmt, fmtDate , toast } from "../../ui.js";
 
 const isObjOptions = (f) => f.type === "select" && f.options && typeof f.options[0] === "object";
@@ -106,13 +106,13 @@ function RecordForm({ cfg, record, onBack, onSaved, onOpenOrder, onOpenProductio
                           <span className="text-sm font-medium text-slate-700">{fl.checkboxLabel || fl.label}</span>
                         </label>
                       ) : fl.type === "select" ? (
-                        <select className={inputCls} value={f[fl.key] ?? ""} onChange={(e) => set(fl.key, e.target.value)}>
+                        <Select className={inputCls} value={f[fl.key] ?? ""} onChange={(e) => set(fl.key, e.target.value)}>
                           <option value="">-- Chọn --</option>
                           {(typeof fl.options === 'function' ? fl.options(f) : fl.options).map((o) =>
                             typeof o === "string"
                               ? <option key={o} value={o}>{o}</option>
                               : <option key={o.value} value={o.value}>{o.label}</option>)}
-                        </select>
+                        </Select>
                       ) : (
                         <input type={fl.type || "text"} className={inputCls} value={f[fl.key] ?? ""}
                           onChange={(e) => set(fl.key, e.target.value)} placeholder={fl.placeholder || ""} />

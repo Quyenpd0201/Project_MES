@@ -104,6 +104,40 @@ export function SearchSelect({ value, onChange, options = [], placeholder = "-- 
 }
 
 /**
+ * Quy tắc chung (11/2026): MỌI ô chọn trong hệ thống dùng <Select> thay cho <Select> của trình duyệt.
+ * Viết y như <Select><option/>…</Select> (value, onChange(e) với e.target.value, disabled, className,
+ * <option disabled>, <optgroup label>) nhưng hiển thị bằng SearchSelect: luôn sổ xuống, có ô tìm.
+ */
+const _text = (n) => (n == null || typeof n === "boolean" ? "" : Array.isArray(n) ? n.map(_text).join("")
+  : typeof n === "object" ? _text(n.props?.children) : String(n));
+function _collect(node, out, group) {
+  if (node == null || typeof node === "boolean") return;
+  if (Array.isArray(node)) { node.forEach((c) => _collect(c, out, group)); return; }
+  if (typeof node !== "object") return;
+  if (node.type === "option") {
+    const label = _text(node.props.children);
+    out.push({ value: String(node.props.value ?? label), label, disabled: !!node.props.disabled });
+  } else if (node.type === "optgroup") {
+    out.push({ value: `__group_${out.length}`, label: `── ${node.props.label} ──`, disabled: true });
+    _collect(node.props.children, out, node.props.label);
+  } else {
+    _collect(node.props?.children, out, group); // Fragment / bọc khác
+  }
+}
+export function Select({ value, onChange, disabled, className, children, "aria-label": ariaLabel, title, placeholder }) {
+  const options = [];
+  _collect(children, options);
+  const v = value == null ? "" : String(value);
+  const ph = placeholder ?? (options.find((o) => o.value === "")?.label || "-- Chọn --");
+  return (
+    <span className="contents" title={title}>
+      <SearchSelect value={v} disabled={disabled} className={className} ariaLabel={ariaLabel} placeholder={ph} options={options}
+        onChange={(nv) => onChange?.({ target: { value: nv }, currentTarget: { value: nv } })} />
+    </span>
+  );
+}
+
+/**
  * Dropdown chọn Đơn vị tính (thay ô nhập tự do). Luôn giữ giá trị cũ ngoài danh mục
  * (vd dữ liệu cũ) để không mất dữ liệu.
  */
@@ -124,10 +158,10 @@ export function UnitSelect({ value, onChange, disabled = false, className }) {
   const v = (value || "").trim().toUpperCase();
   const opts = v && !UNITS.includes(v) ? [v, ...UNITS] : UNITS;
   return (
-    <select className={className || inputCls} disabled={disabled} value={v} onChange={(e) => onChange(e.target.value)}>
+    <Select className={className || inputCls} disabled={disabled} value={v} onChange={(e) => onChange(e.target.value)}>
       <option value="">-- Đơn vị --</option>
       {opts.map((u) => <option key={u} value={u}>{u}</option>)}
-    </select>
+    </Select>
   );
 }
 
@@ -235,10 +269,10 @@ export function Pagination({ total, page, size, pageCount, start, onPage, onSize
     <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
       <div className="flex items-center gap-2 text-sm text-slate-500">
         <span>Hiển thị</span>
-        <select value={size} onChange={(e) => onSize(+e.target.value)} aria-label="Số dòng mỗi trang"
+        <Select value={size} onChange={(e) => onSize(+e.target.value)} aria-label="Số dòng mỗi trang"
           className="rounded-md border border-slate-300 px-2 py-1 text-sm">
           {sizes.map((n) => <option key={n} value={n}>{n}</option>)}
-        </select>
+        </Select>
         <span>dòng · {from}–{to} / {total}</span>
       </div>
       <div className="flex items-center gap-1">

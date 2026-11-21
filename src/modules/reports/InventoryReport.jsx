@@ -9,7 +9,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
 } from "recharts";
-import { ListHeader, Section } from "../../components.jsx";
+import { ListHeader, Section, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { fmt, fmtDate, toast, todayYmd, fmtDateTime } from "../../ui.js";
 import * as XLSX from "xlsx";
@@ -326,7 +326,7 @@ function InventoryReportBody({ lookups }) {
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Khoảng thời gian giao dịch</label>
-          <select
+          <Select
             className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             value={days} onChange={e => setDays(e.target.value)}
           >
@@ -334,16 +334,16 @@ function InventoryReportBody({ lookups }) {
             <option value="14">14 ngày qua</option>
             <option value="30">30 ngày qua</option>
             <option value="90">90 ngày qua</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Đơn vị (biểu đồ, nhập – xuất)</label>
-          <select
+          <Select
             className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             value={unit} onChange={e => setUnitSel(e.target.value)}
           >
             {units.map(u => <option key={u} value={u}>{u}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="text-xs text-slate-400 self-end pb-1.5 ml-auto">
           {loading ? "Đang tải…" : `${filteredStock.length} sản phẩm · ${recentTxns.length} giao dịch`}

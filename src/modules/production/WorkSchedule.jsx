@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAppSettings } from "../../appSettings.js";
 import { ChevronLeft, ChevronRight, RotateCcw, Pencil, Check, X } from "lucide-react";
-import { ListHeader, useSaving } from "../../components.jsx";
+import { ListHeader, useSaving, Select } from "../../components.jsx";
 import { workSchedules } from "../../mesApi.js";
 import {  inputCls , toast } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -175,12 +175,12 @@ Chuyển tuần?`)) return;
 
                       return (
                         <td key={dy} className="px-1.5 py-1.5 border-r border-slate-100">
-                          <select value={val} onChange={(ev) => handleChange(e.id, dy, ev.target.value)}
+                          <Select value={val} onChange={(ev) => handleChange(e.id, dy, ev.target.value)}
                             disabled={!isEditing || isLocked}
                             className={`${inputCls} px-1.5 py-1 text-xs ${val ? "bg-blue-50 border-blue-200 text-blue-700 font-medium" : "text-slate-400"} ${(!isEditing || isLocked) ? "opacity-60 cursor-not-allowed bg-slate-100" : ""}`}>
                             <option value="">—</option>
                             {shiftList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                          </select>
+                          </Select>
                         </td>
                       );
                     })}

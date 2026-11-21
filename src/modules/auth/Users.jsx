@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { RotateCcw, Plus, Pencil, Trash2, Save } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, useSaving } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, useSaving, Select } from "../../components.jsx";
 import { users, roles } from "../../mesApi.js";
 import {  inputCls, statusClass , toast } from "../../ui.js";
 
@@ -33,25 +33,25 @@ function UserForm({ record, roleList, teams, employees, onBack, onSaved }) {
           </F>
           <F label="Họ và tên"><input className={inputCls} value={f.full_name} onChange={(e) => set("full_name", e.target.value)} /></F>
           <F label="Vai trò">
-            <select className={inputCls} value={f.role_id} onChange={(e) => set("role_id", e.target.value)}>
+            <Select className={inputCls} value={f.role_id} onChange={(e) => set("role_id", e.target.value)}>
               <option value="">-- Chọn --</option>
               {roleList.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
+            </Select>
           </F>
           <F label="Trạng thái">
-            <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></select>
+            <Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></Select>
           </F>
           <F label="Đội (giới hạn xem ở màn Thực thi)">
-            <select className={inputCls} value={f.team} onChange={(e) => set("team", e.target.value)}>
+            <Select className={inputCls} value={f.team} onChange={(e) => set("team", e.target.value)}>
               <option value="">-- Không giới hạn (xem tất cả) --</option>
               {(teams || []).map((t) => <option key={t}>{t}</option>)}
-            </select>
+            </Select>
           </F>
           <F label="Liên kết với công nhân (Báo cáo)">
-            <select className={inputCls} value={f.linked_worker} onChange={(e) => set("linked_worker", e.target.value)}>
+            <Select className={inputCls} value={f.linked_worker} onChange={(e) => set("linked_worker", e.target.value)}>
               <option value="">-- Không giới hạn --</option>
               {(employees || []).map((emp) => <option key={emp.name} value={emp.name}>{emp.name}</option>)}
-            </select>
+            </Select>
           </F>
         </div>
       </Section>

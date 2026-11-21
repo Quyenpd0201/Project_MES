@@ -3,7 +3,7 @@ import { RotateCcw, Plus, Trash2, Pencil, ArrowLeft, Save, FlaskConical, Copy, G
 import { resource } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving, Select } from "../../components.jsx";
 
 const bomApi = resource("boms");
 const procApi = resource("processes");
@@ -124,16 +124,16 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
       <Section title="Thông tin chung">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           {!fhid("product_id") && <Field label="Sản phẩm đầu ra" required>
-            <select className={inputCls} disabled={fdis("product_id")} value={f.product_id}
+            <Select className={inputCls} disabled={fdis("product_id")} value={f.product_id}
               onChange={(e) => { const id = e.target.value; const p = lookups.products.find((pp) => pp.id === id); setF((s) => ({ ...s, product_id: id, output_unit: p?.unit || s.output_unit })); }}>
               <option value="">-- Chọn TP / BTP --</option>
               {outputs.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-            </select>
+            </Select>
           </Field>}
           {!fhid("bom_type") && <Field label="Loại định mức" required>
-            <select className={inputCls} disabled={fdis("bom_type")} value={f.bom_type} onChange={(e) => set("bom_type", e.target.value)}>
+            <Select className={inputCls} disabled={fdis("bom_type")} value={f.bom_type} onChange={(e) => set("bom_type", e.target.value)}>
               {BOM_TYPES.map((t) => <option key={t}>{t}</option>)}
-            </select>
+            </Select>
           </Field>}
           {!fhid("name") && <Field label="Tên định mức" required>
             <input className={inputCls} disabled={fdis("name")} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="vd: Công thức pha màu Trắng sữa" />
@@ -143,16 +143,16 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
             <Field label="Đơn vị"><UnitSelect value={f.output_unit} onChange={(v) => set("output_unit", v)} /></Field>
           </div>
           <Field label="Trạng thái">
-            <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+            <Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
               <option>Hoạt động</option><option>Không hoạt động</option>
-            </select>
+            </Select>
           </Field>
           <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
           <Field label={<span className="inline-flex items-center gap-1.5"><GitBranch size={14} className="text-blue-500" /> Gắn Quy trình CN</span>}>
-            <select className={inputCls} value={f.process_id} onChange={(e) => set("process_id", e.target.value)}>
+            <Select className={inputCls} value={f.process_id} onChange={(e) => set("process_id", e.target.value)}>
               <option value="">-- Không gắn (nhập tay) --</option>
               {procList.map((p) => <option key={p.id} value={p.id}>{p.process_code} · {p.name}</option>)}
-            </select>
+            </Select>
           </Field>
         </div>
       </Section>
@@ -177,10 +177,10 @@ function BomForm({ lookups, editId, copyId, onBack, onSaved }) {
             {lines.map((l) => (
               <tr key={l._k}>
                 <td className="py-1.5 pr-2">
-                  <select className={inputCls} value={l.material_id} onChange={(e) => upLine(l._k, "material_id", e.target.value)}>
+                  <Select className={inputCls} value={l.material_id} onChange={(e) => upLine(l._k, "material_id", e.target.value)}>
                     <option value="">-- Chọn NVL/BTP --</option>
                     {materials.map((m) => <option key={m.id} value={m.id}>{m.product_code} · {m.product_name}</option>)}
-                  </select>
+                  </Select>
                 </td>
                 <td className="py-1.5 pr-2"><input type="number" min="0" className={inputCls} value={l.quantity} onChange={(e) => upLine(l._k, "quantity", e.target.value)} /></td>
                 <td className="py-1.5 pr-2"><UnitSelect value={l.unit} onChange={(v) => upLine(l._k, "unit", v)} /></td>

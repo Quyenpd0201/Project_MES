@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { RotateCcw, ChevronRight } from "lucide-react";
-import { ListHeader, DataTable, LoadError, usePager, useRemembered } from "../../components.jsx";
+import { ListHeader, DataTable, LoadError, usePager, useRemembered, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { inputCls, fmt, fmtDate, statusClass, toast, fmtDateTime } from "../../ui.js";
 import { specShort } from "../../specs.js";
@@ -439,18 +439,18 @@ function TreeTab({ lookups, viewMode, reloadKey }) {
     <div className="space-y-4">
       <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
         <input aria-label="Tìm sản phẩm hoặc lô" className={`${inputCls} basis-full md:basis-auto flex-1 min-w-0 w-auto`} placeholder="Tìm SP / Lô…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select aria-label="Lọc theo kho" className={selectCls} value={filterWh} onChange={e => { setFilterWh(e.target.value); setFilterZone(""); }}>
+        <Select aria-label="Lọc theo kho" className={selectCls} value={filterWh} onChange={e => { setFilterWh(e.target.value); setFilterZone(""); }}>
           <option value="">Kho: Tất cả</option>
           {(lookups.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-        </select>
-        <select aria-label="Lọc theo khu" className={selectCls} value={filterZone} onChange={e => setFilterZone(e.target.value)}>
+        </Select>
+        <Select aria-label="Lọc theo khu" className={selectCls} value={filterZone} onChange={e => setFilterZone(e.target.value)}>
           <option value="">Khu: Tất cả</option>
           {zonesList.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
-        </select>
-        <select aria-label="Lọc theo loại sản phẩm" className={selectCls} value={filterType} onChange={e => setFilterType(e.target.value)}>
+        </Select>
+        <Select aria-label="Lọc theo loại sản phẩm" className={selectCls} value={filterType} onChange={e => setFilterType(e.target.value)}>
           <option value="">Loại: Tất cả</option>
           {typeOptions.map((t) => <option key={t}>{t}</option>)}
-        </select>
+        </Select>
         <label className="flex items-center gap-1.5 text-sm text-slate-600 cursor-pointer whitespace-nowrap">
           <input type="checkbox" checked={showZero} onChange={(e) => setShowZero(e.target.checked)} className="w-4 h-4 accent-slate-500" />
           Hiện lô 0

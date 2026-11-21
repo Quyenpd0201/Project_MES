@@ -9,7 +9,7 @@ const ordersApi = resource("sales-orders");
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast, todayYmd } from "../../ui.js";
 import { specShort, specKeyLabel } from "../../specs.js";
-import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose, DateInput, LsxProgressChip } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, Logo, UnitSelect, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose, DateInput, LsxProgressChip, Select } from "../../components.jsx";
 
 // Bảng chuyển trạng thái (khớp backend). "Giao hàng" chỉ đặt qua nút Giao hàng (trừ tồn).
 // Bản nháp chỉ được Hủy; sau khi đã giao không cho Hủy — hàng trả lại dùng nút "Khách trả hàng" (nhập lại kho).
@@ -147,11 +147,11 @@ function ReturnModal({ id, noteCode, lookups, onClose, onSaved }) {
                     <td className="px-3 py-2"><input type="number" min="0" step="any" disabled={left(l) <= 0} className={inputCls + " text-right no-spin"}
                       value={qty[l.trx_id] ?? ""} placeholder={left(l) > 0 ? `≤ ${fmt(left(l))}` : "đã trả hết"}
                       onChange={(e) => setQty((s) => ({ ...s, [l.trx_id]: e.target.value }))} /></td>
-                    <td className="px-3 py-2"><select className={inputCls} value={loc[l.trx_id] || ""} disabled={left(l) <= 0}
+                    <td className="px-3 py-2"><Select className={inputCls} value={loc[l.trx_id] || ""} disabled={left(l) <= 0}
                       onChange={(e) => setLoc((s) => ({ ...s, [l.trx_id]: e.target.value }))}>
                       <option value="">-- Chọn vị trí --</option>
                       {(lookups.locations || []).map((x) => <option key={x.id} value={x.id}>{x.warehouse_name} · {x.name}</option>)}
-                    </select></td>
+                    </Select></td>
                   </tr>
                 ))}
               </tbody>
@@ -511,10 +511,10 @@ function DeliveryForm({ lookups, editId, initialOrderId, onBack, onSaved, onPrin
               />
             </Field>
             <Field label="Trạng thái">
-              <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+              <Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
                 <option value={f.status}>{f.status}{["Bản nháp", "Giao hàng"].includes(f.status) ? " (hệ thống)" : ""}</option>
                 {(DN_TRANSITIONS[f.status] || []).map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+              </Select>
             </Field>
             {/* Ngày giao chốt = ngày bấm "Giao hàng" → sau đó khóa; không chọn ngày tương lai */}
             <Field label="Ngày giao"><DateInput className={inputCls} value={f.delivery_date} max={today()} disabled={!isDraft}

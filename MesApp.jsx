@@ -53,7 +53,7 @@ import EmployeeReport from "./src/modules/reports/EmployeeReport.jsx";
 import OutputReport from "./src/modules/production/OutputReport.jsx";
 import ScrapModule from "./src/modules/production/ScrapModule.jsx";
 import RecyclingModule from "./src/modules/production/RecyclingModule.jsx";
-import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect, useSaving, LoadError } from "./src/components.jsx";
+import { PageHeader, Section, ListHeader, usePager, DataTable, Logo, UnitSelect, useSaving, LoadError, Select } from "./src/components.jsx";
 
 /* =====================================================================
    MES — Quản lý Sản phẩm & Dashboard (single-file demo)
@@ -540,9 +540,9 @@ function ProductFields({ form, set, disabled, code }) {
               onChange={(v) => set("product_types", v)} />
           </Field>}
           {!hid("production_area") && <Field label="Khu vực sản xuất">
-            <select className={cls("production_area")} disabled={dis("production_area")} value={form.production_area || ""} onChange={(e) => set("production_area", e.target.value)}>
+            <Select className={cls("production_area")} disabled={dis("production_area")} value={form.production_area || ""} onChange={(e) => set("production_area", e.target.value)}>
               <option value="">-- Chọn --</option>{AREAS.map((a) => <option key={a}>{a}</option>)}
-            </select>
+            </Select>
           </Field>}
           {!hid("unit") && <Field label="Đơn vị tính">
             <UnitSelect value={form.unit || ""} disabled={dis("unit")} onChange={(v) => set("unit", v)} />
@@ -558,14 +558,14 @@ function ProductFields({ form, set, disabled, code }) {
 
           {/* Hàng 4: theo dõi / mã vạch */}
           {!hid("tracking_type") && <Field label="Hình thức theo dõi">
-            <select className={cls("tracking_type")} disabled={dis("tracking_type")} value={form.tracking_type || ""} onChange={(e) => set("tracking_type", e.target.value)}>
+            <Select className={cls("tracking_type")} disabled={dis("tracking_type")} value={form.tracking_type || ""} onChange={(e) => set("tracking_type", e.target.value)}>
               <option>Theo lô</option><option>Theo serial</option>
-            </select>
+            </Select>
           </Field>}
           {!hid("barcode_type") && <Field label="Loại mã vạch">
-            <select className={cls("barcode_type")} disabled={dis("barcode_type")} value={form.barcode_type || ""} onChange={(e) => set("barcode_type", e.target.value)}>
+            <Select className={cls("barcode_type")} disabled={dis("barcode_type")} value={form.barcode_type || ""} onChange={(e) => set("barcode_type", e.target.value)}>
               <option value="">-- Chọn --</option><option>CODE128</option><option>QR</option><option>EAN13</option>
-            </select>
+            </Select>
           </Field>}
           <div className="flex items-end gap-6">
             {!hid("is_pqc_required") && <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -605,10 +605,10 @@ function WarehouseLimitsList({ limits, setLimits, lookups, disabled, productUnit
             <div key={l._key || l.warehouse_id} className="flex flex-wrap items-center gap-4 attr-row p-3 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="flex-1 min-w-[200px]">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Kho chứa</label>
-                <select className={inputCls} disabled={disabled} value={l.warehouse_id || ""} onChange={(e) => updateLimit(l._key, "warehouse_id", e.target.value)}>
+                <Select className={inputCls} disabled={disabled} value={l.warehouse_id || ""} onChange={(e) => updateLimit(l._key, "warehouse_id", e.target.value)}>
                   <option value="">-- Chọn Kho --</option>
                   {(lookups?.warehouses || []).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
+                </Select>
               </div>
               <div className="w-32">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Tồn tối thiểu</label>

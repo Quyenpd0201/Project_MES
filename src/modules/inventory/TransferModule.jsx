@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { RotateCcw, Save, RefreshCcw, History, ArrowRight } from "lucide-react";
-import { DataTable, PageHeader, UnitSelect, useRemembered } from "../../components.jsx";
+import { DataTable, PageHeader, UnitSelect, useRemembered, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, toast, fmtDateTime } from "../../ui.js";
@@ -123,12 +123,12 @@ function TransferForm({ lookups, onSaved }) {
         {/* Product & qty */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Field label="Sản phẩm" required>
-            <select className={inputCls} value={form.product_id} onChange={e => onProductChange(e.target.value)}>
+            <Select className={inputCls} value={form.product_id} onChange={e => onProductChange(e.target.value)}>
               <option value="">-- Chọn sản phẩm --</option>
               {(lookups.products || []).map(p => (
                 <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>
               ))}
-            </select>
+            </Select>
           </Field>
           <Field label="Tồn kho hiện tại">
             <div className={`${inputCls} flex items-center bg-slate-50 text-slate-600 cursor-default`}>
@@ -150,13 +150,13 @@ function TransferForm({ lookups, onSaved }) {
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <Field label="Kho / Vị trí nguồn" required>
-                <select className={inputCls} value={form.from_location_id}
+                <Select className={inputCls} value={form.from_location_id}
                   onChange={e => setForm(s => ({ ...s, from_location_id: e.target.value, spec_key: "" }))}>
                   <option value="">-- Kho xuất hàng --</option>
                   {fromLocationsToShow.map(l => (
                     <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
               {fromLoc && <div className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-rose-400" />
@@ -171,12 +171,12 @@ function TransferForm({ lookups, onSaved }) {
 
             <div className="flex-1">
               <Field label="Kho / Vị trí đích" required>
-                <select className={inputCls} value={form.to_location_id} onChange={e => set("to_location_id", e.target.value)}>
+                <Select className={inputCls} value={form.to_location_id} onChange={e => set("to_location_id", e.target.value)}>
                   <option value="">-- Kho nhận hàng --</option>
                   {(lookups.locations || []).filter(l => l.id !== form.from_location_id).map(l => (
                     <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
                   ))}
-                </select>
+                </Select>
               </Field>
               {toLoc && <div className="mt-1.5 flex items-center gap-1.5 text-sm text-slate-600">
                 <span className="w-2 h-2 rounded-full bg-emerald-400" />
@@ -189,23 +189,23 @@ function TransferForm({ lookups, onSaved }) {
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <Field label="Thông số">
             {specOptions.length > 1 ? (
-              <select className={`${inputCls} ${!spec ? "border-amber-400" : ""}`} value={form.spec_key} onChange={e => set("spec_key", e.target.value)}>
+              <Select className={`${inputCls} ${!spec ? "border-amber-400" : ""}`} value={form.spec_key} onChange={e => set("spec_key", e.target.value)}>
                 <option value="">-- Chọn thông số --</option>
                 {specOptions.map(k => <option key={k} value={k}>{specLabel(k)}</option>)}
-              </select>
+              </Select>
             ) : (
               <div className={`${inputCls} bg-slate-50 text-slate-500`}>{specOptions.length === 1 ? specLabel(specOptions[0]) : "—"}</div>
             )}
           </Field>
           <Field label={lotOptions.length > 1 ? "Số lô *" : "Số lô"}>
             {lotOptions.length > 1 ? (
-              <select className={`${inputCls} ${needLot ? "border-amber-400" : ""}`} value={lot} onChange={e => set("lot_code", e.target.value)}>
+              <Select className={`${inputCls} ${needLot ? "border-amber-400" : ""}`} value={lot} onChange={e => set("lot_code", e.target.value)}>
                 <option value="">{hasNoLot ? "(không lô)" : "-- Chọn lô --"}</option>
                 {lotOptions.map(x => {
                   const qty = specRows.filter(r => r.lot_code === x).reduce((sum, r) => sum + Number(r.quantity || 0), 0);
                   return <option key={x} value={x}>{x} — tồn {fmt(qty)}</option>;
                 })}
-              </select>
+              </Select>
             ) : <div className={`${inputCls} bg-slate-50 text-slate-500`}>{lotOptions[0] || "—"}</div>}
           </Field>
           <Field label="Ghi chú">

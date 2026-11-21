@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Plus, Edit, Trash2, Users, AlertCircle, Search, RotateCcw, Save } from "lucide-react";
-import { ListHeader, DataTable, Section, useSaving, useRemembered, DialogBehavior, confirmClose } from "../../components.jsx";
+import { ListHeader, DataTable, Section, useSaving, useRemembered, DialogBehavior, confirmClose, Select } from "../../components.jsx";
 import { roles, users } from "../../mesApi.js";
 import { toast, inputCls, statusClass } from "../../ui.js";
 import { PermissionEditor } from "./PermissionEditor.jsx";
@@ -52,10 +52,10 @@ function RoleForm({ record, onBack, onSaved }) {
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Trạng thái</label>
-          <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+          <Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
             <option>Hoạt động</option>
             <option>Không hoạt động</option>
-          </select>
+          </Select>
         </div>
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>

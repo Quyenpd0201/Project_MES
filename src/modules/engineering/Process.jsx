@@ -4,7 +4,7 @@ import { processes, resource } from "../../mesApi.js";
 
 const bomApi = resource("boms");
 import {  inputCls, fmt, statusClass , toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, useSaving, Select } from "../../components.jsx";
 import { usePerm } from "../../perm.jsx";
 
 const procApi = processes;
@@ -174,18 +174,18 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
             <Field label="Tên quy trình" required><input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="vd: Quy trình túi HD" /></Field>
             <Field label="Thành phẩm cuối">
-              <select className={inputCls} value={f.product_id} onChange={(e) => set("product_id", e.target.value)}>
+              <Select className={inputCls} value={f.product_id} onChange={(e) => set("product_id", e.target.value)}>
                 <option value="">-- Chọn --</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-              </select>
+              </Select>
             </Field>
-            <Field label="Trạng thái"><select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></select></Field>
+            <Field label="Trạng thái"><Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Hoạt động</option><option>Không hoạt động</option></Select></Field>
             <Field label="Ghi chú"><input className={inputCls} value={f.note} onChange={(e) => set("note", e.target.value)} /></Field>
             <Field label={<span className="inline-flex items-center gap-1.5"><GitBranch size={14} className="text-blue-500" /> Gắn Định mức (BOM)</span>}>
-              <select className={inputCls} value={f.linked_bom_id} onChange={(e) => set("linked_bom_id", e.target.value)}>
+              <Select className={inputCls} value={f.linked_bom_id} onChange={(e) => set("linked_bom_id", e.target.value)}>
                 <option value="">-- Không gắn --</option>
                 {bomList.map((bm) => <option key={bm.id} value={bm.id}>{bm.bom_code} · {bm.name}</option>)}
-              </select>
+              </Select>
               <div className="text-[11px] text-slate-400 mt-1">NVL + số lượng của các bước sẽ ghi vào định mức này (định mức thành chỉ-xem).</div>
             </Field>
           </div>
@@ -216,7 +216,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                     <div className="md:col-span-5">
                       <Field label="Máy thực hiện (có thể chọn nhiều)">
                         <div className="flex flex-col gap-2">
-                          <select className={inputCls} value="" onChange={(e) => {
+                          <Select className={inputCls} value="" onChange={(e) => {
                             if (!e.target.value) return;
                             const v = e.target.value;
                             let curr = s.machine_ids || [];
@@ -230,7 +230,7 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                                 {m.factory ? `[${m.factory}] ` : ""}{m.name}{m.machine_type ? ` · ${m.machine_type}` : ""}
                               </option>
                             ))}
-                          </select>
+                          </Select>
                           <div className="flex flex-wrap gap-1.5">
                             {!(s.machine_ids && s.machine_ids.length > 0) ? (
                               <span className="text-slate-400 text-[13px] py-1">Chưa chọn máy nào</span>
@@ -265,10 +265,10 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                           {s.inputs.map((it, idx) => (
                             <tr key={idx}>
                               <td className="px-3 py-1.5">
-                                <select className={inputCls} value={it.material_id} onChange={(e) => upInput(s._k, idx, "material_id", e.target.value)}>
+                                <Select className={inputCls} value={it.material_id} onChange={(e) => upInput(s._k, idx, "material_id", e.target.value)}>
                                   <option value="">-- Chọn NVL/BTP --</option>
                                   {products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-                                </select>
+                                </Select>
                               </td>
                               <td className="px-3 py-1.5"><input type="number" min="0" className={inputCls + " text-right"} value={it.quantity} onChange={(e) => upInput(s._k, idx, "quantity", e.target.value)} /></td>
                               <td className="px-3 py-1.5"><UnitSelect value={it.unit} onChange={(v) => upInput(s._k, idx, "unit", v)} /></td>
@@ -286,10 +286,10 @@ function ProcessForm({ lookups, editId, copyId, onBack, onSaved }) {
                     <div className="text-sm font-medium text-slate-600 mb-2">TP / BTP đầu ra</div>
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                       <div className="col-span-2 md:col-span-2"><Field label="Sản phẩm đầu ra">
-                        <select className={inputCls} value={s.output_product_id} onChange={(e) => upStep(s._k, "output_product_id", e.target.value)}>
+                        <Select className={inputCls} value={s.output_product_id} onChange={(e) => upStep(s._k, "output_product_id", e.target.value)}>
                           <option value="">-- Chọn --</option>
                           {products.map((p) => <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>)}
-                        </select>
+                        </Select>
                       </Field></div>
                       <Field label="SL đầu ra ước tính"><input type="number" min="0" className={inputCls} value={s.output_quantity} placeholder="0" onChange={(e) => upStep(s._k, "output_quantity", e.target.value)} /></Field>
                       <Field label="Đơn vị"><UnitSelect value={s.output_unit} onChange={(v) => upStep(s._k, "output_unit", v)} /></Field>

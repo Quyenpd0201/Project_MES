@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Save, RotateCcw, Factory, CalendarClock, Package, Boxes, AlertTriangle, Play, Pause, CheckCircle2 } from "lucide-react";
 import { production } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, useRemembered, LoadError, DialogBehavior, confirmClose } from "../../components.jsx";
+import { ListHeader, useRemembered, LoadError, DialogBehavior, confirmClose, Select } from "../../components.jsx";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
 
 /* ---- Modal: NVL thực tế sử dụng (gợi ý từ BOM) → trừ tồn kho ---- */
@@ -259,19 +259,19 @@ export default function ExecutionModule({ lookups }) {
           {lockedTeam ? (
             <div className={inputCls + " bg-slate-100 text-slate-600 flex items-center"}>Đội: <b className="ml-1">{lockedTeam}</b></div>
           ) : (
-            <select className={inputCls} value={filters.team} onChange={(e) => setTeam(e.target.value)}>
+            <Select className={inputCls} value={filters.team} onChange={(e) => setTeam(e.target.value)}>
               <option value="">Đội: tất cả</option>
               {teams.map((t) => <option key={t} value={t}>Đội: {t}</option>)}
-            </select>
+            </Select>
           )}
-          <select className={inputCls} value={filters.worker} onChange={(e) => setFilters({ ...filters, worker: e.target.value })}>
+          <Select className={inputCls} value={filters.worker} onChange={(e) => setFilters({ ...filters, worker: e.target.value })}>
             <option value="">Công nhân: tất cả</option>
             {workers.map((e) => <option key={e.id} value={e.name}>{e.name}</option>)}
-          </select>
-          <select className={inputCls} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          </Select>
+          <Select className={inputCls} value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
             <option value="">Trạng thái: tất cả</option>
             {TASK_STATUSES.map((s) => <option key={s}>{s}</option>)}
-          </select>
+          </Select>
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Factory size={16} /> <b className="text-slate-800">{todo}</b> việc cần làm / {rows.length} tổng

@@ -4,7 +4,7 @@ import {
   BarChart2, FileText, CheckCircle2, TrendingUp, TrendingDown,
   RefreshCcw, ChevronDown, ChevronRight
 } from "lucide-react";
-import { PageHeader, DataTable, useRemembered, DateInput } from "../../components.jsx";
+import { PageHeader, DataTable, useRemembered, DateInput, Select } from "../../components.jsx";
 import { scrap } from "../../mesApi.js";
 import { inputCls, fmt, toast, todayYmd, fmtDate, fmtDateTime, fmtDec } from "../../ui.js";
 import { usePerm } from "../../perm.jsx";
@@ -637,13 +637,13 @@ export default function ScrapModule({ onOpenOrder }) {
             <label className="block text-sm font-bold text-blue-900 uppercase tracking-wider mb-2">Công nhân thực hiện</label>
             <div className="relative">
               <Users className="absolute left-3 top-2.5 text-blue-500" size={18} />
-              <select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"}
+              <Select className={inputCls + " pl-10 border-blue-200 focus:border-blue-500 focus:ring-blue-500 font-medium"}
                 value={worker} onChange={e => setWorker(e.target.value)}>
                 <option value="">-- Vui lòng chọn công nhân --</option>
                 {workerList.map(w => (
                   <option key={w.id} value={w.id}>{w.employee_code ? `${w.employee_code} · ` : ""}{w.name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
             {workerList.length === 0 && (
               <p className="text-xs text-rose-500 mt-2 flex items-center gap-1">Chưa có công nhân nào phát sinh dữ liệu gần đây.</p>

@@ -5,7 +5,7 @@ import {
   Package, Factory, LayoutDashboard, Calendar, Check, RotateCcw,
   BarChart2, Settings, Save, ArrowLeft, Recycle, Lock, CheckCircle2, GitBranch, UserCheck, MapPin, Clock // [HR-G1] Clock
 } from "lucide-react";
-import { ListHeader, useSaving, DialogBehavior, confirmClose } from "../../components.jsx";
+import { ListHeader, useSaving, DialogBehavior, confirmClose, Select } from "../../components.jsx";
 import { roles } from "../../mesApi.js";
 import { toast } from "../../ui.js";
 
@@ -492,7 +492,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                         })}
                                       </div>
                                       {(actVal?.scope === "FACTORY" || actVal?.scope === "WAREHOUSE") && (
-                                        <select
+                                        <Select
                                           className="mt-2 w-full text-xs border border-slate-200 rounded px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 outline-none"
                                           value={actVal?.scopeValue || ""}
                                           onChange={e => handleChangeScope(mod.key, actKey, "scopeValue", e.target.value)}
@@ -510,7 +510,7 @@ function PermTreeEditor({ draft, setDraft, searchQuery = "", inheritedPerms = {}
                                               <option value="Kho Phế liệu">Kho Phế liệu</option>
                                             </>
                                           )}
-                                        </select>
+                                        </Select>
                                       )}
                                     </div>
                                   )}
@@ -891,17 +891,17 @@ export default function PermissionsModule() {
         <div className="flex flex-wrap items-end gap-5">
           <div className="flex-1 min-w-[250px]">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Vai trò đang chọn</label>
-            <select
+            <Select
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 outline-none"
               value={roleId} onChange={e => selectRole(e.target.value)}
             >
               <option value="">-- Chọn vai trò --</option>
               {roleList.map(r => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
-            </select>
+            </Select>
           </div>
           <div className="flex-1 min-w-[250px]">
             <label className="block text-sm font-medium text-slate-500 mb-2">Kế thừa quyền từ</label>
-            <select
+            <Select
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 focus:ring-blue-500 outline-none"
               value={parentId}
               disabled={!roleId}
@@ -910,7 +910,7 @@ export default function PermissionsModule() {
             >
               <option value="">-- Không kế thừa --</option>
               {roleList.filter(r => r.id !== roleId).map(r => <option key={r.id} value={r.id}>{r.role_code} · {r.name}</option>)}
-            </select>
+            </Select>
             {parentId !== savedParentId && (
               <div className="flex items-center gap-2 mt-2 text-xs text-amber-700">
                 Chưa lưu thay đổi kế thừa.

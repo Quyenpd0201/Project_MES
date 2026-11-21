@@ -6,7 +6,7 @@ import { resource, salesOrders as salesOrdersApi, planning } from "../../mesApi.
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import {  inputCls, fmt, fmtDate, fmtDateTime, statusClass, dueTone , toast, todayYmd, fmtDec } from "../../ui.js";
-import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose, LsxProgressChip } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, usePager, DataTable, UnitSelect, DateInput, Logo, SearchSelect, useSaving, LoadError, DialogBehavior, confirmClose, LsxProgressChip, Select } from '../../components.jsx';
 import { PRODUCT_SPECS, SPEC_NAMES, splitNU, specShort } from "../../specs.js";
 import { SpecFields } from "../../SpecFields.jsx";
 import * as XLSX from "xlsx";
@@ -265,16 +265,16 @@ function QuickAllocateModal({ orderId, orderItems, lookups, onClose, onDone }) {
                           <td className="px-3 py-2 text-slate-400 font-semibold">{idx + 1}</td>
                           <td className="px-3 py-2"><span className="font-medium text-slate-700">{s.name}</span><span className="text-slate-400"> · {s.stage}</span></td>
                           <td className="px-2 py-2">
-                            <select className={inputCls + ' py-1'} value={s.machine_id} onChange={(e) => setStage(s._k, 'machine_id', e.target.value)}>
+                            <Select className={inputCls + ' py-1'} value={s.machine_id} onChange={(e) => setStage(s._k, 'machine_id', e.target.value)}>
                               <option value="">-- Chọn máy --</option>
                               {machinesOf(s.assigned_team).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
+                            </Select>
                           </td>
                           <td className="px-2 py-2">
-                            <select className={inputCls + ' py-1'} value={s.assigned_worker} onChange={(e) => setStage(s._k, 'assigned_worker', e.target.value)}>
+                            <Select className={inputCls + ' py-1'} value={s.assigned_worker} onChange={(e) => setStage(s._k, 'assigned_worker', e.target.value)}>
                               <option value="">-- Công nhân --</option>
                               {workersOf(s.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ''}</option>)}
-                            </select>
+                            </Select>
                           </td>
                         </tr>
                       ))}
@@ -401,14 +401,14 @@ function OrderForm({ lookups, editId, copyId, onBack, onSaved, onPrint, onCreate
         </Field>}
         {!fhid("status") && <Field label="Trạng thái">
           {/* Đơn mới luôn "Mới" (backend cũng ép) → khóa khi tạo / sao chép */}
-          <select className={inputCls} disabled={fdis("status") || !editId} title={!editId ? "Đơn mới luôn ở trạng thái Mới" : undefined} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</select>
+          <Select className={inputCls} disabled={fdis("status") || !editId} title={!editId ? "Đơn mới luôn ở trạng thái Mới" : undefined} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUSES.map((s) => <option key={s}>{s}</option>)}</Select>
         </Field>}
         {!fhid("priority") && <Field label="Độ ưu tiên">
-          <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+          <Select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
             <option value="Cao">Cao (Gấp)</option>
             <option value="Trung bình">Trung bình</option>
             <option value="Thấp">Thấp</option>
-          </select>
+          </Select>
         </Field>}
         {!fhid("order_date") && <Field label="Ngày đặt"><DateInput className={inputCls} disabled={fdis("order_date")} value={f.order_date} onChange={(e) => set("order_date", e.target.value)} /></Field>}
         {!fhid("due_date") && <Field label="Ngày giao"><DateInput className={inputCls} disabled={fdis("due_date")} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} /></Field>}

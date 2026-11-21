@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { PackagePlus, Save, Plus, Trash2, RefreshCcw, FileText, History } from "lucide-react";
-import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect, useRemembered } from "../../components.jsx";
+import { ListHeader, DataTable, PageHeader, Section, UnitSelect, SearchSelect, useRemembered, Select } from "../../components.jsx";
 import { inventory } from "../../mesApi.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast, todayYmd, fmtDateTime } from "../../ui.js";
@@ -99,18 +99,18 @@ function InboundForm({ lookups, onSaved }) {
             <div className={`${inputCls} bg-slate-50 text-slate-500`}>Hôm nay ({fmtDate(todayYmd())})</div>
           </Field>
           <Field label="Nguồn nhập" required>
-            <select className={inputCls} value={header.source} onChange={e => setH("source", e.target.value)}>
+            <Select className={inputCls} value={header.source} onChange={e => setH("source", e.target.value)}>
               {INBOUND_SOURCES.map(s => <option key={s}>{s}</option>)}
-            </select>
+            </Select>
             <p className="text-[11px] text-slate-400 mt-1">Chuyển kho → màn Chuyển kho; Khách trả hàng → nút trên phiếu giao</p>
           </Field>
           <Field label="Kho / Vị trí nhập" required>
-            <select className={inputCls} value={header.location_id} onChange={e => setH("location_id", e.target.value)}>
+            <Select className={inputCls} value={header.location_id} onChange={e => setH("location_id", e.target.value)}>
               <option value="">-- Chọn kho/vị trí --</option>
               {(lookups.locations || []).map(l => (
                 <option key={l.id} value={l.id}>{l.warehouse_name} · {l.name}</option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
 

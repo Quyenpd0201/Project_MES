@@ -5,7 +5,7 @@ import { production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory, machinesForStage } from "../../productionDefaults.js";
 import { usePerm } from "../../perm.jsx";
 import { inputCls, fmt, fmtDate, statusClass, toast } from "../../ui.js";
-import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, DialogBehavior, confirmClose, useRemembered, DateInput } from "../../components.jsx";
+import { PageHeader, Section, ListHeader, DataTable, UnitSelect, SearchSelect, DialogBehavior, confirmClose, useRemembered, DateInput, Select } from "../../components.jsx";
 import { PackageCheck, CheckCircle2, Lock, RotateCcw } from "lucide-react";
 import Qr from "../../Qr.jsx";
 import { SpecFields } from "../../SpecFields.jsx";
@@ -611,10 +611,10 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
             {fromOrder ? (
               <ReadOnly>{lookups.customers.find((c) => c.id === f.customer_id)?.name || "— Khách lẻ —"}</ReadOnly>
             ) : (
-              <select className={inputCls} disabled={fdis("customer_id")} value={f.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
+              <Select className={inputCls} disabled={fdis("customer_id")} value={f.customer_id} onChange={(e) => set("customer_id", e.target.value)}>
                 <option value="">-- Không / Khách lẻ --</option>
                 {lookups.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </Select>
             )}
           </Field>}
           {!fhid("quantity") && <Field label="Số lượng cần sản xuất" required>
@@ -635,18 +635,18 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
             <DateInput className={inputCls} value={f.due_date} onChange={(e) => set("due_date", e.target.value)} />
           </Field>
           {!fhid("priority") && <Field label="Độ ưu tiên">
-            <select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
+            <Select className={inputCls} disabled={fdis("priority")} value={f.priority} onChange={(e) => set("priority", e.target.value)}>
               <option value="Cao">Cao (Gấp)</option>
               <option value="Trung bình">Trung bình</option>
               <option value="Thấp">Thấp</option>
-            </select>
+            </Select>
           </Field>}
           {editId && <Field label="Trạng thái">
             {/* 'Hoàn thành' được suy ra tự động khi hoàn thành các dòng phân công — không đặt tay ở đây. */}
-            <select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
+            <Select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>
               {!f.status && <option value="">-- Chọn trạng thái --</option>}
               {STATUSES.filter((s) => (s !== 'Hoàn thành' || f.status === 'Hoàn thành') && !(s === 'Đã hủy' && meta?.status === 'Hoàn thành')).map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </Select>
             {f.status === 'Hoàn thành' && <p className="text-xs text-slate-400 mt-1">Lệnh đã Hoàn thành (tự động theo sản lượng). Dùng "Hủy hoàn thành" trên từng dòng nếu cần sửa.</p>}
           </Field>}
           <Field label="Ghi chú">
@@ -951,22 +951,22 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                                 // Ô trống chỉ còn ở dòng đã Hoàn thành từ trước khi có tính năng này → hiện SP mặc định thật
                                 const defP = productById(computeOutput(stg, f.product_id, tasks.some((x) => x.stage === "Cắt")));
                                 return (
-                                  <select disabled={dis} className={cellCls} value={t.output_product_id || ""} onChange={(e) => upTask(t._k, "output_product_id", e.target.value)}
+                                  <Select disabled={dis} className={cellCls} value={t.output_product_id || ""} onChange={(e) => upTask(t._k, "output_product_id", e.target.value)}
                                     title={stg === "Thổi" ? "Cuộn tạo ra (nhập kho BTP) — chỉ liệt kê SP loại Bán thành phẩm" : "Bao bì thành phẩm (nhập kho TP) — chỉ liệt kê SP loại Thành phẩm"}>
                                     <option value="">{defP ? `${defP.product_code} · ${defP.product_name} (mặc định)` : "-- Chọn sản phẩm --"}</option>
                                     {outputOptions(stg, t.output_product_id).map((p) => (
                                       <option key={p.id} value={p.id}>{p.product_code} · {p.product_name}</option>
                                     ))}
-                                  </select>
+                                  </Select>
                                 );
                               })()}
                             </td>
-                            <td className="py-1.5 pr-2"><select disabled={dis} className={cellCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{stageMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</select></td>
+                            <td className="py-1.5 pr-2"><Select disabled={dis} className={cellCls} value={t.machine_id} onChange={(e) => upTask(t._k, "machine_id", e.target.value)}><option value="">-- Chọn máy --</option>{stageMachines.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></td>
                             <td className="py-1.5 pr-2"><DateInput disabled={dis} className={cellCls} value={t.planned_date} onChange={(e) => upTask(t._k, "planned_date", e.target.value)} /></td>
                             {/* Cột Đội đã ẨN (dữ liệu assigned_team vẫn giữ). Công nhân: người của nhà máy theo
                                 công đoạn xếp trên, người khác xếp dưới — không chặn ai. */}
                             <td className="py-1.5 pr-2">
-                              <select disabled={dis} className={cellCls} value={t.assigned_worker_id || ""} onChange={(e) => setTaskWorker(t._k, e.target.value)}>
+                              <Select disabled={dis} className={cellCls} value={t.assigned_worker_id || ""} onChange={(e) => setTaskWorker(t._k, e.target.value)}>
                                 <option value="">-- Công nhân --</option>
                                 {[[factory, emps.filter((e) => e.factory === factory)], ["Khác", emps.filter((e) => e.factory !== factory)]]
                                   .filter(([, list]) => list.length).map(([label, list]) => (
@@ -974,13 +974,13 @@ function ProductionForm({ lookups, editId, copyId, onBack, onSaved, onOpenSalesO
                                       {list.map((e) => <option key={e.id} value={e.id}>{e.employee_code ? `${e.employee_code} · ` : ""}{e.name}</option>)}
                                     </optgroup>
                                   ))}
-                              </select>
+                              </Select>
                             </td>
                             <td className="py-1.5 pr-2"><input disabled={dis} type="number" min="0" className={cellCls + " no-spin"} value={t.actual_qty} onChange={(e) => upTask(t._k, "actual_qty", e.target.value)} placeholder="SL thực" /></td>
                             <td className="py-1.5 pr-2">
                               {rowLocked
                                 ? <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">Hoàn thành</span>
-                                : <select disabled={dis} className={cellCls} value={t.status === 'Hoàn thành' ? 'Chờ' : t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Dừng sản xuất</option><option>Đã hủy</option></select>}
+                                : <Select disabled={dis} className={cellCls} value={t.status === 'Hoàn thành' ? 'Chờ' : t.status} onChange={(e) => upTask(t._k, "status", e.target.value)}><option>Chờ</option><option>Đang sản xuất</option><option>Dừng sản xuất</option><option>Đã hủy</option></Select>}
                             </td>
                             <td className="py-1.5 pr-2 text-center">
                               {rowLocked
@@ -1156,12 +1156,12 @@ export function ScheduleModal({ lookups, order, onClose, onSaved }) {
                       <tr key={t.id}>
                         <td className="px-3 py-2 font-medium text-slate-700">{t.stage}</td>
                         <td className="px-3 py-2">
-                          <select disabled={dis} className={inputCls} value={t.machine_id || ""} onChange={e => setTask(t.id, "machine_id", e.target.value)}>
+                          <Select disabled={dis} className={inputCls} value={t.machine_id || ""} onChange={e => setTask(t.id, "machine_id", e.target.value)}>
                             <option value="">- Chọn máy -</option>
                             {machinesForStage(lookups.machines, t.stage).map(m => (
                               <option key={m.id} value={m.id}>{m.name}</option>
                             ))}
-                          </select>
+                          </Select>
                         </td>
                         <td className="px-3 py-2">
                           <DateInput disabled={dis} className={inputCls} value={t.planned_date?.slice(0, 10) || ""} onChange={e => setTask(t.id, "planned_date", e.target.value)} />
@@ -1285,11 +1285,11 @@ export default function ProductionModule({ lookups, focusId, onFocusConsumed, on
   return (
     <div className="space-y-5">
       <ListHeader title="Lệnh sản xuất" actions={<>
-        <select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Phạm vi lệnh" title="Phạm vi lệnh hiển thị"
+        <Select value={scope} onChange={(e) => setScope(e.target.value)} aria-label="Phạm vi lệnh" title="Phạm vi lệnh hiển thị"
           className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-700">
           <option value="recent">Chưa xong + 90 ngày</option>
           <option value="all">Tất cả lệnh</option>
-        </select>
+        </Select>
         <div className="flex rounded-lg border border-slate-200 overflow-hidden text-sm">
           <button onClick={() => setMode("table")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "table" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><List size={15} /> Bảng</button>
           <button onClick={() => setMode("gantt")} className={`flex items-center gap-1.5 px-3 py-1.5 ${mode === "gantt" ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"}`}><GanttChartSquare size={15} /> Gantt</button>

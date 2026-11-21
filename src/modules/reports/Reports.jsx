@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PageHeader, ListHeader, Section, Pagination, usePager, LoadError, DateInput } from '../../components.jsx';
+import { PageHeader, ListHeader, Section, Pagination, usePager, LoadError, DateInput, Select } from '../../components.jsx';
 import { reports } from '../../mesApi.js';
 import { Download, Activity, Factory, PieChart as PieChartIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -467,23 +467,23 @@ function DetailedReport() {
           {/* Product */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Sản phẩm</label>
-            <select value={filters.productId}
+            <Select value={filters.productId}
               onChange={e => setFilters({ ...filters, productId: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-44 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
               <option value="">Chọn sản phẩm</option>
               {products.map(p => <option key={p.id} value={p.id}>{p.product_name}</option>)}
-            </select>
+            </Select>
           </div>
           {/* Status */}
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">Trạng thái</label>
-            <select value={filters.status}
+            <Select value={filters.status}
               onChange={e => setFilters({ ...filters, status: e.target.value })}
               className="px-3 py-2 border border-slate-300 rounded-lg text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500">
               {['Tất cả', 'Chờ duyệt', 'Đã lên kế hoạch', 'Chờ nguyên vật liệu', 'Đang sản xuất', 'Hoàn thành', 'Đã hủy'].map(s =>
                 <option key={s} value={s}>{s}</option>
               )}
-            </select>
+            </Select>
           </div>
           {/* Actions */}
           <button onClick={handleFilter}

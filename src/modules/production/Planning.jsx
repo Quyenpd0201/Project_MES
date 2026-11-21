@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { getAppSettings } from "../../appSettings.js";
 import { Layers, CalendarClock, RotateCcw, ShoppingCart, AlertTriangle, ClipboardList, Save, ChevronLeft, ChevronRight, CalendarRange, Star } from "lucide-react";
-import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose, DateInput } from "../../components.jsx";
+import { ListHeader, usePager, DataTable, useSaving, DialogBehavior, confirmClose, DateInput, Select } from "../../components.jsx";
 import { planning, production } from "../../mesApi.js";
 import { DEFAULT_STAGES, stageFactory } from "../../productionDefaults.js";
 import {  inputCls, fmt, fmtDate, statusClass , toast } from "../../ui.js";
@@ -141,26 +141,26 @@ function AllocateModal({ lookups, batch, onClose, onDone }) {
                       <td className="px-3 py-2 text-slate-400 font-semibold">{idx + 1}</td>
                       <td className="px-3 py-2"><span className="font-medium text-slate-700">{s.name}</span>{s.name !== s.stage && <span className="text-slate-400"> · {s.stage}</span>}</td>
                       <td className="px-2 py-2">
-                        <select className={inputCls + " py-1"} value={s.machine_id} onChange={(e) => setStage(s._k, "machine_id", e.target.value)}>
+                        <Select className={inputCls + " py-1"} value={s.machine_id} onChange={(e) => setStage(s._k, "machine_id", e.target.value)}>
                           <option value="">-- Chọn máy --</option>
                           {machinesOf(s.assigned_team).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td className="px-2 py-2">
-                        <select className={inputCls + " py-1"} value={s.shift} onChange={(e) => setStage(s._k, "shift", e.target.value)}>
+                        <Select className={inputCls + " py-1"} value={s.shift} onChange={(e) => setStage(s._k, "shift", e.target.value)}>
                           <option value="">--</option>{(lookups.shifts || []).map((c) => <option key={c}>{c}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td className="px-2 py-2">
-                        <select className={inputCls + " py-1"} value={s.assigned_team} onChange={(e) => setStage(s._k, "assigned_team", e.target.value)}>
+                        <Select className={inputCls + " py-1"} value={s.assigned_team} onChange={(e) => setStage(s._k, "assigned_team", e.target.value)}>
                           <option value="">-- Đội --</option>{teams.map((t) => <option key={t}>{t}</option>)}
-                        </select>
+                        </Select>
                       </td>
                       <td className="px-2 py-2">
-                        <select className={inputCls + " py-1"} value={s.assigned_worker} onChange={(e) => setStage(s._k, "assigned_worker", e.target.value)}>
+                        <Select className={inputCls + " py-1"} value={s.assigned_worker} onChange={(e) => setStage(s._k, "assigned_worker", e.target.value)}>
                           <option value="">-- Công nhân --</option>
                           {workersOf(s.assigned_team).map((e) => <option key={e.id} value={e.name}>{e.name}{e.position ? ` · ${e.position}` : ""}</option>)}
-                        </select>
+                        </Select>
                       </td>
                     </tr>
                   ))}

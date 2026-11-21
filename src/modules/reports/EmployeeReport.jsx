@@ -12,7 +12,7 @@ import { reports } from "../../mesApi.js";
 import { fmt, fmtDate, statusClass, toast, ymd, todayYmd, monthStartYmd, fmtDec } from "../../ui.js";
 import * as XLSX from "xlsx";
 import { usePerm } from "../../perm.jsx";
-import { ListHeader, Section, DateInput } from "../../components.jsx";
+import { ListHeader, Section, DateInput, Select } from "../../components.jsx";
 
 /* ── helpers ── */
 const today = todayYmd; // ngày theo giờ VN (toISOString là UTC → lệch 1 ngày trước 7h sáng)
@@ -631,11 +631,11 @@ function EmployeeReportBody() {
           {!isManager ? (
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">Thời gian</label>
-              <select value={timeRange} onChange={e => handleTimeRangeChange(e.target.value)}
+              <Select value={timeRange} onChange={e => handleTimeRangeChange(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40 bg-white">
                 <option value="week">Tuần này</option>
                 <option value="month">Tháng này</option>
-              </select>
+              </Select>
             </div>
           ) : (
             <>
@@ -655,11 +655,11 @@ function EmployeeReportBody() {
             <>
               <div>
                 <label className="block text-xs font-medium text-slate-500 mb-1">Đội / Nhà máy</label>
-                <select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
+                <Select value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-400/40 bg-white">
                   <option value="">Tất cả</option>
                   {teamOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                </Select>
               </div>
             </>
           )}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Printer, Tag } from "lucide-react";
-import { ListHeader } from "../../components.jsx";
+import { ListHeader, Select } from "../../components.jsx";
 import { production } from "../../mesApi.js";
 import {  inputCls, fmt, fmtDate , toast } from "../../ui.js";
 
@@ -94,16 +94,16 @@ export default function QrLabelsModule() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1.5">Lệnh sản xuất</label>
-            <select className={inputCls} value={orderId} onChange={(e) => load(e.target.value)}>
+            <Select className={inputCls} value={orderId} onChange={(e) => load(e.target.value)}>
               <option value="">-- Chọn lệnh SX --</option>
               {orderList.map((o) => <option key={o.id} value={o.id}>{o.order_code} · {o.product_name}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1.5">Cỡ tem</label>
-            <select className={inputCls} value={size} onChange={(e) => setSize(e.target.value)}>
+            <Select className={inputCls} value={size} onChange={(e) => setSize(e.target.value)}>
               <option value="S">Nhỏ</option><option value="M">Vừa</option><option value="L">Lớn</option>
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1.5">Số bản in mỗi lô</label>
