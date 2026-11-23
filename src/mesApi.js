@@ -241,7 +241,7 @@ export const hrConfig = {
   createHoliday: (d) => http(`/hr/holidays`, body("POST", d)),
   deleteHoliday: (id) => http(`/hr/holidays/${id}`, { method: "DELETE" }),
   employees: () => http(`/hr/employees`),
-  resetPin: (id) => http(`/hr/employees/${id}/pin`, { method: "POST" }),
+  setPin: (id, pin) => http(`/hr/employees/${id}/pin`, body("POST", { pin })), // admin tự đặt PIN 6 số
   unlockPin: (id) => http(`/hr/employees/${id}/pin/unlock`, { method: "POST" }),
   moveEmployee: (id, orgUnitId) => http(`/hr/employees/${id}/org-unit`, body("PUT", { org_unit_id: orgUnitId })),
   // [HR-G2] tablet kiosk — 2026-10-23, CHƯA PHÁT HÀNH

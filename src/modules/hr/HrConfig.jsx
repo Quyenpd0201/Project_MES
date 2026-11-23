@@ -416,14 +416,11 @@ function HolidaysTab({ canEdit }) {
 function EmployeesTab({ canEdit }) {
   const { rows, err, load } = useList(hrConfig.employees);
   const units = useList(hrConfig.orgUnits);
-  const [pinShown, setPinShown] = useState(null);
+  const [pinEdit, setPinEdit] = useState(null); // admin tự đặt PIN 6 số (chốt 2026-11-23), không tự sinh
   const [moving, setMoving] = useState(null);
   const [busy, guard] = useSaving();
   if (err) return <LoadError message={`Không tải được nhân viên (${err})`} onRetry={load} />;
-  const resetPin = (r) => guard(async () => {
-    if (r.has_pin && !window.confirm(`Đặt lại PIN cho ${r.name}? PIN cũ sẽ không dùng được nữa.`)) return;
-    try { const { pin } = await hrConfig.resetPin(r.id); setPinShown({ name: r.name, pin }); load(); } catch (e) { toast.error(e.message); }
-  });
+  const resetPin = (r) => setPinEdit(r);
   const unlock = (r) => guard(async () => {
     try { await hrConfig.unlockPin(r.id); toast.success(`Đã mở khóa PIN của ${r.name}`); load(); } catch (e) { toast.error(e.message); }
   });
@@ -440,21 +437,37 @@ function EmployeesTab({ canEdit }) {
       <div className="flex justify-end gap-1">
         <button type="button" disabled={busy} className={iconBtn} title="Chuyển tổ" aria-label={`Chuyển tổ ${r.name}`} onClick={() => setMoving(r)}><ArrowRightLeft size={15} /></button>
         {r.pin_locked && <button type="button" disabled={busy} className={iconBtn} title="Mở khóa PIN" aria-label={`Mở khóa PIN ${r.name}`} onClick={() => unlock(r)}><Unlock size={15} /></button>}
-        <button type="button" disabled={busy} className={iconBtn} title={r.has_pin ? "Đặt lại PIN" : "Tạo PIN"} aria-label={`${r.has_pin ? "Đặt lại" : "Tạo"} PIN ${r.name}`} onClick={() => resetPin(r)}><KeyRound size={15} /></button>
+        <button type="button" disabled={busy} className={iconBtn} title={r.has_pin ? "Đổi mã PIN" : "Đặt mã PIN"} aria-label={`${r.has_pin ? "Đổi" : "Đặt"} mã PIN ${r.name}`} onClick={() => resetPin(r)}><KeyRound size={15} /></button>
       </div>) }] : []),
   ];
   const unitOpts = (units.rows || []).filter((u) => u.status === "Hoạt động").map((u) => ({ value: u.id, label: `${u.name} (${KIND_LABEL[u.kind]})` }));
   return (
     <>
       <DataTable columns={columns} rows={rows || []} rowKey={(r) => r.id} loading={!rows} stateKey="hr:employees" pageSize={15} />
-      {pinShown && (
-        <Modal title={`PIN mới — ${pinShown.name}`} onClose={() => setPinShown(null)} size="sm"
-          footer={(close) => <button type="button" className="btn-primary" onClick={close}>Đã ghi lại PIN</button>}>
-          <div className="text-center space-y-3">
-            <div className="text-3xl font-bold tracking-[0.3em] tabular-nums text-slate-800 font-mono">{pinShown.pin}</div>
-            <p className="text-sm text-slate-600">PIN chỉ hiện <b>một lần</b>. Đưa trực tiếp cho công nhân, không gửi qua nhóm chat.</p>
-          </div>
-        </Modal>
+      {pinEdit && (
+        <FormModal title={`${pinEdit.has_pin ? "Đổi" : "Đặt"} mã PIN — ${pinEdit.name} (${pinEdit.employee_code})`} initial={{ pin: "", pin2: "" }} submitLabel="Lưu mã PIN" onClose={() => setPinEdit(null)}
+          onSubmit={async (v) => {
+            if (!/^d{6}$/.test(v.pin)) throw new Error("Mã PIN phải gồm đúng 6 chữ số");
+            if (v.pin !== v.pin2) throw new Error("Hai lần nhập mã PIN không khớp");
+            await hrConfig.setPin(pinEdit.id, v.pin);
+            toast.success(`Đã ${pinEdit.has_pin ? "đổi" : "đặt"} mã PIN cho ${pinEdit.name}`);
+            load();
+          }}>
+          {(v, set) => <>
+            <Field label="Mã PIN (6 chữ số)" required>
+              <input className={`${inputCls} font-mono tracking-[0.3em]`} value={v.pin} inputMode="numeric" maxLength={6} autoComplete="off" placeholder="••••••"
+                onChange={(e) => set("pin")(e.target.value.replace(/D/g, "").slice(0, 6))} />
+            </Field>
+            <Field label="Nhập lại mã PIN" required>
+              <input className={`${inputCls} font-mono tracking-[0.3em]`} value={v.pin2} inputMode="numeric" maxLength={6} autoComplete="off" placeholder="••••••"
+                onChange={(e) => set("pin2")(e.target.value.replace(/D/g, "").slice(0, 6))} />
+            </Field>
+            <p className="md:col-span-2 lg:col-span-3 text-sm text-slate-500">
+              Công nhân dùng mã này để chấm công trên tablet của tổ. Không dùng mã dễ đoán như 111111, 123456.
+              {pinEdit.has_pin ? " Mã cũ sẽ không dùng được nữa." : ""} Hệ thống chỉ lưu dạng mã hóa — admin tự ghi nhớ / đưa trực tiếp cho công nhân.
+            </p>
+          </>}
+        </FormModal>
       )}
       {moving && (
         <FormModal title={`Chuyển tổ — ${moving.name}`} initial={{ org_unit_id: moving.org_unit_id || "" }} submitLabel="Chuyển tổ" onClose={() => setMoving(null)}

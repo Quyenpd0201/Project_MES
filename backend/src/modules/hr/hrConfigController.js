@@ -501,16 +501,22 @@ async function requireEmployeeInScope(client, req, res, id) {
   return false;
 }
 
+// Chốt 2026-11-23: PIN do ADMIN tự đặt (nhập 6 chữ số), hệ thống KHÔNG tự sinh. Chỉ admin / nhân sự.
+// PIN chỉ lưu dạng băm, không trả lại — admin tự giữ / đưa trực tiếp cho công nhân.
+const WEAK_PINS = new Set(['123456', '654321', '012345', '543210', '123123', '112233']);
 exports.resetPin = async (req, res) => {
+  if (!canManageTree(req)) return res.status(403).json({ message: 'Chỉ admin mới được đặt mã PIN chấm công.' });
   const { id } = req.params;
+  const pin = String(req.body?.pin ?? '');
+  if (!new RegExp(`^\\d{${PIN_LENGTH}}$`).test(pin)) return res.status(400).json({ message: `Mã PIN phải gồm đúng ${PIN_LENGTH} chữ số.` });
+  if (/^(\d)\1+$/.test(pin) || WEAK_PINS.has(pin)) return res.status(400).json({ message: 'Mã PIN quá dễ đoán (vd 111111, 123456) — vui lòng chọn mã khác.' });
   const out = await inTx(res, async (client) => {
     if (!(await requireEmployeeInScope(client, req, res, id))) return undefined;
-    const pin = String(crypto.randomInt(0, 10 ** PIN_LENGTH)).padStart(PIN_LENGTH, '0');
     await client.query(
       `UPDATE employees SET pin_hash = $1, pin_failed_count = 0, pin_locked_until = NULL, updated_at = now() WHERE id = $2`,
       [hashPassword(pin), id]);
-    await logHr(client, req, { action: 'reset_pin', entity: 'employee', entityId: id });
-    return { pin }; // Trả 1 lần duy nhất để in/đưa cho công nhân — không lưu ở đâu khác
+    await logHr(client, req, { action: 'set_pin', entity: 'employee', entityId: id });
+    return { ok: true };
   });
   send(res, 200, out);
 };
