@@ -19,6 +19,8 @@ router.get('/production-orders/:id/tasks', production.getTasks);
 router.get('/production-orders/:id/roll-availability', production.rollAvailability);
 router.put('/production-orders/:id/tasks', requirePerm('production:edit'), production.saveTasks);
 router.post('/production-orders/:id/complete-tasks', requirePerm('production:edit'), production.completeTasks);
+router.post('/production-orders/:id/record-rolls', requirePerm('production:edit'), production.recordRolls); // ghi cuộn nhanh (mobile)
+router.get('/production-orders/:id/record-rolls', production.listRecordedRolls);
 router.get('/production-orders/:id/materials', production.getMaterials);
 router.post('/production-orders/:id/materials', requirePerm('production:edit'), production.saveMaterials);
 // NVL cần cung cấp (kế hoạch cấp NVL) + Yêu cầu NVL → xuất kho

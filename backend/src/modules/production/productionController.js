@@ -1357,6 +1357,99 @@ exports.completeTasks = async (req, res) => {
   } finally { client.release(); }
 };
 
+// POST /api/production-orders/:id/record-rolls — GHI CUỘN NHANH từ app mobile (chốt 2026-11-23).
+// Body: { task_code: <dòng việc được giao>, weights: [kg, kg, ...] , finish?: bool }
+// Mỗi số kg = 1 CUỘN = 1 dòng phân công MỚI (sao từ dòng việc: công đoạn, máy, ca, công nhân, SP đầu ra),
+// được cấp mã cuộn, HOÀN THÀNH + NHẬP KHO ngay (cùng logic nút Hoàn thành trên web). Dòng việc gốc giữ nguyên để ghi tiếp.
+// finish = true: kết thúc việc — xóa dòng việc gốc nếu nó chưa có SL thực (chỉ là dòng giao việc).
+// Tất cả trong MỘT transaction: 1 cuộn lỗi → không cuộn nào được ghi.
+exports.recordRolls = async (req, res) => {
+  const client = await db.pool.connect();
+  try {
+    const poId = req.params.id;
+    const tplCode = String(req.body?.task_code || '');
+    const weights = (Array.isArray(req.body?.weights) ? req.body.weights : []).map(Number);
+    const finish = req.body?.finish === true;
+    if (!tplCode) return res.status(400).json({ message: 'Thiếu dòng việc.' });
+    if (weights.length > 50) return res.status(400).json({ message: 'Mỗi lần ghi tối đa 50 cuộn.' });
+    if (weights.some((w) => !Number.isFinite(w) || w <= 0 || w > 100000)) return res.status(400).json({ message: 'Số kg mỗi cuộn phải lớn hơn 0.' });
+    if (!weights.length && !finish) return res.status(400).json({ message: 'Chưa nhập số kg của cuộn nào.' });
+
+    await client.query('BEGIN');
+    const bail = async (code, message) => { await client.query('ROLLBACK'); return res.status(code).json({ message }); };
+    const po = (await client.query(
+      `SELECT po.id, po.order_code, po.product_id, po.unit, po.specs, po.status, po.quantity, p.product_type, p.product_code
+       FROM production_orders po JOIN products p ON p.id = po.product_id
+       WHERE po.id = $1 AND po.is_deleted = FALSE FOR UPDATE OF po`, [poId])).rows[0];
+    if (!po) return bail(404, 'Không tìm thấy lệnh sản xuất');
+    if (po.status === 'Đã hủy') return bail(400, 'Lệnh đã Hủy — không ghi cuộn được.');
+    const tpl = (await client.query(
+      `SELECT * FROM production_tasks WHERE production_order_id = $1 AND task_code = $2 FOR UPDATE`, [poId, tplCode])).rows[0];
+    if (!tpl) return bail(404, 'Không tìm thấy dòng việc — có thể vừa bị sửa trên web, hãy tải lại.');
+    if (!rollsLib.STAGE_NO[tpl.stage]) return bail(400, `Công đoạn "${tpl.stage}" không ghi theo cuộn.`);
+    if (tpl.status === 'Hoàn thành' && weights.length) return bail(400, 'Dòng việc đã Hoàn thành — không ghi thêm cuộn.');
+    const lacks = [];
+    if (!tpl.machine_id) lacks.push('máy');
+    if (!tpl.assigned_worker) lacks.push('công nhân');
+    if (weights.length && lacks.length) return bail(400, `Dòng việc chưa có ${lacks.join(', ')} — nhờ quản lý phân công đủ trên web trước.`);
+
+    // Ràng buộc 150% như lưu phân công: SL thực cộng dồn của công đoạn (kể cả cuộn mới) ≤ 150% SL cần SX
+    const cap = Number(po.quantity) * 1.5;
+    const { rows: [{ s: actSum }] } = await client.query(
+      `SELECT COALESCE(SUM(actual_qty), 0)::numeric AS s FROM production_tasks WHERE production_order_id = $1 AND stage = $2`, [poId, tpl.stage]);
+    const add = weights.reduce((a, b) => a + b, 0);
+    if (Number(actSum) + add > cap + 1e-6) {
+      return bail(400, `Tổng SL ${tpl.stage} sẽ là ${Math.round((Number(actSum) + add) * 100) / 100} — vượt 150% SL cần sản xuất (tối đa ${cap}).`);
+    }
+
+    const { rows: [mx] } = await client.query(
+      `SELECT COALESCE(MAX(seq), 0)::int AS seq,
+              COALESCE(MAX((substring(task_code from '-(\\d+)$'))::int), 0)::int AS suffix
+         FROM production_tasks WHERE production_order_id = $1`, [poId]);
+    let seq = mx.seq; let suffix = mx.suffix;
+    const created = [];
+    for (const w of weights) {
+      const code = `${po.order_code}-${++suffix}`;
+      const rollCode = await allocRollCode(client, poId, tpl.stage);
+      const { rows: [t] } = await client.query(`
+        INSERT INTO production_tasks
+          (production_order_id, task_code, stage, quantity, actual_qty, scrap_qty, machine_id, shift, planned_date, planned_end_date,
+           assigned_team, assigned_worker, status, seq, note, assigned_worker_id, posted_qty, output_product_id, roll_code)
+        VALUES ($1,$2,$3,$4,$4,0,$5,$6,COALESCE($7, CURRENT_DATE),COALESCE($8, $7, CURRENT_DATE),$9,$10,'Đang sản xuất',$11,$12,$13,0,$14,$15)
+        RETURNING *`,
+        [poId, code, tpl.stage, w, tpl.machine_id, tpl.shift, tpl.planned_date, tpl.planned_end_date,
+          tpl.assigned_team, tpl.assigned_worker, ++seq, `Cuộn ghi trên mobile — việc ${tpl.task_code}`, tpl.assigned_worker_id,
+          tpl.output_product_id, rollCode]);
+      const outQty = await postTaskStock(client, po, t, []);
+      await client.query(`UPDATE production_tasks SET status = 'Hoàn thành', posted_qty = $2 WHERE id = $1`, [t.id, outQty]);
+      created.push({ task_code: code, roll_code: rollCode, qty: w });
+    }
+    let finished = false;
+    if (finish && tpl.status !== 'Hoàn thành' && !(Number(tpl.actual_qty) > 0)) {
+      await client.query('DELETE FROM production_tasks WHERE id = $1', [tpl.id]);
+      finished = true;
+    } else if (tpl.status === 'Chờ' && weights.length) {
+      await client.query(`UPDATE production_tasks SET status = 'Đang sản xuất', updated_at = now() WHERE id = $1`, [tpl.id]);
+    }
+    const result = await recomputeOrder(client, poId);
+    await client.query('COMMIT');
+    res.json({ message: weights.length ? `Đã ghi ${weights.length} cuộn` : 'Đã kết thúc việc', rolls: created, finished, ...result });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {}); console.error(err); if (stockErrorResponse(res, err)) return;
+    res.status(400).json({ message: err.detail || err.message || 'Lỗi khi ghi cuộn' });
+  } finally { client.release(); }
+};
+
+// GET /api/production-orders/:id/record-rolls?task_code= — các cuộn đã ghi từ 1 dòng việc (mới nhất trước)
+exports.listRecordedRolls = async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT task_code, roll_code, actual_qty::numeric AS qty, status, updated_at, created_at
+       FROM production_tasks
+      WHERE production_order_id = $1 AND note = $2
+      ORDER BY seq DESC`, [req.params.id, `Cuộn ghi trên mobile — việc ${String(req.query.task_code || '')}`]);
+  res.json({ data: rows });
+};
+
 // POST /api/production/tasks/:taskId/reopen — Admin "Hủy hoàn thành" một dòng, hoàn kho đúng như đã ghi.
 exports.reopenTask = async (req, res) => {
   const client = await db.pool.connect();
