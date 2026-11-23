@@ -447,7 +447,7 @@ function EmployeesTab({ canEdit }) {
       {pinEdit && (
         <FormModal title={`${pinEdit.has_pin ? "Đổi" : "Đặt"} mã PIN — ${pinEdit.name} (${pinEdit.employee_code})`} initial={{ pin: "", pin2: "" }} submitLabel="Lưu mã PIN" onClose={() => setPinEdit(null)}
           onSubmit={async (v) => {
-            if (!/^d{6}$/.test(v.pin)) throw new Error("Mã PIN phải gồm đúng 6 chữ số");
+            if (!/^\d{6}$/.test(v.pin)) throw new Error("Mã PIN phải gồm đúng 6 chữ số");
             if (v.pin !== v.pin2) throw new Error("Hai lần nhập mã PIN không khớp");
             await hrConfig.setPin(pinEdit.id, v.pin);
             toast.success(`Đã ${pinEdit.has_pin ? "đổi" : "đặt"} mã PIN cho ${pinEdit.name}`);
@@ -456,11 +456,11 @@ function EmployeesTab({ canEdit }) {
           {(v, set) => <>
             <Field label="Mã PIN (6 chữ số)" required>
               <input className={`${inputCls} font-mono tracking-[0.3em]`} value={v.pin} inputMode="numeric" maxLength={6} autoComplete="off" placeholder="••••••"
-                onChange={(e) => set("pin")(e.target.value.replace(/D/g, "").slice(0, 6))} />
+                onChange={(e) => set("pin")(e.target.value.replace(/\D/g, "").slice(0, 6))} />
             </Field>
             <Field label="Nhập lại mã PIN" required>
               <input className={`${inputCls} font-mono tracking-[0.3em]`} value={v.pin2} inputMode="numeric" maxLength={6} autoComplete="off" placeholder="••••••"
-                onChange={(e) => set("pin2")(e.target.value.replace(/D/g, "").slice(0, 6))} />
+                onChange={(e) => set("pin2")(e.target.value.replace(/\D/g, "").slice(0, 6))} />
             </Field>
             <p className="md:col-span-2 lg:col-span-3 text-sm text-slate-500">
               Công nhân dùng mã này để chấm công trên tablet của tổ. Không dùng mã dễ đoán như 111111, 123456.
