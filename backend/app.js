@@ -1,5 +1,4 @@
-// backend/app.js — khởi tạo Express app (không listen) để server.js và test dùng chung
-// [HR-G1] Tách từ server.js ngày 2026-10-22 (CHƯA PHÁT HÀNH) — nội dung giữ nguyên, chỉ bỏ app.listen.
+// backend/app.js — cấu hình Express (không listen); server.js khởi động, test tích hợp dùng trực tiếp.
 const express = require('express');
 require('./src/core/asyncErrors'); // lỗi trong handler async → error handler cuối (500), không sập server
 const cors = require('cors');

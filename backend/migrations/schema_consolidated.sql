@@ -2271,7 +2271,7 @@ CREATE INDEX IF NOT EXISTS idx_soi_product              ON public.sales_order_it
 CREATE INDEX IF NOT EXISTS idx_po_sales_order           ON public.production_orders (sales_order_id);
 CREATE INDEX IF NOT EXISTS idx_po_sales_order_item      ON public.production_orders (sales_order_item_id);
 CREATE INDEX IF NOT EXISTS idx_po_product               ON public.production_orders (product_id);
-CREATE INDEX IF NOT EXISTS idx_pt_production_order      ON public.production_tasks (production_order_id);
+-- (idx_pt_production_order: bỏ 2026-11-13 — trùng idx_pt_po, xem mục 37)
 CREATE INDEX IF NOT EXISTS idx_pt_assigned_worker_id    ON public.production_tasks (assigned_worker_id);
 CREATE INDEX IF NOT EXISTS idx_pom_production_order     ON public.production_order_materials (production_order_id);
 CREATE INDEX IF NOT EXISTS idx_pom_material             ON public.production_order_materials (material_id);
@@ -3348,8 +3348,103 @@ UPDATE public.app_settings SET value = to_jsonb('Số 8F3, Đường DD6, Khu Ph
 -- [M3-END]
 -- ---------------------------------------------------------------------
 
+-- 37) KẾ HOẠCH CHUYỂN KỲ (2026-11-13): lưu ngày hoàn thành / ngày hủy của lệnh SX để biết lệnh còn mở ở đầu kỳ.
+--   Ghi bằng trigger → mọi cửa đổi trạng thái (API, recomputeOrder, sửa tay) đều có ngày.
+--   Gỡ: DROP TRIGGER po_status_dates ON public.production_orders; DROP FUNCTION public.trg_po_status_dates();
+--       ALTER TABLE public.production_orders DROP COLUMN completed_at, DROP COLUMN cancelled_at;
+ALTER TABLE public.production_orders ADD COLUMN IF NOT EXISTS completed_at timestamptz;
+ALTER TABLE public.production_orders ADD COLUMN IF NOT EXISTS cancelled_at timestamptz;
+CREATE OR REPLACE FUNCTION public.trg_po_status_dates() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_OP = 'INSERT' OR NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NEW.status = 'Hoàn thành' THEN NEW.completed_at := COALESCE(NEW.completed_at, now());
+    ELSE NEW.completed_at := NULL; END IF;
+    IF NEW.status = 'Đã hủy' THEN NEW.cancelled_at := COALESCE(NEW.cancelled_at, now());
+    ELSE NEW.cancelled_at := NULL; END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS po_status_dates ON public.production_orders;
+CREATE TRIGGER po_status_dates BEFORE INSERT OR UPDATE OF status ON public.production_orders
+  FOR EACH ROW EXECUTE FUNCTION public.trg_po_status_dates();
+--   Dữ liệu cũ (ƯỚC LƯỢNG cho lệnh trước 2026-11-13). Không dùng po.updated_at: đã bị cập nhật hàng loạt nên không phản ánh ngày xong.
+--     Hoàn thành → lần cuối một công đoạn của lệnh hoàn thành; không có → ngày tạo lệnh.
+--     Đã hủy     → lần cuối một công đoạn của lệnh được cập nhật; không có → ngày tạo lệnh.
+--   Chỉ điền ô trống → chạy lại an toàn. DB đã điền theo cách cũ: xem migrations/manual/2026-11-13_*.sql
+--   Tắt tạm trigger updated_at: điền ngày ước lượng KHÔNG được làm đổi updated_at của lệnh.
+ALTER TABLE public.production_orders DISABLE TRIGGER trg_production_orders_updated;
+UPDATE public.production_orders po SET completed_at = COALESCE(
+    (SELECT MAX(t.updated_at) FROM public.production_tasks t WHERE t.production_order_id = po.id AND t.status = 'Hoàn thành'), po.created_at)
+  WHERE po.status = 'Hoàn thành' AND po.completed_at IS NULL;
+UPDATE public.production_orders po SET cancelled_at = COALESCE(
+    (SELECT MAX(t.updated_at) FROM public.production_tasks t WHERE t.production_order_id = po.id), po.created_at)
+  WHERE po.status = 'Đã hủy' AND po.cancelled_at IS NULL;
+ALTER TABLE public.production_orders ENABLE TRIGGER trg_production_orders_updated;
+--   Index cho periodOutput / công đoạn cuối (FINAL_STAGE: EXISTS theo (lệnh, stage); cộng task hoàn thành theo lệnh)
+CREATE INDEX IF NOT EXISTS idx_pt_po_stage ON public.production_tasks (production_order_id, stage);
+CREATE INDEX IF NOT EXISTS idx_pt_po_stage_done ON public.production_tasks (production_order_id, stage)
+  INCLUDE (updated_at, actual_qty, quantity) WHERE status = 'Hoàn thành';
+--   Bỏ 2 index trùng (cùng cột production_order_id với idx_pt_po) — chỉ làm chậm ghi phân công, không đổi kết quả.
+DROP INDEX IF EXISTS public.idx_tasks_po;
+DROP INDEX IF EXISTS public.idx_pt_production_order;
+-- 38) TỒN KHO THEO CUỘN (2026-11-13): mỗi dòng Thổi/Cắt có mã cuộn cố định {LSX}_{1|2}_{xxx};
+--   lô LSX trong tồn kho có các cuộn con. Tổng còn của cuộn ≤ số lô; phần chênh = "Không rõ cuộn" (tính khi đọc).
+--   Logic cuộn chỉ ở backend/src/core/lib/rolls.js (gọi từ applyStock, cùng transaction). Dữ liệu cũ KHÔNG chuyển đổi.
+--   Gỡ (chạy tay): DROP TABLE public.inventory_rolls; DROP TABLE public.production_roll_counters;
+--       ALTER TABLE public.production_tasks DROP COLUMN roll_code; ALTER TABLE public.production_roll_usage DROP COLUMN roll_code;
+CREATE TABLE IF NOT EXISTS public.inventory_rolls (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id uuid NOT NULL REFERENCES public.products(id),
+  location_id uuid REFERENCES public.locations(id),
+  spec_key text NOT NULL,
+  lot_code varchar(40) NOT NULL,
+  roll_code varchar(60) NOT NULL,
+  stage smallint NOT NULL CHECK (stage IN (1, 2)),       -- 1 = Thổi (cuộn BTP), 2 = Cắt (bao bì TP)
+  qty_initial numeric(14,2) NOT NULL DEFAULT 0 CHECK (qty_initial >= 0),
+  qty_remaining numeric(14,2) NOT NULL DEFAULT 0 CONSTRAINT inventory_rolls_remaining_nonneg CHECK (qty_remaining >= 0),
+  specs jsonb NOT NULL DEFAULT '{}'::jsonb,
+  task_code varchar(40),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+--   Một mã cuộn có thể nằm ở 2 lô khi chuyển kho một phần (tách cuộn) → duy nhất theo lô + mã.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_inventory_rolls_lot_code
+  ON public.inventory_rolls (product_id, location_id, spec_key, lot_code, roll_code) NULLS NOT DISTINCT;
+CREATE INDEX IF NOT EXISTS idx_inventory_rolls_lot_code ON public.inventory_rolls (lot_code);
+--   Bộ đếm bền "số lớn nhất đã cấp" theo LSX + công đoạn: xóa dòng không trả số, không dùng lại.
+CREATE TABLE IF NOT EXISTS public.production_roll_counters (
+  production_order_id uuid NOT NULL REFERENCES public.production_orders(id) ON DELETE CASCADE,
+  stage smallint NOT NULL CHECK (stage IN (1, 2)),
+  last_no integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (production_order_id, stage)
+);
+ALTER TABLE public.production_tasks ADD COLUMN IF NOT EXISTS roll_code varchar(60);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_production_tasks_roll_code ON public.production_tasks (roll_code) WHERE roll_code IS NOT NULL;
+ALTER TABLE public.production_roll_usage ADD COLUMN IF NOT EXISTS roll_code varchar(60); -- NULL = phần "Không rõ cuộn"
+--   Sổ cuộn theo giao dịch kho (cổng B 2026-11-17): mỗi lần trừ lô có cuộn (applyStock) ghi cuộn nào bị trừ bao nhiêu
+--   (qty < 0, trx_id = dòng inventory_transactions vừa ghi). Khách trả hàng / đảo phiếu xuất / trả NVL cộng về ĐÚNG cuộn
+--   gốc (qty > 0, source_move_id = dòng trừ tương ứng); phần không rõ gốc cấp mã mới (qty > 0, source_move_id NULL).
+--   Gỡ (chạy tay): DROP TABLE public.inventory_roll_moves;
+CREATE TABLE IF NOT EXISTS public.inventory_roll_moves (
+  id bigserial PRIMARY KEY,
+  trx_id uuid REFERENCES public.inventory_transactions(id) ON DELETE CASCADE,
+  product_id uuid NOT NULL,
+  location_id uuid,
+  spec_key text NOT NULL,
+  lot_code varchar(40) NOT NULL,
+  roll_code varchar(60) NOT NULL,
+  qty numeric(14,2) NOT NULL CHECK (qty <> 0),            -- < 0 = bị trừ, > 0 = được trả về
+  source_move_id bigint REFERENCES public.inventory_roll_moves(id) ON DELETE SET NULL,
+  trx_type varchar(20),
+  ref_code varchar(50),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_inventory_roll_moves_trx ON public.inventory_roll_moves (trx_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_roll_moves_source ON public.inventory_roll_moves (source_move_id) WHERE source_move_id IS NOT NULL;
 -- ---------------------------------------------------------------------
--- 37) [HR-MOBILE] (2026-11-11, CHƯA PHÁT HÀNH): GẮN TÀI KHOẢN ↔ NHÂN VIÊN cho chấm công trên tablet của tổ.
+
+-- ---------------------------------------------------------------------
+-- 39) [HR-MOBILE] (2026-11-11, CHƯA PHÁT HÀNH): GẮN TÀI KHOẢN ↔ NHÂN VIÊN cho chấm công trên tablet của tổ.
 --   Nguồn duy nhất: users.linked_worker ("Công nhân liên kết" trên màn Tài khoản) — backend đồng bộ sang employees.user_id
 --   mỗi khi lưu tài khoản. Khối này gắn sẵn cho tài khoản ĐÃ có liên kết, chỉ khi khớp đúng 1 nhân viên và nhân viên
 --   chưa gắn tài khoản nào (chạy lại an toàn, không ghi đè gắn tay).
