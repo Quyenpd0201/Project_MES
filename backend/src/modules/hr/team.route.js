@@ -63,7 +63,21 @@ router.post('/hr/team/identify', requireTeamLeader, perUser(30), (req, res, next
   if (!req.body?.employee_id) return res.status(400).json({ message: 'Vui lòng chọn tên' });
   if (!/^\d{6}$/.test(String(req.body?.pin || ''))) return res.status(400).json({ message: 'PIN gồm 6 chữ số' });
   delete req.body.employee_code;
-  return k.identify(req, res, next);
+  // Chốt 2026-11-23: tablet tổ trưởng — mỗi người 1 lần VÀO + 1 lần RA mỗi ngày.
+  // Đã có lần RA hôm nay và lần chấm cuối là RA → không cho chấm nữa (nhầm thì làm yêu cầu sửa công).
+  db.query(`
+    SELECT direction, punched_at FROM attendance_punches
+     WHERE employee_id = $1::uuid
+       AND (punched_at AT TIME ZONE 'Asia/Ho_Chi_Minh')::date = (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+     ORDER BY punched_at DESC LIMIT 1`, [String(req.body.employee_id)])
+    .then(({ rows: [last] }) => {
+      if (last?.direction === 'OUT') {
+        const t = new Date(last.punched_at).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+        return res.status(409).json({ message: `Hôm nay bạn đã chấm VÀO và RA (ra lúc ${t}) — mỗi ngày chỉ chấm 1 lần vào, 1 lần ra. Chấm nhầm thì báo tổ trưởng làm yêu cầu sửa công.` });
+      }
+      return k.identify(req, res, next);
+    })
+    .catch((err) => (err.code === '22P02' ? res.status(404).json({ message: 'Không tìm thấy nhân viên' }) : next(err)));
 });
 router.post('/hr/team/consent', requireTeamLeader, k.consent);
 router.post('/hr/team/punch', requireTeamLeader, perUser(120), (req, res, next) => {
