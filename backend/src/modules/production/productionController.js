@@ -815,6 +815,9 @@ exports.executionTasks = async (req, res) => {
     const { rows } = await db.query(`
       SELECT t.id, t.task_code, t.stage, t.quantity, t.actual_qty, t.scrap_qty, t.status, t.shift,
              t.planned_date, t.planned_end_date, t.assigned_team, t.assigned_worker, t.assigned_worker_id,
+             -- tổng kg các cuộn đã ghi trên mobile từ dòng việc này (record-rolls) — để mobile hiện đúng 'đã sản xuất'
+             (SELECT COALESCE(SUM(r.actual_qty), 0) FROM production_tasks r
+               WHERE r.production_order_id = t.production_order_id AND r.note = 'Cuộn ghi trên mobile — việc ' || t.task_code) AS roll_qty,
              m.name AS machine_name,
              po.id AS production_order_id, po.order_code, po.due_date, po.unit,
              po.attr_color, po.attr_size, po.attr_thickness, po.specs, po.priority,
