@@ -10,6 +10,7 @@ const { stockAvailabilityRows, assertAvailable } = require('../../core/lib/avail
 const { slipSources, remaining, postReturn, refreshIssuedFlag } = require('../../core/lib/materialReturns');
 const { issueSlipFIFO, SlipIssueError } = require('../../core/lib/slipIssue');
 const { isNewFlow, reverseBlockedMessage } = require('../production/materialGate');
+const { isUuid } = require('../../core/lib/validate');
 
 // A5: tồn của SP / kho / vị trí ĐÃ XÓA không hiển thị, không tính tổng (dữ liệu cũ vẫn giữ trong DB).
 // Dòng tồn cũ không có vị trí (location_id NULL) của SP còn hoạt động vẫn hiện.
@@ -162,14 +163,13 @@ exports.list = async (req, res) => {
 
 // GET /api/inventory/rolls?product_id&location_id&spec_key&lot_code — cuộn con của 1 lô (bấm mở rộng ở màn tồn kho).
 // Quyền xem = phạm vi kho xem tồn hiện có (invViewScope). Trả { lot_qty, unknown_qty, rolls[{ roll_code, qty_initial, qty_remaining, status, … }] }.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 exports.rolls = async (req, res) => {
   try {
     // Chỉ nhận chuỗi: ?x[]=… / ?x[a]=… (mảng, object) → 400, không để lọt xuống truy vấn thành lỗi 500 (QA NN-1)
     const str = (v) => (typeof v === 'string' ? v : null);
     const product_id = str(req.query.product_id), location_id = str(req.query.location_id), lot_code = str(req.query.lot_code);
     const spec_key = req.query.spec_key == null ? '||||' : str(req.query.spec_key);
-    if (!UUID_RE.test(product_id || '') || !UUID_RE.test(location_id || '') || !lot_code || spec_key == null) {
+    if (!isUuid(product_id) || !isUuid(location_id) || !lot_code || spec_key == null) {
       return res.status(400).json({ message: 'Thiếu hoặc sai sản phẩm / vị trí / lô.' });
     }
     const ok = (await db.query(
@@ -267,7 +267,7 @@ exports.addStockLine = async (req, res) => {
       [b.product_id, loc, specKey, lot]);
     await client.query('COMMIT');
     res.status(201).json(rows[0]);
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi thêm dòng tồn' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: 'Lỗi khi thêm dòng tồn' }); }
   finally { client.release(); }
 };
 
@@ -416,7 +416,7 @@ exports.adjust = async (req, res) => {
     await client.query('ROLLBACK');
     console.error(err);
     if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return;
-    res.status(500).json({ message: err.detail || 'Lỗi khi điều chỉnh tồn kho' });
+    res.status(500).json({ message: 'Lỗi khi điều chỉnh tồn kho' });
   } finally { client.release(); }
 };
 
@@ -457,7 +457,7 @@ exports.createOutboundSlip = async (req, res) => {
 
     await client.query('COMMIT');
     res.json({ message: `Đã tạo phiếu chờ xuất kho ${slip.slip_code}.`, slip_code: slip.slip_code, slip_id: slip.id });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi tạo phiếu xuất' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return; res.status(500).json({ message: 'Lỗi khi tạo phiếu xuất' }); }
   finally { client.release(); }
 };
 
@@ -541,7 +541,7 @@ exports.confirmOutboundSlip = async (req, res) => {
     }
     await client.query('COMMIT');
     res.json({ message: `Đã xác nhận xuất kho phiếu ${s.slip_code} (${lines.length} dòng).`, count: lines.length });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: err.detail || 'Lỗi khi xác nhận xuất kho' }); }  finally { client.release(); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); if (stockErrorResponse(res, err)) return; res.status(500).json({ message: 'Lỗi khi xác nhận xuất kho' }); }  finally { client.release(); }
 };
 
 // POST /api/outbound-slips/:id/cancel — HỦY phiếu (chỉ khi Chờ xuất). Mở khóa lệnh SX nguồn.
@@ -560,7 +560,7 @@ exports.cancelOutboundSlip = async (req, res) => {
     if (s.prod_order_id) await refreshIssuedFlag(client, s.prod_order_id);
     await client.query('COMMIT');
     res.json({ message: `Đã hủy phiếu ${s.slip_code}.` });
-  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: err.detail || 'Lỗi khi hủy phiếu' }); }
+  } catch (err) { await client.query('ROLLBACK'); console.error(err); res.status(500).json({ message: 'Lỗi khi hủy phiếu' }); }
   finally { client.release(); }
 };
 
@@ -677,6 +677,6 @@ exports.transfer = async (req, res) => {
   } catch (err) {
     await client.query('ROLLBACK');
     console.error(err); if (stockErrorResponse(res, err) || specErrorResponse(res, err)) return;
-    res.status(500).json({ message: err.detail || 'Lỗi khi chuyển kho' });
+    res.status(500).json({ message: 'Lỗi khi chuyển kho' });
   } finally { client.release(); }
 };

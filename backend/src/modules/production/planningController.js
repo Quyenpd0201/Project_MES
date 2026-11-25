@@ -231,7 +231,7 @@ exports.generate = async (req, res) => {
     res.status(201).json({ created });
   } catch (err) {
     await client.query('ROLLBACK'); console.error(err);
-    res.status(500).json({ message: err.detail || 'Lỗi khi sinh lệnh sản xuất từ kế hoạch' });
+    res.status(500).json({ message: 'Lỗi khi sinh lệnh sản xuất từ kế hoạch' });
   } finally { client.release(); }
 };
 

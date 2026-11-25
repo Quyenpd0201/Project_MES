@@ -2875,3 +2875,18 @@ CREATE INDEX IF NOT EXISTS idx_inventory_roll_moves_source ON public.inventory_r
 ALTER TABLE public.production_orders ADD COLUMN IF NOT EXISTS nvl_strict boolean NOT NULL DEFAULT FALSE;
 ALTER TABLE public.production_order_materials ADD COLUMN IF NOT EXISTS requested_initial numeric;
 -- ---------------------------------------------------------------------
+-- 40) requested_initial (định mức NVL) không âm (2026-11-25). Thêm NOT VALID (dòng mới / sửa bị kiểm ngay, dữ liệu cũ
+--   không làm migrate lỗi); chỉ VALIDATE khi không còn dòng âm. Chạy lại được.
+--   Gỡ (chạy tay): ALTER TABLE public.production_order_materials DROP CONSTRAINT IF EXISTS chk_pom_requested_initial_nonneg;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_pom_requested_initial_nonneg') THEN
+    ALTER TABLE public.production_order_materials
+      ADD CONSTRAINT chk_pom_requested_initial_nonneg CHECK (requested_initial IS NULL OR requested_initial >= 0) NOT VALID;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_pom_requested_initial_nonneg' AND NOT convalidated)
+     AND NOT EXISTS (SELECT 1 FROM public.production_order_materials WHERE requested_initial < 0) THEN
+    ALTER TABLE public.production_order_materials VALIDATE CONSTRAINT chk_pom_requested_initial_nonneg;
+  END IF;
+END $$;
+-- ---------------------------------------------------------------------

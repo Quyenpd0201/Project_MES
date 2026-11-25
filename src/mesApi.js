@@ -126,6 +126,8 @@ export const production = {
   saveMaterials: (id, lines) => http(`/production-orders/${id}/materials`, body("POST", { lines })),
   // NVL cần cung cấp (kế hoạch) + Yêu cầu NVL (xuất kho)
   plannedMaterials: (id) => http(`/production-orders/${id}/planned-materials`).then((r) => r.data),
+  // Kiểm trần NVL trước khi lưu lệnh (không ghi) → { message: câu lỗi | null }
+  checkMaterialCap: (payload) => http(`/production-orders/check-material-cap`, body("POST", payload)),
   savePlannedMaterials: (id, lines) => http(`/production-orders/${id}/planned-materials`, body("POST", { lines })),
   requestMaterials: (id, lines) => http(`/production-orders/${id}/request-materials`, body("POST", { lines })),
   finish: (id) => http(`/production-orders/${id}/finish`, body("POST", {})),

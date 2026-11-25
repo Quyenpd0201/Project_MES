@@ -129,9 +129,10 @@ async function assertCanRun(conn, order) {
  * (đảo phiếu DPX: lệnh giữ "Đang sản xuất" nhưng bị khóa tới khi Yêu cầu NVL lại).
  * order cần { id, order_code, status, nvl_strict }.
  */
-async function isOutputBlocked(conn, order) {
+async function isOutputBlocked(conn, order, state = null) {
   if (!isNewFlow(order)) return false;
-  return order.status !== 'Đang sản xuất' || !(await hasIssuedMaterials(conn, order));
+  if (order.status !== 'Đang sản xuất') return true;
+  return !(state ? state.issued : await hasIssuedMaterials(conn, order)); // state: getIssuedState đã đọc sẵn (tránh đọc 2 lần)
 }
 /** Câu chặn ghi SL khi lệnh mới đã Hoàn thành (R9) — không nói "chưa xuất NVL" gây hiểu nhầm. */
 function completedMessage(orderCode) {
@@ -157,15 +158,124 @@ async function assertCanRecordOutput(conn, order) {
  */
 async function materialsProgress(conn, order) {
   if (!isNewFlow(order)) return { materials_progress: null, gate_message: null };
-  const { perMaterial } = await getIssuedState(conn, order.id);
+  const state = await getIssuedState(conn, order.id);
+  const { perMaterial } = state;
   const cons = computeConsumption(order, perMaterial, await producedQtyLastStage(conn, order.id));
   const progress = perMaterial.map((m, i) => ({
     product_id: m.product_id, requested_initial: m.requested_initial, issued: m.issued, returned: m.returned,
     consumed: cons ? cons[i].consumed : null, remaining: cons ? cons[i].remaining : null, over: cons ? cons[i].over : null,
   }));
   const closed = order.status === 'Hoàn thành' || order.status === 'Đã hủy';
-  const blocked = !closed && (await isOutputBlocked(conn, order));
+  const blocked = !closed && (await isOutputBlocked(conn, order, state));
   return { materials_progress: progress, gate_message: blocked ? gateMessage(order.order_code) : null };
+}
+
+/**
+ * Danh sách NVL cần cung cấp chỉ nhận sản phẩm loại "Nguyên vật liệu" (product_types nếu có, không thì product_type —
+ * cùng cách màn LSX lọc ô chọn NVL). Trả câu lỗi (→ 400) hoặc null. lines: [{ material_id }].
+ */
+const { isUuid } = require('../../core/lib/validate');
+async function nonMaterialError(conn, lines) {
+  const ids = [...new Set(lines.map((l) => String(l.material_id)))];
+  if (!ids.length) return null;
+  const badId = ids.find((id) => !isUuid(id));
+  if (badId) return `Mã NVL "${badId}" không hợp lệ.`;
+  const rows = (await conn.query(
+    `SELECT id, product_code, product_name,
+            CASE WHEN jsonb_array_length(COALESCE(product_types, '[]'::jsonb)) > 0 THEN product_types ? 'Nguyên vật liệu'
+                 ELSE product_type = 'Nguyên vật liệu' END AS is_nvl
+       FROM products WHERE id = ANY($1::uuid[])`, [ids])).rows;
+  const found = new Map(rows.map((r) => [r.id, r]));
+  const missing = ids.find((id) => !found.has(id));
+  if (missing) return 'Có NVL trong danh sách không còn tồn tại — tải lại trang rồi chọn lại.';
+  const wrong = rows.filter((r) => !r.is_nvl);
+  if (wrong.length) return `${wrong.map((r) => `${r.product_code} ${r.product_name}`).join(', ')} không phải nguyên vật liệu — chỉ chọn sản phẩm loại "Nguyên vật liệu".`;
+  return null;
+}
+
+/** Hệ số quy về kg; null = đơn vị không quy được (không phải KG/GRAM). */
+function kgFactor(unit) {
+  const u = String(unit || '').trim().toUpperCase();
+  return u === 'KG' ? 1 : u === 'GRAM' ? 0.001 : null;
+}
+const fmtKg = (n) => Number(n.toFixed(3)).toLocaleString('vi-VN');
+
+/**
+ * Trần NVL đầu vào (chủ dự án chốt): lệnh nvl_strict đơn vị KG/GRAM — tổng định mức NVL quy kg
+ * (mỗi NVL lấy MAX(requested_initial, SL trong danh sách) = định mức sau lần yêu cầu/bổ sung kế tiếp)
+ * ≤ nvl_max_input_percent % số kg cần sản xuất. Đọc danh sách ĐÃ GHI trong transaction (gọi sau replacePlannedLines).
+ * NVL đơn vị không phải KG/GRAM: không cộng (chưa quy được kg). Trả câu lỗi (→ 400) hoặc null.
+ * baseline (kg, tùy chọn) = tổng đang lưu TRƯỚC khi sửa danh sách: chủ dự án chốt — lệnh đã vượt trần từ trước chỉ bị chặn
+ * khi tổng MỚI tăng so với baseline (giữ nguyên / giảm chưa đủ vẫn lưu được). Đổi SL / đơn vị lệnh: không truyền baseline.
+ */
+async function inputCapError(conn, orderId, { baseline = null } = {}) {
+  const po = (await conn.query(`SELECT order_code, quantity, unit, nvl_strict FROM production_orders WHERE id = $1`, [orderId])).rows[0];
+  if (!isNewFlow(po)) return null;
+  return inputCapMessage(po, await storedCapRows(conn, orderId), (await getAppSettings(conn)).nvl_max_input_percent, baseline);
+}
+const storedCapRows = async (conn, orderId) => (await conn.query(
+  `SELECT pom.qty, pom.requested_initial, COALESCE(NULLIF(pom.unit, ''), p.unit) AS unit
+     FROM production_order_materials pom LEFT JOIN products p ON p.id = pom.material_id
+    WHERE pom.production_order_id = $1`, [orderId])).rows;
+
+/** Tổng kg NVL (định mức) — mỗi dòng MAX(qty, requested_initial) quy kg; đơn vị không quy được thì bỏ qua. */
+function inputKgTotal(rows) {
+  let total = 0;
+  for (const r of rows) {
+    const k = kgFactor(r.unit);
+    if (k == null) continue;
+    total += Math.max(Number(r.qty) || 0, Number(r.requested_initial) || 0) * k;
+  }
+  return total;
+}
+/** Tổng kg NVL đang lưu của lệnh (baseline trước khi sửa danh sách). */
+const storedInputKg = async (conn, orderId) => inputKgTotal(await storedCapRows(conn, orderId));
+
+/**
+ * Lõi thuần của trần NVL (MỘT định nghĩa cho lưu danh sách, yêu cầu NVL, đổi SL lệnh, kiểm trước khi lưu).
+ * po { order_code, quantity, unit } (lệnh nvl_strict); rows [{ qty, requested_initial, unit }]; pct = nvl_max_input_percent.
+ * baseline: xem inputCapError — tổng không tăng so với baseline thì không chặn.
+ */
+function inputCapMessage(po, rows, pct, baseline = null) {
+  const f = kgFactor(po.unit);
+  if (f == null) return null;
+  const total = inputKgTotal(rows);
+  const max = (Number(po.quantity) || 0) * f * pct / 100;
+  if (total <= max + EPS) return null;
+  if (baseline != null && total <= baseline + EPS) return null;
+  return `Tổng NVL của lệnh${po.order_code ? ' ' + po.order_code : ''} là ${fmtKg(total)} kg, vượt mức tối đa ${fmtKg(max)} kg `
+    + `(${pct}% số kg cần sản xuất). Hãy giảm số kg NVL trong danh sách.`;
+}
+
+/**
+ * Kiểm trần TRƯỚC khi lưu (màn LSX gọi trước Lưu lệnh — tránh lệnh đã lưu mà danh sách NVL bị từ chối).
+ * orderId null = lệnh mới (luôn nvl_strict). Lệnh đang sửa: định mức mỗi NVL = MAX(SL mới, requested_initial đã có).
+ * lines [{ material_id, qty, unit }]; unit dòng rỗng → đơn vị sản phẩm.
+ */
+async function previewInputCap(conn, { orderId = null, quantity, unit, lines }) {
+  let code = null; let ri = new Map(); let baseline = null;
+  if (orderId) {
+    const po = (await conn.query(`SELECT order_code, nvl_strict, quantity, unit FROM production_orders WHERE id = $1 AND is_deleted = FALSE`, [orderId])).rows[0];
+    if (!po || !isNewFlow(po)) return null;
+    code = po.order_code;
+    // Giữ SL + đơn vị: theo quy tắc "chỉ chặn khi tổng tăng" (baseline = tổng đang lưu). Đổi SL / đơn vị: chặn như update.
+    const sameQty = Number(quantity) === Number(po.quantity) && (String(unit || '').trim().toUpperCase()) === (String(po.unit || '').trim().toUpperCase());
+    if (sameQty) baseline = await storedInputKg(conn, orderId);
+    ri = new Map((await conn.query(
+      `SELECT material_id, SUM(requested_initial) AS ri FROM production_order_materials WHERE production_order_id = $1 GROUP BY material_id`, [orderId])).rows
+      .map((r) => [r.material_id, Number(r.ri) || 0]));
+  }
+  const ids = [...new Set(lines.map((l) => String(l.material_id)).filter((x) => isUuid(x)))];
+  const pu = new Map((await conn.query(`SELECT id, unit FROM products WHERE id = ANY($1::uuid[])`, [ids])).rows.map((r) => [r.id, r.unit]));
+  const seen = new Set();
+  const rows = lines.map((l) => { seen.add(l.material_id); return { qty: l.qty, requested_initial: ri.get(l.material_id) || 0, unit: l.unit || pu.get(l.material_id) }; });
+  // NVL đã có định mức mà không nằm trong danh sách gửi lên vẫn được giữ (R1) → vẫn tính
+  for (const [mid, v] of ri) if (!seen.has(mid) && v > 0) {
+    const u = (await conn.query(`SELECT COALESCE(NULLIF(pom.unit, ''), p.unit) AS unit FROM production_order_materials pom LEFT JOIN products p ON p.id = pom.material_id
+      WHERE pom.production_order_id = $1 AND pom.material_id = $2 LIMIT 1`, [orderId, mid])).rows[0]?.unit;
+    rows.push({ qty: 0, requested_initial: v, unit: u });
+  }
+  return inputCapMessage({ order_code: code, quantity, unit }, rows, (await getAppSettings(conn)).nvl_max_input_percent, baseline);
 }
 
 /** Gọi trong catch của controller (sau ROLLBACK): GateError → 400, trả true. */
@@ -178,4 +288,5 @@ function gateErrorResponse(res, err) {
 module.exports = {
   EPS, isNewFlow, gateMessage, completedMessage, completedRunMessage, reverseBlockedMessage, computeConsumption, getIssuedState, producedQtyLastStage, isQtyReached, canComplete,
   GateError, RUN_TASK_STATUSES, hasIssuedMaterials, assertCanRun, assertCanRecordOutput, gateErrorResponse, materialsProgress,
+  nonMaterialError, inputCapError, inputCapMessage, previewInputCap, storedInputKg,
 };
