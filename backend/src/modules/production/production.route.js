@@ -26,6 +26,7 @@ router.get('/production-orders/:id/planned-materials', production.getPlannedMate
 router.post('/production-orders/:id/planned-materials', requirePerm('production:edit'), production.savePlannedMaterials);
 router.get('/production-orders/:id/material-returns', production.materialReturns);
 router.post('/production-orders/:id/material-returns', requirePerm('production:edit'), production.createMaterialReturn);
+router.post('/production-orders/:id/finish', requirePerm('production:edit'), production.finish);
 router.post('/production-orders/:id/request-materials', requirePerm('production:request'), production.requestMaterials);
 router.delete('/production-orders/:id', requirePerm('production:delete'), production.remove);
 
