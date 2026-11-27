@@ -1403,6 +1403,13 @@ exports.saveTasks = async (req, res) => {
     if (illegalDone) {
       return bail(400, `Dùng nút "Hoàn thành" để hoàn thành dòng ${illegalDone.stage} — không đặt trạng thái Hoàn thành khi lưu phân công.`);
     }
+    // Lệnh mới chưa xuất NVL → không thêm dòng Thổi/Cắt mới (chưa có NVL thì chưa xếp việc).
+    // Dòng tạo sẵn khi lập lệnh vẫn sửa được; chặn ghi SL thật vẫn ở QT3 bên dưới + recordRolls.
+    const prevCodes = new Set(prevRows.map((r) => r.task_code));
+    if (isNewFlow(po) && tasks.some((t) => !t.task_code || !prevCodes.has(t.task_code)) && !(await hasIssuedMaterials(client, po))) {
+      return bail(400, `Lệnh ${po.order_code} chưa xuất NVL nên chưa thêm dòng Thổi/Cắt được. `
+        + "Vào mục 'Nguyên vật liệu cần cung cấp' → bấm 'Yêu cầu NVL' trước, rồi mới phân công thêm.");
+    }
     // QT2: dòng mới / dòng đổi sang trạng thái chạy → lệnh mới phải đã xuất NVL (dòng đang chạy sẵn giữ nguyên thì không xét)
     const prevStatus = new Map(prevRows.map((r) => [r.task_code, r.status]));
     if (tasks.some((t) => !doneByCode.has(t.task_code) && RUN_TASK_STATUSES.has(t.status) && prevStatus.get(t.task_code) !== t.status)) {
