@@ -1612,11 +1612,12 @@ exports.recordRolls = async (req, res) => {
     await client.query('BEGIN');
     const bail = async (code, message) => { await client.query('ROLLBACK'); return res.status(code).json({ message }); };
     const po = (await client.query(
-      `SELECT po.id, po.order_code, po.product_id, po.unit, po.specs, po.status, po.quantity, p.product_type, p.product_code
+      `SELECT po.id, po.order_code, po.product_id, po.unit, po.specs, po.status, po.quantity, po.nvl_strict, p.product_type, p.product_code
        FROM production_orders po JOIN products p ON p.id = po.product_id
        WHERE po.id = $1 AND po.is_deleted = FALSE FOR UPDATE OF po`, [poId])).rows[0];
     if (!po) return bail(404, 'Không tìm thấy lệnh sản xuất');
     if (po.status === 'Đã hủy') return bail(400, 'Lệnh đã Hủy — không ghi cuộn được.');
+    if (weights.length) await assertCanRecordOutput(client, po); // QT3: lệnh mới chưa xuất NVL / đã trả hết NVL → chặn ghi cuộn
     const tpl = (await client.query(
       `SELECT * FROM production_tasks WHERE production_order_id = $1 AND task_code = $2 FOR UPDATE`, [poId, tplCode])).rows[0];
     if (!tpl) return bail(404, 'Không tìm thấy dòng việc — có thể vừa bị sửa trên web, hãy tải lại.');
@@ -1669,7 +1670,7 @@ exports.recordRolls = async (req, res) => {
     await client.query('COMMIT');
     res.json({ message: weights.length ? `Đã ghi ${weights.length} cuộn` : 'Đã kết thúc việc', rolls: created, finished, ...result });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {}); console.error(err); if (stockErrorResponse(res, err)) return;
+    await client.query('ROLLBACK').catch(() => {}); console.error(err); if (stockErrorResponse(res, err)) return; if (gateErrorResponse(res, err)) return;
     res.status(400).json({ message: err.detail || err.message || 'Lỗi khi ghi cuộn' });
   } finally { client.release(); }
 };
